@@ -27,6 +27,31 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-061: The `if X is set then X else …` conditional discharges presence for an event arg but not for a stored field
+
+- **Discovered**: 2026-07-24, verifying that the existing coalescing idiom covers the fallback case for presence-tolerant rendering. **Confirmed at HEAD via a direct `Compiler.Compile` harness.**
+- **Symptom**: the presence narrowing in a conditional's `then`-branch fires for an event argument but not for a field.
+
+  Works (event arg — matches the shipped corpus idiom, `samples/clinic-appointment-scheduling.precept:62`):
+  ```precept
+  event CheckIn(Note as string optional maxlength 100)
+  from Waiting on CheckIn
+      -> set CheckInNote = if CheckIn.Note is set then CheckIn.Note else "No note recorded"
+  ```
+  → compiles clean, presence discharged. Also clean inside an interpolation hole: `"note: {if CheckIn.Note is set then CheckIn.Note else "none"}"`.
+
+  Fails (bare field, identical shape):
+  ```precept
+  field Opt as string optional maxlength 20 editable
+  from Draft on Stamp
+      -> set Marker = if Opt is set then Opt else "unset"
+  ```
+  → `UnprovedPresenceRequirement` (PRE0116) on `Opt`, obligation `Unresolved`. Same error inside a hole.
+- **Why it is a gap, not intended**: the expression is pure — nothing writes between the `is set` test and the read of `Opt` in the same conditional — so the `then`-branch read is provably present. A `when Opt is set` *guard* on the same field does discharge (verified: `Proved strategy=GuardInPath`). So field presence narrows through a guard but not through a conditional-expression test; args narrow through both.
+- **Class**: completeness gap / over-rejection (rejects valid programs). Same family as BUG-060 (the engine's presence narrowing does not see every construct that establishes presence).
+- **Why it is load-bearing now**: `if X is set then X else "…"` is the existing coalescing idiom — the author-supplied-fallback mechanism for rendering an optional in a message, needing NO new language surface. It works for args today; it does not work for fields. Several of the 11 unguarded message holes in `samples/` are field reads, so this must close for the fallback idiom to cover them without a `when` guard. Sequencing dependency for `docs/Working/presence-tolerant-message-rendering-2026-07-23.md`.
+- **Status**: Active — over-rejection; narrowing gap.
+
 ### BUG-060: A state-scoped `ensure X is set` does not discharge presence for reads in that state (over-rejection)
 
 - **Discovered**: 2026-07-23, verifying an independent agent's claim during the presence-tolerant-rendering design pass. **Confirmed at HEAD via a direct `Compiler.Compile` harness** (the precept MCP server was disconnected; the harness references `src/Precept/Precept.csproj` and prints `Compilation.Diagnostics` plus `Proof.Obligations`).

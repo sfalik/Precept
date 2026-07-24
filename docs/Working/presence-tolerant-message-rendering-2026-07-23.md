@@ -1,24 +1,38 @@
 ---
-status: Draft — 2026-07-23
-phase-target: TBD (obligation-creation sweep; same sweep as the already-ruled value-fault arm)
+status: Draft — 2026-07-24
+phase-target: TBD (obligation-creation sweep; the same sweep that must wire the already-ruled value-fault arm — both arms are equally unbuilt)
 comparable-systems-research-status: strong — grounded in `research/language/expressiveness/absence-in-string-interpolation-survey-2026-07-23.md` (13 systems, verbatim excerpts, stable identifiers)
 sources-consulted:
-  - `research/language/expressiveness/absence-in-string-interpolation-survey-2026-07-23.md` — the comparator survey commissioned for this design; 13 systems, and it contradicts the scope this design started from
-  - `research/language/expressiveness/expression-language-audit.md § L12` — the nearest in-tree prior: nullable-in-string treated as a type-checker rejection
-  - `docs/language/precept-language-spec.md § 0.1` — the eleven principles; Principle 9's generated-rationale clause and Principle 10's totality clause are both load-bearing here
-  - `docs/language/precept-language-spec.md § 2.4` — "A constraint modifier … desugars to the equivalent `rule` with a generated rationale"
+  - `research/language/expressiveness/absence-in-string-interpolation-survey-2026-07-23.md` — the comparator survey commissioned for this design; 13 systems. Its bottom line is the spine of the turned-around recommendation: no statically-checked language splits its presence rule by string position.
+  - `research/language/expressiveness/expression-language-audit.md § L12` — the nearest in-tree prior: nullable-in-string treated as a type-checker rejection.
+  - `docs/language/precept-language-spec.md § 0.1` — the eleven principles; Principle 1 (prevention), 3 (determinism), 4 (inspectability), 10 (totality), 11 (static completeness) are all load-bearing here.
   - `docs/language/precept-language-spec.md:1553` — "Each `{expr}` inside `\"...\"` is type-checked independently. Any scalar type is coercible to string. Collections are a type error inside string interpolation."
-  - `docs/language/precept-language-spec.md:1557` — typed-constant interpolation is validated against the context-determined type
-  - `docs/compiler/literal-system.md § String Coercion Table` — the thirteen-row scalar table, invariant culture
-  - `docs/compiler/soundness-and-coverage.md:229-230` — the two rows this design's parent fork was split into
-  - `src/Precept/Pipeline/SlotValue.cs:100` — `BecauseClauseSlot(string Message, SourceSpan Span)`
-  - `src/Precept/Pipeline/TypeChecker.Normalization.cs:113` — the message becomes a `TypedLiteral`
-  - `samples/customer-profile.precept:27` — a live corpus rule interpolating an `optional` field into its `because`
-  - `samples/insurance-claim.precept:96` — a live corpus `reject` message interpolating a field
-  - live `precept_compile` probes, 2026-07-23 — recorded in § What HEAD actually does
+  - `docs/language/primitive-types.md:118` — `.length` "Requires presence guard (`is set`) for optional fields." Canon: reading an optional requires a guard.
+  - `docs/compiler/literal-system.md:145` — "The language has no `null` literal. Optional fields use `is set` / `is not set`."
+  - `docs/compiler/literal-system.md § String Coercion Table` — the thirteen-row scalar table, invariant culture; it omits the seven business-domain types and `choice` (see § Adjacent gaps).
+  - `docs/compiler/soundness-and-coverage.md:229-230` — the two rows this design is the **presence** half of. Row :229 is the value-fault arm (ruled 2026-07-23); row :230 is this arm.
+  - `src/Precept/Pipeline/SlotValue.cs:100` — `BecauseClauseSlot(string Message, SourceSpan Span)`; the message is a raw string, not an expression tree.
+  - `src/Precept/Pipeline/Parser.Expressions.cs:558-564` — a message's holes are parsed then flattened to the literal `{}` and discarded (the field name does not survive).
+  - `src/Precept/Pipeline/ProofEngine.cs:208` — `CollectObligations` enumerates constructs by hand and never visits `.Message`.
+  - `src/Precept/Pipeline/ProofEngine.cs:340-345` — the `TypedPostfixOp` skip: the walker deliberately does **not** recurse into the operand of `is set` (the basis for "read, not named").
+  - `src/Precept/Pipeline/ProofEngine.cs:347-357` — the interpolation walk, and the `includeOptionalArgRefs` asymmetry (BUG-057).
+  - `samples/clinic-appointment-scheduling.precept:62` — the shipped coalescing idiom `if X is set then X else "…"`; the fallback mechanism already in the corpus.
+  - `samples/customer-profile.precept:27` — a live corpus rule interpolating an `optional` field; already guarded by `when … is set`.
+  - `samples/insurance-claim.precept:96` — a live corpus `reject` message; interpolates a **required** field, not an optional.
+  - commit `62479cae` (2026-07-23) — the value-fault owner ruling; **docs-only** (2 files, no `.cs`), so the value-fault arm is ruled-but-unbuilt.
+  - `docs/Working/bugs.md` BUG-056 … BUG-061 — the six defects found while probing; referenced by number, none re-filed here.
+  - live `Compiler.Compile` probes, 2026-07-24 — recorded in § What HEAD actually does. (The precept MCP server was disconnected during this pass; verification used a direct harness against `src/Precept/Precept.csproj` that prints `Diagnostics` and `Proof.Obligations`, then was removed.)
 ---
 
 # Presence-tolerant message rendering
+
+> **This document was turned around on 2026-07-24.** It began arguing that a bare `{Opt}` render is
+> *tolerant* — that rendering an absent optional is a total operation minting no presence obligation.
+> That spine was refuted from three independent directions (see § Why the tolerant spine was refuted)
+> and is no longer the recommendation. The document now recommends the opposite: **an interpolation
+> hole is a read, and refuses uniformly** — every optional field a hole reads carries a presence
+> obligation, regardless of hole shape or string position. The title is kept for continuity; the
+> content is the strict reading. Status stays **Draft** — this does not lock.
 
 ## How to read this document
 
@@ -29,38 +43,45 @@ Three plain terms carry most of the weight, so they are defined once here and th
   `-> reject "..."` refusal. Its output is read by a person. Nothing in the precept computes on it.
 - **Value position** — every other place a quoted literal can appear: the right-hand side of a `set`,
   a default, a condition, a guard, a function argument. Its output becomes or feeds governed data.
+- **Read** vs **named** — a hole *reads* a field when its value is coerced or computed on; it merely
+  *names* a field when the field appears only as the operand of a presence test (`{Opt is set}`),
+  which consumes no value. This distinction is load-bearing and is the subject of Rule R2.
 
-The question this document settles is what happens when a hole names a field that might not have a
+The question this document settles is what happens when a hole reads a field that might not have a
 value — an `optional` field that is currently unset.
 
 ## Goal
 
-When done: a `rule` or `reject` message may interpolate an `optional` field without the author being
-forced to guard the very field the message is reporting on, and the language states — in canon, not
-by accident of an unwalked code path — exactly what an absent value renders as and exactly where that
-tolerance stops.
+When done: the language states — in canon, not by accident of an unwalked code path — that an
+interpolation hole is a **read**, and that reading an unset `optional` at a hole is refused exactly as
+it is refused in any other read position, with no special case for message text. The message-vs-value
+divergence visible at HEAD is closed as the walk-gap it is, not blessed as a semantic. An author who
+wants to render an optional into a message writes the coalescing conditional the language already
+ships — `if Opt is set then Opt else "fallback"` — which discharges presence and needs no new syntax.
 
 ## Scope
 
-- **In scope**: presence of an optional value at an interpolation hole; the boundary between the
-  hole's outermost rendering step and any computation inside the hole; the scope line between message
-  positions and value positions; what an absent value renders as; how that rendering interacts with
-  the string-length interval the proof engine already computes.
+- **In scope**: presence of an optional value at an interpolation hole; the boundary between what a
+  hole *reads* and what it merely *names*; the scope line between message positions and value
+  positions (and the finding that there should be none); how presence enrollment interacts with the
+  string-length interval the proof engine already computes.
 - **Out of scope**: value faults inside a message hole (division by zero, overflow, `sqrt` of a
-  negative). The owner ruled that arm on 2026-07-23 — those enroll and are caught at compile time.
-  This document must not contradict that ruling and does not re-open it.
+  negative). The owner ruled that arm on 2026-07-23 (commit `62479cae`) — those enroll and are caught
+  at compile time. This document is the **presence** half of the same fork and does not re-open the
+  value-fault half.
 - **Out of scope**: `BUG-053` (an optional event argument read in arithmetic mints nothing). That is
   a pure value position with no rendering defence; it is an independent bug.
-- **Deferred to future**: the String Coercion Table's omission of the seven business-domain types and
-  `choice` — named in § Adjacent gap below, not fixed here.
+- **Adjacent, not fixed here**: the String Coercion Table's omission of the seven business-domain
+  types and `choice`. Under the strict reading an absent value never reaches the renderer, so this is
+  no longer even a mechanical prerequisite — it is a separate new-surface gap, named in § Adjacent gaps.
 
 ---
 
 ## What HEAD actually does
 
-Every claim in this section was established by live `precept_compile` on 2026-07-23. This is not the
-proposed design — it is the baseline the design changes, recorded first so no later section can drift
-from it.
+Every claim in this section was established by a live compile on 2026-07-24 (direct `Compiler.Compile`
+harness) or by a path:line source cite. This is the baseline the design changes, recorded first so no
+later section can drift from it.
 
 ### The message is not an expression
 
@@ -102,62 +123,53 @@ survives**. Two consequences worth separating:
 
 1. *For implementation*: the information exists at parse time and is discarded. Making messages
    checkable is a slot-shape change (`string` → expression) plus wiring the existing walks, not new
-   parsing work. That is **easier** than a first reading of the flat `string` suggests.
-2. *For the soundness doc*: `docs/compiler/soundness-and-coverage.md:229` says *"`CollectObligations`
-   walks a constraint's `.Condition` only and never its `.Message`, so nothing is minted today"* —
-   true but incomplete. Message positions are excluded **twice**: the slot holds no expression tree,
-   *and* `CollectObligations` (`src/Precept/Pipeline/ProofEngine.cs:208`) enumerates constructs by
-   hand and never visits `Message` even though `TypedRule` and `TypedEnsure` both carry one
-   (`SemanticIndex.cs:569-585`). Both exclusions have to be removed, and the reject arms are guarded
-   on the *success* subtype (`ProofEngine.cs:217-218`, `:224-225`) so reject rows are never walked at
-   all. The row's "same fix shape as the default-expression rows above" is therefore wrong in the
-   direction of *understating* the wiring, while overstating the parsing.
+   parsing work.
+2. *For the scope question*: message positions are excluded **twice** — the slot holds no expression
+   tree, *and* `CollectObligations` (`src/Precept/Pipeline/ProofEngine.cs:208`) enumerates constructs
+   by hand and never visits `.Message` even though `TypedRule` and `TypedEnsure` both carry one
+   (`SemanticIndex.cs:569-585`). Grepping `src/Precept/Pipeline/ProofEngine.cs` for `.Message`
+   returns nothing. **This is why message holes mint nothing today — the walker never reaches them.
+   It is a walk-gap, not a designed exemption.** That distinction is the whole of Decision 3.
 
-Three probes confirming the effect:
+Three probes confirming the effect (all compile with zero diagnostics):
 
 ```precept
-rule Amount > 0 because "unknown {NoSuchField}"      # compiles clean — the name is never resolved
-rule Amount > 0 because "bad {Amount + true}"        # compiles clean — decimal + boolean, no type error
-rule Amount > 0 because "tags {Tags}"                # compiles clean — a collection, which the spec
-                                                     # says is a compile error in interpolation
+rule Amount > 0 because "unknown {NoSuchField}"      # the name is never resolved
+rule Amount > 0 because "bad {Amount + true}"        # decimal + boolean, no type error
+rule Amount > 0 because "tags {Tags}"                # a collection, which the spec says is a compile error
 ```
 
-All three produce zero diagnostics. The third contradicts two pieces of canon at once —
-`precept-language-spec.md:1553` ("Collections are a type error inside string interpolation") and the
-String Coercion Table's `Collection | **Compile error** — use .count` row — **and that gap is not
-confined to message positions.** `ResolveInterpolatedString`
-(`src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs:845-869`) performs no type
-validation on hole types at all, and the diagnostic intended for it, `InvalidInterpolationCoercion`
-(PRE0051, *"A {0} value cannot appear inside a text interpolation"*), is allow-listed as never
-emitted — `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs:39`:
-`"InvalidInterpolationCoercion", // TypeMismatch fires instead (precision upgrade)`. So the
-collection-in-interpolation rule is unenforced everywhere, which is a separate defect from this
-design and should be filed rather than absorbed.
+The third contradicts canon (`precept-language-spec.md:1553`; the String Coercion Table's
+`Collection | Compile error` row) — and the gap is **not** confined to message positions.
+`ResolveInterpolatedString` (`src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs:845-869`)
+performs no type validation on hole types at all, and the diagnostic intended for it,
+`InvalidInterpolationCoercion` (PRE0051), is allow-listed as never emitted
+(`src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs:39`). Filed as **BUG-058**; not absorbed here.
 
 ### Nothing renders messages, anywhere
 
-A repo-wide sweep of `src/`, `tools/`, and `test/` for any code that substitutes hole values into a
-message found **none**. The runtime evaluator is a stub with no expression walk
-(`src/Precept/Runtime/Evaluator.cs:45` — `// TODO: implement Fire/Update once the executable model is
-designed`); `src/Precept/Runtime/Precept.cs:84` passes a reject string through verbatim;
-`src/Precept/Language/Faults.cs:51`'s `string.Format` formats the *fault catalog's* own `{0}`/`{1}`
-templates, not DSL interpolation; the language server's message handling
-(`RichHoverFactory.cs:2970-2980`) unwraps `TypedLiteral` and prints it raw. `ProofEngine.cs:998`
-renders a `TypedInterpolatedString` as the placeholder `"<string>"`.
+A repo-wide sweep of `src/`, `tools/`, and `test/` for code that substitutes hole values into a
+message found **none**. The runtime evaluator is a stub (`src/Precept/Runtime/Evaluator.cs:45`);
+`src/Precept/Runtime/Precept.cs:84` passes a reject string through verbatim; `Faults.cs:51`'s
+`string.Format` formats the fault catalog's own templates, not DSL interpolation; the language server
+unwraps `TypedLiteral` and prints it raw (`RichHoverFactory.cs:2970-2980`); `ProofEngine.cs:998`
+renders a `TypedInterpolatedString` as the placeholder `"<string>"`. There is **no existing rendering
+behavior to stay consistent with**, and the flattened `"unknown {}"` form is not a viable template, so
+whatever this design decides requires the slot-shape change regardless.
 
-This matters for the design in two ways. There is **no existing rendering behavior to stay consistent
-with** — the field is genuinely open. And the flattened `"unknown {}"` form is **not a viable
-template**, so whatever rendering is eventually specified requires the slot-shape change regardless
-of how the presence question lands.
+### The value-fault arm is ruled but unbuilt — same wiring still to do
 
-**This corrects a claim in the already-ruled value arm.** `soundness-and-coverage.md:229` records the
-value-fault fix as *"Complete trigger: obligation-creation sweep, same fix shape as the default-expression
-rows above."* It is not the same fix shape. The default-expression rows have a parsed expression that
-a walker skips; the message has no expression at all. Implementing the ruled value arm requires the
-message to become an expression first. That is a larger change than the row states, and the row should
-be corrected whether or not this design's presence proposal is adopted.
+`soundness-and-coverage.md:229` records the value-fault arm as an owner ruling (2026-07-23). That
+ruling is real, but it is **not yet built**: commit `62479cae` that recorded it touched two docs and
+no `.cs` file (`git show --stat 62479cae`), and `ProofEngine.cs` still never walks `.Message`. So the
+value-fault arm and the presence arm are in the **same** unbuilt state — both wait on the same
+slot-shape change plus obligation-creation sweep. This corrects an earlier synthesis that leaned on
+the value-fault positions being "already made symmetric" with value positions; they are not, because
+neither arm's message walk exists yet. The row's characterisation of the fix as "same fix shape as the
+default-expression rows above" also understates it: the default rows have a parsed expression a walker
+skips; the message has no expression at all until the slot is reshaped.
 
-### The four positions, measured
+### The four positions, measured — and the divergence is a walk-gap
 
 | Position | Probe | Presence minted? | Value fault minted? | Type-checked? |
 |---|---|---|---|---|
@@ -166,59 +178,105 @@ be corrected whether or not this design's presence proposal is adopted.
 | `set F = "…{Opt}…"` | `set Marker = "note is {Note}, ratio {100 / Divisor}"` | **Yes** (PRE0116) | **Yes** (PRE0083) | Yes |
 | `set F = '…{Opt}… hours'` (typed constant) | `set Window = '{Days} hours'` | **Yes** (PRE0116) | — | Yes |
 
-So the split at HEAD is exactly **message positions mint nothing; value positions mint everything**.
-Both message positions behave identically, which is a useful fact: whatever this design decides
-applies to `because` and `reject` together, with no special-casing.
+At HEAD the split is **message positions mint nothing; value positions mint everything**. The design
+turnaround is precisely that this split is not a semantic to preserve — it is the walk-gap documented
+above (the message slot holds no expression, and `CollectObligations` never visits it). The survey
+found no statically-checked language that splits its presence rule by string position; HEAD does not
+either — it just fails to check messages at all. Closing the gap makes all four positions behave the
+same, which is what the strict reading asks for.
 
-### The string-length interval already reads holes
+### The string-length interval already reads holes — and presence is load-bearing under it
 
-This is the finding that makes the rendering question more than cosmetic. The proof engine computes a
-static character-width interval for an interpolated template and discharges `maxlength` containment
-from it:
+This is refutation direction #1 for the tolerant spine, so it is recorded as a measured baseline here
+and argued in § Why the tolerant spine was refuted. The proof engine computes a static character-width
+interval for an interpolated template and discharges length containment from it. For a **string** hole
+it takes the field's declared `minlength` as the floor via `LengthIntervalFromModifiers`
+(`src/Precept/Pipeline/ProofEngine.Lengths.cs:235-241`), and that floor drives a *provably-contained*
+or *provably-violating* verdict (`:33-36`). The file has no reference to presence or optionality
+anywhere (`grep -n "Presence\|Optional" src/Precept/Pipeline/ProofEngine.Lengths.cs` → nothing).
+
+**Verified probe, 2026-07-24** (harness). Both `Opt` and `Marker` declared `minlength 5 maxlength 5`:
 
 ```precept
-field Code as string optional minlength 3 maxlength 3
-field Marker as string maxlength 5 default ""
-
-from Draft on Stamp when Code is set
-    -> set Marker = "x{Code}x"
+field Opt as string optional minlength 5 maxlength 5 editable
+field Marker as string minlength 5 maxlength 5 default "xxxxx"
+from Draft on Stamp
+    -> set Marker = "{Opt}"
     -> transition Done
 ```
 
-compiles with `LengthContainment … Proved` — the engine derived `1 + [3..3] + 1 = [5..5]` and fitted
-it inside `maxlength 5`. When a hole's width is unknown the containment fails:
+Ledger, unguarded:
 
-```precept
-    -> set Marker = "tags {Tags}"    # PRE0135: "String value has ? character(s) but field 'Marker'
-                                     # requires length in [0..200]"
+```
+LengthContainmentProofRequirement  Proved   strat=LengthContainment
+PresenceProofRequirement           Unresolved
+DIAG UnprovedPresenceRequirement (PRE0116) on 'Opt'
 ```
 
-**Therefore whatever an absent value renders as, its character width joins that interval arithmetic.**
-A five-character sentinel raises the upper bound of every unguarded optional hole by up to five
-characters; a zero-width one lowers the floor to zero. The sentinel decision has a proof consequence,
-not only a display one.
+The length proof **passes** — the engine derives the hole width as `[5..5]` from `Opt`'s declared
+floor of 5 and fits it inside `Marker`'s `[5..5]`. The **only** diagnostic holding the program is the
+presence obligation. Add the guard and everything clears:
 
-**And the length machinery already contradicts itself on exactly this point.** The doc comment on
-`HoleLengthInterval` (`src/Precept/Pipeline/ProofEngine.Lengths.cs:163-168`) states the zero floor and
-gives this design's reason for it:
+```precept
+from Draft on Stamp when Opt is set
+    -> set Marker = "{Opt}"     # PresenceProofRequirement Proved strat=GuardInPath, no diagnostics
+```
 
-> "The lower bound is 0 (a hole could render empty for an optional/edge value), which is sound for a
-> maxlength-direction proof"
+So presence is the single load-bearing check on this program. Remove it (the tolerant spine's
+recommendation) and an **absent** `Opt` — which renders empty, width 0 — flows into a field that
+forbids anything shorter than 5, with the length proof having falsely certified `[5..5]`. This is
+BUG-059's territory (the floor should be 0 for an optional, per the code's own comment at
+`ProofEngine.Lengths.cs:163-168`), but it is more than a bug: it shows the presence obligation is not
+"unnecessary by construction." It is the check keeping the length proof honest.
 
-But that floor is applied only on the **non-string** path (`:180` — `return (0, digits);`). A string
-hole bypasses it (`:171-172`) and inherits the field's `minlength` as its floor, via
-`LengthIntervalFromModifiers` (`:235-241`), which consults declared bounds and never presence — the
-file contains no reference to presence or optionality at all.
+### Optional event-arg holes mint no presence even in a value position (BUG-057)
 
-That floor is not merely advisory: `TryLengthContainmentProof` uses it to return a **provably
-violating** verdict rather than an unresolved one (`:33-34` — `if (req.DeclaredMaxLength.HasValue && min > req.DeclaredMaxLength.Value) return false;`).
-So if an absent optional renders as empty, the computed floor overstates the true minimum and the
-provably-violating branch can fire on a satisfiable program. This should be filed as a bug and
-verified independently of this design; it is recorded here because it is **prior evidence of intent**
-— someone already assumed absence renders empty — and because Decision 4 cannot be made without
-knowing which floor is correct.
+**Verified probe, 2026-07-24** (harness). `Stamp.Note` is an **optional event argument**:
 
-### A live hole found while probing
+```precept
+field Log as string maxlength 200 default ""
+event Stamp(Note as string optional maxlength 100)
+from Draft on Stamp
+    -> set Log = "note is {Stamp.Note}"     # compiles CLEAN — zero presence obligation
+```
+
+The ledger carries only length obligations; there is **no** presence obligation on `Stamp.Note`, even
+though this is a value position (`set` RHS) where a field read of an unset optional would be PRE0116.
+The cause is `ProofEngine.cs:347-357`: a plain `TypedInterpolatedString` walks its holes passing
+`includeOptionalArgRefs` through unchanged (default `false`), while an `InterpolatedTypedConstant`
+forces it `true`. So the value walker itself has a hole for event-argument reads. **This is why "just
+reuse the value walker verbatim" ships a soundness hole** — the value walker under-mints for arg refs.
+Filed as **BUG-057**; it must close before message holes are enrolled by copying the value path.
+
+### The coalescing idiom already works inside a hole — and narrows for args but not fields
+
+The language already ships `if X is set then X else "fallback"` as the presence-discharging idiom
+(`samples/clinic-appointment-scheduling.precept:62`). It works **inside an interpolation hole**.
+
+**Verified probe, 2026-07-24** (harness), event-arg operand:
+
+```precept
+event Stamp(Note as string optional maxlength 100)
+from Draft on Stamp
+    -> set Log = "note: {if Stamp.Note is set then Stamp.Note else "none"}"   # compiles CLEAN
+```
+
+The conditional discharges presence and the whole hole is clean — no PRE0116. This is the fallback
+mechanism, and it needs no new language surface (see Decision 4).
+
+**But it narrows for an event arg and not for a stored field.** Same shape, field operand:
+
+```precept
+field Opt as string optional maxlength 20 editable
+from Draft on Stamp
+    -> set Marker = if Opt is set then Opt else "unset"   # PRE0116 on 'Opt', obligation Unresolved
+```
+
+The `then`-branch read is provably present (the expression is pure; nothing writes between the
+`is set` test and the read), yet the field read is not discharged while the arg read is. Filed as
+**BUG-061**; it must close for the fallback idiom to cover field reads without an outer `when` guard.
+
+### A live hole found while probing (BUG-056)
 
 ```precept
 field BaseCurrency as currency optional
@@ -226,522 +284,527 @@ field Rate as exchangerate in '{BaseCurrency}' to '{QuoteCurrency}' optional max
 ```
 
 compiles with **zero obligations**. A typed-constant hole in a *declaration* position is not walked,
-so an absent currency would flow into the qualifier. Contrast `set Window = '{Days} hours'`, which
-correctly mints PRE0116. This is a separate defect from the message question and should be filed;
-it is noted here because it is the same family of unwalked interpolation and a reader will otherwise
-assume typed-constant holes are uniformly handled.
+so an absent currency flows into the qualifier unchecked. Contrast `set Window = '{Days} hours'`, which
+correctly mints PRE0116. Filed as **BUG-056**; the same family of unwalked interpolation.
 
 ---
 
-## How big is the problem, actually
+## Why the tolerant spine was refuted
 
-This section exists because the design's motivating premise did not survive measurement, and that has
-to be visible rather than buried.
+The document began recommending **R1-tolerant**: a bare `{Opt}` render mints no presence obligation
+because rendering is total on absence. Three independent passes refuted it.
 
-The premise was the owner's: enrolling presence at a message hole *"would force authors to guard the
-field they are reporting on."* The draft cited two shipped samples as live instances. **Neither is
-one.**
+**1 — The length machinery makes presence load-bearing (measured).** § "The string-length interval
+already reads holes" above shows a program whose *only* diagnostic is the presence obligation, kept
+sound by that obligation alone. Removing it lets an absent optional render the wrong width into a
+field that forbids it. The tolerant spine's claim that the obligation is "unnecessary by construction"
+is false against live machinery. And no single language-chosen sentinel repairs it: to satisfy a
+`minlength 5` field a sentinel must be ≥ 5 characters, but to satisfy a `maxlength 3` field elsewhere
+it must be ≤ 3 — no string is simultaneously wide enough and narrow enough for every field, so **no
+sentinel is sound**. The only sound disposition is to keep the absent value out of the renderer, which
+is what refusal does.
 
-- **`samples/insurance-claim.precept:96`** — `-> reject "Police-report claims are capped at $100,000 (you submitted {ClaimAmount})"`. `ClaimAmount` is declared at `:22` as `field ClaimAmount as money in 'USD' default '0.00 USD'` — **required, with a default**. It is not optional, so it would mint no presence obligation under any reading. Miscited.
-- **`samples/customer-profile.precept:27`** — the rule interpolates the optional `PreferredContactMethod`, but it already carries `when PreferredContactMethod is set`, and **that guard discharges the obligation.** Verified at HEAD in a direct-harness probe: a rule-level `when X is set` yields `PresenceProofRequirement Proved strategy=GuardInPath`, while the identical rule without the `when` yields `Unresolved` + PRE0116. So enrolling this message would cost **zero** extra guards. The design's single live motivating example does not survive.
+**2 — A three-lens design panel disqualified the tolerant candidate unanimously.** Reviewed through
+soundness, philosophy, and buildability, the tolerant candidate re-permits the exact silent
+empty-string coercion that Precept spent three revisions deleting:
 
-**The corpus measurement.** Across `samples/`: 808 interpolation holes; 83 name an `optional` field;
-**none of the 83 sit in a value position**; 71 of 83 already carry an `is set` guard in scope that
-the engine discharges from; **11 are unguarded in scope** — `Test.precept:51`,
-`academic-course-registration.precept:172`, `calibration-management.precept:173`,
-`hotel-reservation-management.precept:132`, `incoming-material-inspection.precept:78`,
-`library-hold-request.precept:111`, `library-inter-library-loan.precept:275`,
-`maintenance-work-order.precept:98`, `non-profit-membership-renewal.precept:155` and `:163`,
-`prior-auth-appeal.precept:349`.
+1. `git show c4d0abf8:docs/LiteralSystemDesign.md:121` — the original broad tolerant rule: *"In
+   expressions, `null` … is coerced to empty string `\"\"` in string interpolation contexts."*
+2. `git show 9ab60e47` (EvaluatorDesign.md, "Null Handling") — reversed it: *"`.length` on a `null`
+   value produces an evaluation error … `null` is not coerced to empty string."*
+3. Current canon — went further: the `null` literal was removed
+   (`docs/compiler/literal-system.md:145`), absence became a first-class runtime value with an
+   explicit `IsAbsent` (`docs/runtime/evaluator.md:228`), and reading an optional was made to *require
+   a guard* (`docs/language/primitive-types.md:118`: `.length` *"Requires presence guard (`is set`)
+   for optional fields."*).
 
-*(The "none in a value position" figure is not merely counted — it follows: the corpus compiles clean,
-and an unguarded optional in a value-position hole is a hard error at HEAD, so there cannot be one.)*
+Every step moved **away** from silent tolerance of absence in a string. Tolerant rendering would walk
+that back — reintroduce the empty-string coercion in the one position (`{Opt}`) canon had not yet
+closed. Under Principle 4 (full inspectability), a message that silently renders empty also hides, at
+the moment of explanation, that the value it reports was never there.
 
-**And several of the 11 are not authoring gaps at all.** They sit under a state-scoped
-`ensure X is set` that guarantees presence but that the proof engine cannot use — filed as
-**BUG-060**, verified at HEAD. Those authors did guard; the engine cannot see it.
+**3 — A red-team confirmed the refutation** and, in doing so, corrected the strict framing in three
+places that are folded into the rules below: the rule must be stated over what a hole **reads**, not
+what it names (else guards break); it must be **recursive** at every nesting depth (a nested render is
+a hole); and the value-fault arm it leans on is **unbuilt**, not accomplished.
 
-**What this means for the design.** The real, unforced demand is at most 11 holes out of 808, and
-some fraction of those 11 is a proof-engine gap rather than an authoring need. That does not make the
-design wrong — the rules below still have to be *stated* somewhere, because the message position is
-currently unchecked in every respect and the already-ruled value-fault arm forces it open regardless.
-But it does mean the design should not be justified as relieving author burden, and **BUG-060 should
-close before message holes are enrolled**, or a fallback annotation will get adopted as a workaround
-for a compiler weakness and become permanent noise in the corpus.
+---
 
-## The proposal
+## The proposal — refuse uniformly
 
-### The core semantic
+### The core semantic: a hole is a read
 
 A presence obligation exists because reading an absent optional leaves an operation **with no result**
-— there is no decimal to divide, no string to compare, no length to take. Principle 10 (totality)
-requires every expression to produce a result, so the compiler must prove the value is there before
-any operation that is undefined without it.
+— no decimal to divide, no string to take the length of. Principle 10 (totality) requires every
+expression to produce a result, so the compiler must prove the value is present before any read.
 
-Rendering a value to display text is **defined for absence**. There is a result: whatever the language
-says an absent value renders as. It is a well-formed `string`. No fault mode exists.
+Coercing a value to display text is a **read**. It consumes the value exactly as `.length` or `+`
+does — it must produce the value's characters, which for an absent optional do not exist without a
+language-chosen fabrication that § Why the tolerant spine was refuted showed is unsound. There is no
+privileged "bare-render" tier that reads nothing: the render step reads. So a hole reading an optional
+is an ordinary read and enrolls presence like any other.
 
-So the proposal is not an exemption from the presence rule. It is the observation that the presence
-rule's trigger — *"this operation is undefined when the value is absent"* — is simply not met by the
-rendering step. The obligation is unnecessary by construction, which is the shape the owner asked for.
+> **Rule R1 (a hole is a read).** Coercing a value to its display text is a read. A hole that reads an
+> `optional` field mints a presence obligation (PRE0116) **identical** to that field's obligation in a
+> value read position — regardless of hole shape (`{Opt}`, `{Opt.length}`, `{10 / Opt}`) or string
+> position (message `because`/`reject` vs value `set`/default/guard). One rule generates every
+> disposition; there is no split by string position.
 
-> **Rule R1 (rendering totality).** Coercing a value to its display text is a total operation: it is
-> defined on every inhabitant of the type *and on absence*. It therefore mints no presence obligation.
+> **Rule R2 (read, not named; at every depth).** The obligation attaches to what a hole *reads*, not
+> what it *names*, applied **recursively** at every nesting depth.
+> - `{Opt is set}` names `Opt` but does not read it: `is set` is a presence test whose operand the
+>   walker deliberately does not recurse into (`src/Precept/Pipeline/ProofEngine.cs:340-345` — the
+>   `TypedPostfixOp` skip, whose own comment says recursing "would generate a spurious
+>   PresenceProofRequirement on an optional X, defeating the purpose of the presence guard"). So
+>   `because "{Opt is set}"` mints **nothing** — and stating the rule over "named" instead of "read"
+>   would break every guard.
+> - A nested render `{"prefix {Opt}"}` is a hole containing an inner hole. R1 applies to the inner
+>   hole at its own boundary — it reads `Opt` and mints presence. There is no "outermost hole reads
+>   nothing" carve-out; a hole is a hole at every depth.
 
-> **Rule R2 (the boundary).** R1 applies to the **outermost** step of a hole and to nothing inside it.
-> Every operator, accessor, and function application within a hole is an ordinary consumer and mints
-> presence exactly as it would outside a string.
+> **Rule R3 (typed-constant holes).** A `'...'` typed-constant hole reads its operand **and** feeds a
+> content validator that is not defined on absence. It mints presence for both reasons and is excluded
+> from any would-be render tolerance. This rule held against the red-team unchanged.
 
-> **Rule R3 (the other target).** A `'...'` typed-constant hole is **not** a rendering step. Its
-> content must satisfy the context type's content validator, which is not defined on absence. R1 does
-> not reach it; a typed-constant hole reading an optional mints presence as usual.
-
-### R3 is the same argument as R1, applied a second time
-
-R1 says the render step mints nothing because *the thing it feeds accepts absence*. R3 says a typed
-constant's hole mints presence because *the thing it feeds does not*. One principle, two targets —
-not a rule plus an exception.
-
-This framing was not the one this design started from, and the change is worth recording. The draft
-originally justified tolerance **positionally**: message text is terminal, value text is governed,
-so tolerance follows the position. The comparator survey commissioned for this design found that
-framing to be both unprecedented and unnecessary:
-
-- **Unprecedented.** *"No statically-checked language in this survey splits its presence rule by
-  string position."* Rust actively refutes it — a `thiserror` `#[error("…")]` message desugars to the
-  same `write!` with the same `Display` bound as any other format string, so a message gets no
-  exemption. Dhall, Swift, Kotlin and C# have no such distinction either.
-- **Unnecessary.** C# supplies the better mechanism. Its nullable-reference flow analysis is *not*
-  exempt inside an interpolation hole — `CS8602` fires on `{c.Length}` where `c` is `string?`
-  (measured, not read). The reason `{c}` alone does not warn is that the target parameter is
-  annotated `string?`. As the survey puts it: *"The check isn't waived; the requirement isn't there."*
-  That is exactly R1, and it needs no position predicate.
-- **Jinja2 draws the same line one axis over.** Its default `Undefined` *"evaluate[s] to an empty
-  string if printed or iterated over, and … fail[s] for every other operation"* — print tolerates,
-  compute refuses. That is R1 plus R2. Jinja's split is by **operation kind**, not by which string
-  literal you are in, and the survey notes that under Jinja's rule a `set Note = "…{X}"` would count
-  as a print.
-
-The remaining question the survey does not settle is whether Precept should *nonetheless* keep the
-positional restriction for reasons of its own. That is Decision 3, and it is deliberately left open.
-
-The typed-constant case is what makes R3 non-negotiable at its edge. A typed constant's content is
-validated against a content validator for the context type:
+R3's independent justification is what makes it non-negotiable at its edge. A typed constant's content
+is validated against the context type:
 
 ```precept
 field Days as integer optional
 from Draft on Stamp
-    -> set Window = '{Days} hours'      # today: PRE0116, correctly
+    -> set Window = '{Days} hours'      # PRE0116, correctly — verified at HEAD
 ```
 
 If absence rendered tolerantly here, an unset `Days` would produce `'<sentinel> hours'`, which no
-duration validator accepts — a runtime content failure from a clean-compiling precept. That is a
-direct Principle 11 breach. Rendering tolerance cannot reach typed constants — not because of where
-they sit, but because what they feed does not accept absence.
+duration validator accepts — a runtime content failure from a clean-compiling precept, a direct
+Principle 11 breach. Under refuse-uniformly this case refuses anyway; R3 records *why* it must, so no
+future relaxation of R1 can accidentally reach typed constants.
 
 ### The boundary cases, resolved
 
-R2 generates these rather than enumerating them. Each row assumes R1 is in play for the hole itself —
-i.e. the hole sits wherever Decision 3 finally lands — so the question here is only what R2 says about
-the hole's *interior*. These answers are the same under either candidate scope.
+R1 and R2 generate these rather than enumerating them. Under refuse-uniformly the answer no longer
+depends on string position, so there is a single column.
 
-| Hole | Outermost step | Presence obligation on `Opt`? | Why |
+| Hole | What it reads | Presence obligation on `Opt`? | Why |
 |---|---|---|---|
-| `{Opt}` | render | **No** | The only consumer is the render step; R1 applies |
-| `{10 / Opt}` | render of a division | **Yes** | `/` consumes `Opt` and is undefined on absence. The divisor obligation also enrolls, per the 2026-07-23 value-fault ruling |
-| `{Opt.length}` | render of an accessor result | **Yes** | `.length` is undefined on absence |
-| `{trim(Opt)}` | render of a call result | **Yes** | A function argument is an ordinary consumer |
-| `{Opt + "x"}` | render of a concatenation | **Yes** | `+` requires a string operand; absence is not a string |
-| `"{Opt} and {Other}"` | two renders | **No** for either | Each hole is independent; R1 applies per hole |
-| `"{Opt} costs {10 / D}"` | one render, one division | **No** for `Opt`, **yes** for `D` | Per-hole, not per-template |
-| `'{Opt} hours'` (typed constant) | content contribution | **Yes** | R3 — typed-constant content is governed data, not terminal display |
+| `{Opt}` | `Opt` | **Yes** | The render step reads `Opt`; R1 |
+| `{Opt is set}` | *(nothing)* | **No** | Names but does not read `Opt`; R2 — the `is set` operand is skipped |
+| `{if Opt is set then Opt else "x"}` | `Opt`, under a discharging test | **No** (once BUG-061 closes) | The conditional narrows presence; the fallback idiom |
+| `{10 / Opt}` | `Opt` | **Yes** | `/` reads `Opt`; the divisor also enrolls per the value-fault ruling |
+| `{Opt.length}` | `Opt` | **Yes** | `.length` reads `Opt`; already canon (`primitive-types.md:118`) |
+| `{trim(Opt)}` | `Opt` | **Yes** | A function argument is a read |
+| `{Opt + "x"}` | `Opt` | **Yes** | `+` reads `Opt` |
+| `"{Opt} and {Other}"` | `Opt`, `Other` | **Yes** for each | Per-hole; R1 applies to each independently |
+| `{"prefix {Opt}"}` (nested render) | `Opt` (inner hole) | **Yes** | R2 — the inner hole is a hole at its own depth |
+| `'{Opt} hours'` (typed constant) | `Opt` | **Yes** | R3 — reads, and feeds a validator not total on absence |
 
-Two cases from the brief do not exist in the language and are struck rather than answered:
+One case from the original brief does not exist and is struck rather than answered:
 
-- **A conditional arm.** Precept has no ternary. `because "{Note is set ? Note : "x"}"` fails at the
-  lexer — `'?' is not a valid character in a precept definition` (PRE0005, verified). There is no
-  conditional-expression case to dispose of.
-- **A nested interpolation.** Nesting is supported (spec § 1.4, mode stack depth 8), but it composes
-  with no new rule: an inner hole is a hole, R1 and R2 apply to it at its own boundary.
+- **A ternary conditional arm.** Precept has no `? :` ternary. `because "{Note is set ? Note : "x"}"`
+  fails at the lexer (`'?' is not a valid character`, PRE0005, verified). The conditional the language
+  *does* have is the `if … then … else …` keyword form, which is the fallback idiom and is handled in
+  the table above and Decision 4.
 
-**The pleasant property of R2.** The tolerant form is also the form an author would naturally write.
-`"{Opt}x"` is both idiomatic and tolerant; `"{Opt + \"x\"}"` is neither. The rule does not ask authors
-to learn an exception — it rewards the phrasing they were already going to use.
+### What an absent value renders as — moot for presence
 
-### What an absent value renders as
-
-**Deliberately unresolved in this draft.** See Decision 4. A neutral survey is running; its
-recommendation is an input, not a formality, and the width consequence recorded above means the choice
-is load-bearing rather than cosmetic.
+Under refuse-uniformly an absent optional **never reaches the renderer**: the program does not compile
+until presence is proven or a fallback supplied. So there is no language-chosen sentinel to pick, and
+the whole "what does absence render as" question dissolves for the presence arm. What an author writes
+when they *want* to render an optional is the coalescing conditional — see Decision 4. (The separate
+question of how a *present* business-domain value renders to display text is a real, unfixed gap — see
+§ Adjacent gaps — but it is determinism surface, not presence.)
 
 ---
 
-## Adjacent gap, named not inherited
+## Adjacent gaps, named not inherited
 
-The String Coercion Table (`docs/compiler/literal-system.md § String Coercion Table`) covers thirteen
-scalar types plus a Collection row. It omits the seven business-domain types (`money`, `currency`,
-`quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`) and `choice` entirely. An absence
-row would join that table, so the table is about to be edited either way — and editing it while
-leaving eight types undefined would bless the omission by proximity.
+**Business-domain coercion is new determinism surface, not a settled prerequisite.** The String
+Coercion Table (`docs/compiler/literal-system.md § String Coercion Table`) covers thirteen scalar
+types plus a Collection row. It omits the seven business-domain types (`money`, `currency`,
+`quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`) and `choice`. The probe
+`set Marker = "paid {Amt} in {Cur}"` with `Amt as money` compiles the money hole without a type error,
+so *something* renders it, but nothing in canon says what. Deciding how `money`/`quantity`/`choice`/etc.
+render to display text is **new Principle-3 (determinism) surface** — each format (`"1000.00 USD"` vs
+`"$1,000.00"` vs `"USD 1000"`) is a design decision needing its own rationale, precedent, and tradeoff.
+This is not a mechanical row this design can just fill in on its way past; it is an adjacent surface
+gap that needs its own consultation. Named here so the promotion that eventually edits that table is on
+notice, and explicitly **not** claimed as a prerequisite this design has settled.
 
-The probe `set Marker = "paid {Amt} in {Cur}"` with `Amt as money` compiles the money hole without a
-type error, so *something* renders it, but nothing in canon says what. That gap is not fixed here. It
-is named so the promotion pass that adds an absence row is on notice that the table it is editing is
-incomplete in a second, unrelated way.
+**Collection-in-interpolation is unenforced everywhere (BUG-058).** Canon says collections are a
+compile error inside interpolation; PRE0051 has zero emission sites. Independent of this design; filed.
+
+---
+
+## Preconditions and dependencies
+
+The strict reading is only sound once the walker it will reuse is itself sound. These are verified
+defects (see `docs/Working/bugs.md`), listed in the order they gate this design:
+
+- **BUG-057 — must close before enrollment.** Optional **event-arg** holes mint no presence even in a
+  value position (`"note is {Stamp.Note}"` → clean, zero obligation; verified 2026-07-24). "Reuse the
+  value walker verbatim" ships this hole, because the value walker under-mints arg refs
+  (`ProofEngine.cs:347-357`, the `includeOptionalArgRefs` gate). Enrolling message holes by copying
+  the value path would inherit it.
+- **BUG-060 — must close before enrollment.** A state-scoped `ensure X is set` does not discharge
+  presence for a read in that state (verified 2026-07-24). Several of the corpus's unguarded message
+  holes rely on exactly this shape; enrolling before this closes gives legitimately-guarded authors a
+  false error caused by the engine's blindness, and any workaround they reach for becomes permanent.
+- **BUG-061 — must close for the fallback idiom to cover field reads.** `if X is set then X else …`
+  discharges presence for an event arg but not for a stored field (verified 2026-07-24). Since the
+  fallback mechanism (Decision 4) is that idiom, it must narrow for fields too, or authors are pushed
+  back onto an outer `when` guard for cases the idiom should cover inline.
+- **BUG-059 — interacts with the length machinery.** A string hole's length floor uses the field's
+  `minlength` while the code's own comment says it must be 0 for optionals, and that floor drives a
+  provably-violating verdict. Under refuse-uniformly an absent value never renders, which removes the
+  *unsound-acceptance* pressure, but the two length paths still disagree and should be reconciled.
+- **BUG-056 — same family.** A declaration-position typed-constant hole is never walked; an optional
+  flows into a qualifier unchecked. Should close as part of making interpolation walks uniform.
+- **BUG-058 — same surface.** Collection-in-interpolation rule unenforced (PRE0051 dead).
+- **The value-fault arm is unbuilt (`62479cae` docs-only).** Both arms wait on the same slot-shape
+  change (`BecauseClauseSlot.Message` → expression) plus the obligation-creation sweep. The presence
+  arm does not ride on the value arm being done — it is not.
 
 ---
 
 ## Decisions
 
-### Decision 1: Rendering is a total operation and mints no presence obligation
+### Decision 1: An interpolation hole is a read; it enrolls presence
 
 **Stakes**: high
 
-- **Rationale**: The presence obligation's trigger is that an operation has no result when its operand
-  is absent. Rendering has a result for absence once the language says what that result is. Framing
-  the tolerance as a property of the *operation* rather than as an exemption for a *position* means
-  Principle 10 is satisfied by construction rather than carved out — which was the explicit
-  requirement the owner relayed.
-- **Tradeoff accepted**: The language gains a second total-on-absence operation alongside `is set` /
-  `is not set`. Every future operation must be classified as total-or-not on absence, and the
-  classification has to live somewhere durable rather than in the walker's control flow.
-- **Alternatives considered**:
-  - *Enroll presence like any other read.* Rejected on the owner's stated ground: it forces an author
-    to guard the field the message is reporting on. **But see § How big is the problem, actually —
-    that ground is much weaker than this design assumed, and the two corpus instances originally
-    cited for it do not support it.** This alternative is closer to live than the draft first
-    suggested, and Decision 1 should not be locked until § How big is the problem is resolved.
-  - *A positional carve-out ("messages are exempt from presence").* Rejected because it states an
-    exception to Principle 10 rather than satisfying it. An exception is a place where the totality
-    guarantee is known not to hold, which is precisely what the philosophy refuses to accumulate.
-- **Precedent**: The language already has a total-on-absence operation — `is set` / `is not set`
-  (`precept-language-spec.md:1484`, "`optional` field | Yes | `boolean`"). Presence testing consumes
-  an optional and mints no presence obligation, for the same reason: it is defined on absence. R1
-  adds a second member to a category that already exists rather than inventing one.
-- **Sources consulted for this decision**:
-  - `docs/language/precept-language-spec.md § 0.1` Principle 10 — "Every expression evaluates to a
-    result — never silent `NaN`, `Infinity`, or `null`. The evaluation surface has no undefined
-    behavior."
-  - `docs/language/precept-language-spec.md:1484` — the `is set` typing row: "| `optional` field | Yes | `boolean` |"
-  - `docs/language/precept-language-spec.md:1553` — "Each `{expr}` inside `\"...\"` is type-checked
-    independently. Any scalar type is coercible to string." *Spec-first check: the spec states holes
-    are type-checked and coercible; it is silent on presence at a hole. Grepped
-    `precept-language-spec.md`, `primitive-types.md`, `literal-system.md`, `proof-engine.md` for
-    "interpolat" ∧ "presence"/"optional" — no prior settlement.*
-  - `samples/customer-profile.precept:27` — the corpus instance quoted above.
-- **Strongest counter-evidence**: Principle 4 (full inspectability) argues the other way. A message
-  that silently renders a sentinel hides, at the moment of explanation, that the value it is reporting
-  was never there. The reader of the failure message sees the sentinel and cannot tell whether the
-  field was unset or literally held that text. *Response*: this is a real cost and it is the reason
-  the sentinel choice is a separate decision with its own weight rather than a detail. A sentinel that
-  cannot be confused with authored data answers it; a sentinel that can (the empty string, or any
-  plausible domain word) does not. Decision 4 must carry this.
-- **Reversibility**: `Hard`. Once authors write messages that interpolate unguarded optionals, adding
-  the obligation later breaks those precepts.
-- **Blast radius**: Catalogs — a total-on-absence classification for the render step (placement is
-  Decision 5). Docs — `precept-language-spec.md § 3.7`, `literal-system.md` String Coercion Table,
-  `soundness-and-coverage.md:230`, `proof-engine.md`. Samples — none break; `customer-profile.precept:27`
-  and `insurance-claim.precept:96` become explicitly legal rather than accidentally legal. External
-  consumers — none; pre-release.
+- **Rationale**: Coercing a value to display text consumes the value — it must produce the value's
+  characters, which for an absent optional do not exist without a fabricated sentinel that the length
+  machinery proves is unsound (§ Why the tolerant spine was refuted, direction 1). So the presence
+  obligation's trigger — *"this read has no result when the value is absent"* — **is** met by the
+  render step. Enrolling presence satisfies Principle 10 directly rather than carving an exception
+  into it, and closing the message/value divergence as the walk-gap it is (rather than a semantic)
+  keeps one rule across all four positions.
+- **Alternatives considered and rejected**:
+  - *R1-tolerant — a bare render mints nothing because rendering is total on absence.* This was the
+    original recommendation. **Rejected on three independent grounds** (§ Why the tolerant spine was
+    refuted): the length machinery makes the presence obligation load-bearing and no sentinel is sound;
+    a three-lens panel found tolerance re-permits the silent empty-string coercion canon spent three
+    revisions deleting; a red-team confirmed it. Its motivating premise — that enrolling would force
+    authors to guard the field they report on — also did not survive measurement (§ How big is the
+    problem, actually).
+  - *A positional carve-out ("messages are exempt from presence").* Rejected: the survey found no
+    statically-checked language splits its presence rule by string position, and Rust actively refutes
+    it (a `thiserror` `#[error("…")]` desugars to the same `write!`/`Display` bound as any string). A
+    carve-out would also state an exception to Principle 10 rather than satisfying it.
+- **Precedent**: C#'s nullable-flow analysis is *not* waived inside an interpolation hole — `CS8602`
+  fires on `{c.Length}` for `c: string?` (survey, measured). The reason `{c}` alone does not warn is
+  that the target parameter is `string?` — "the requirement isn't there," not "the check is waived."
+  Precept's hole target is a present scalar (canon coerces *scalars*), so the requirement **is** there.
+  Dhall refuses uniformly: every interpolated expression must be proven `Text`; an `Optional Text` must
+  be eliminated first. Precept's own canon already requires a guard to read an optional
+  (`primitive-types.md:118`); R1 extends the position that rule already governs to the render step.
+- **Tradeoff accepted**: An author who interpolates an optional into a human-facing message must guard
+  it or write the fallback conditional — a small ceremony on prose that reads as pure display. This is
+  the domain-expert-friction cost, and it is the one residual the owner should weigh (§ The residual
+  owner call).
+- **Sources consulted**:
+  - `docs/language/precept-language-spec.md § 0.1` Principle 10 (totality) and Principle 1 (prevention).
+  - `docs/language/primitive-types.md:118` — reading an optional requires a presence guard.
+  - `research/language/expressiveness/absence-in-string-interpolation-survey-2026-07-23.md` — the
+    C#/Dhall/Rust findings and the "no language splits by string position" bottom line.
+  - *Spec-first check*: grepped `precept-language-spec.md`, `primitive-types.md`, `literal-system.md`,
+    `proof-engine.md` for "interpolat" ∧ "presence"/"optional" — canon settles the general rule
+    (absence is never silently coerced; reading an optional needs a guard) and is silent only on the
+    bare-render sliver `{Opt}`. R1 resolves that sliver *consistently with* the general rule.
+- **Reversibility**: `Medium`. Enrolling a check that some corpus files currently sidestep can break
+  those files — but the corpus impact is bounded (≤ 11 holes, § How big is the problem) and each has a
+  one-line fix (a guard or the fallback idiom). This is the reverse of the tolerant spine's `Hard`
+  reversibility, where *relaxing* a check and later re-adding it would break authored precepts.
+- **Blast radius**: Docs — `precept-language-spec.md § 3.7`, `literal-system.md`,
+  `soundness-and-coverage.md:230`, `proof-engine.md`. Code — the slot-shape change plus the
+  obligation-creation sweep (shared with the value-fault arm). Samples — up to 11 unguarded message
+  holes need a guard or fallback; both originally-cited motivating samples already compile clean.
+  External consumers — none; pre-release.
 
-### Decision 2: Tolerance attaches to the hole's outermost step only
+### Decision 2: The obligation attaches to what a hole reads, at every depth
 
 **Stakes**: high
 
-- **Rationale**: The tolerance is justified by a property of the rendering operation. Nothing about a
-  string literal makes the operations *inside* a hole total — `10 / Opt` is exactly as undefined on
-  absence inside a message as outside one. Attaching tolerance to the hole boundary rather than to the
-  hole's contents is the only reading that keeps the justification and the rule the same shape.
-- **Tradeoff accepted**: An author who writes `"{Opt + " units"}"` gets a presence error while
-  `"{Opt} units"` compiles. That is a real surprise the first time, and the diagnostic has to carry
-  the fix.
-- **Alternatives considered**:
-  - *Whole-hole tolerance — anything inside a hole tolerates absence.* Rejected: it would make
-    `{10 / Opt}` compile with an absent divisor, contradicting the owner's 2026-07-23 value-fault
-    ruling, which the same holes are already enrolled under.
-  - *Whole-template tolerance.* Rejected for the same reason, more broadly.
-- **Precedent**: Precept already scopes narrowing per-expression rather than per-statement — the
-  `GuardInPath` strategy discharges presence for the specific reference it dominates, not for the
-  whole row (probe: `"x{Code}x"` under `when Code is set` discharged `Presence … strategy: GuardInPath`).
-  Per-hole scoping is the same granularity the engine already reasons at.
-- **Sources consulted for this decision**:
-  - `docs/compiler/soundness-and-coverage.md:229` — the value-fault row: "**owner ruling, 2026-07-23:
-    value-fault expressions in a constraint message enroll and are caught at compile time.**"
-  - Live probe, `set Marker = "x{Code}x"` under a presence guard — obligation ledger returned
-    `{"kind":"Presence","disposition":"Proved","strategy":"GuardInPath"}`.
-  - *Spec-first check: grepped `precept-language-spec.md § 2.5 Interpolation Reassembly` and
-    `literal-system.md` for any statement scoping semantics to a hole versus a template — the spec
-    describes reassembly mechanics only and is silent on obligation scope.*
-- **Strongest counter-evidence**: Nothing found arguing for whole-hole tolerance after checking the
-  spec's interpolation sections, the soundness doc, and the obligation-discharge matrix's
-  message-interpolation cells (`fault-6-division-primitive-message-interpolation.cells.json`, whose
-  eight cells all treat the hole's *interior* as a real evaluation site with real obligations). The
-  matrix actively contradicts whole-hole tolerance.
-- **Reversibility**: `Hard` — same reason as Decision 1.
+- **Rationale**: Nothing about a string literal makes the reads *inside* a hole total — `10 / Opt` is
+  as undefined on absence inside a message as outside one, and a nested render `{"prefix {Opt}"}` is a
+  hole at its own depth. Stating the rule over what a hole *reads* (not what it *names*) and applying
+  it recursively is the only formulation that both keeps guards working and reaches nested holes.
+- **The wording fix that makes this correct**: "read," not "named." `{Opt is set}` names `Opt` without
+  reading it; the walker deliberately skips the `is set` operand (`ProofEngine.cs:340-345`). A rule
+  phrased over "every field a hole *names*" would mint a spurious obligation on the guarded field and
+  break `is set` everywhere. This is the red-team correction that the original strict draft missed.
+- **Alternatives considered and rejected**:
+  - *State the rule over named fields.* Rejected — breaks `is set`, as above.
+  - *Apply only to the outermost hole ("nothing inside the hole counts").* Rejected — the red-team
+    showed `{"prefix {Opt}"}` is a nested render whose inner hole reads `Opt`; a flat "outermost only"
+    rule would miss it. The rule must be recursive.
+  - *Whole-hole or whole-template tolerance.* Rejected — would make `{10 / Opt}` compile with an absent
+    divisor, contradicting the 2026-07-23 value-fault ruling the same holes enroll under.
+- **Precedent**: The engine already scopes narrowing per-expression — `GuardInPath` discharges presence
+  for the specific reference it dominates, not the whole row (verified: `"{Opt}"` under `when Opt is set`
+  → `Presence Proved strategy=GuardInPath`). The `TypedPostfixOp` skip is itself existing precedent that
+  the engine distinguishes read from named. Per-hole, recursive scoping is the granularity the engine
+  already reasons at.
+- **Tradeoff accepted**: The recursive "read vs named" rule is more to *state* than "a message is
+  exempt" — the spec must define read-vs-named and the nesting behavior explicitly. Accepted because
+  the alternative formulations are unsound or break guards.
+- **Sources consulted**:
+  - `src/Precept/Pipeline/ProofEngine.cs:340-345` — the `TypedPostfixOp` skip (read ≠ named).
+  - `src/Precept/Pipeline/ProofEngine.cs:347-357` — the interpolation walk and its recursion into holes.
+  - `docs/compiler/soundness-and-coverage.md:229` — the value-fault row the interior reads enroll under.
+  - Live probe: `{Opt is set}` mints nothing; `{if Opt is set then Opt else …}` mints nothing for an
+    arg (clean); the same over a field is PRE0116 (BUG-061).
+- **Strongest counter-evidence**: none found for whole-hole tolerance after checking the spec's
+  interpolation sections, the soundness doc, and the obligation-discharge matrix's message-interpolation
+  cells — those cells treat the hole's interior as a real evaluation site with real obligations, which
+  actively contradicts whole-hole tolerance.
+- **Reversibility**: `Medium` — same as Decision 1.
 - **Blast radius**: Same surfaces as Decision 1; no additional.
 
-### Decision 3: Whether tolerance is restricted to message positions — OPEN
+### Decision 3: Tolerance is not restricted to message positions — refuse uniformly
 
-**Stakes**: exploratory
+**Stakes**: high (settled toward refuse-uniformly; one residual open — see § The residual owner call)
 
-This is the load-bearing open question, and it is open because the evidence moved during the design
-pass. It needs an owner ruling; the analysis below is complete enough to make that ruling on.
+This was the load-bearing open question. The evidence settles it toward **refuse uniformly**: the
+presence rule does not vary by string position.
 
-- **Exploratory because**: The design pass began from the architect's message-scoped framing, and
-  built a positional justification for it (message text is terminal, value text is governed). The
-  comparator survey commissioned for this design then found that justification unprecedented, and
-  supplied a cleaner mechanism that does not need the position predicate at all. Choosing to keep
-  the positional restriction anyway is a legitimate call, but it is now a call *against* the survey
-  rather than one supported by it, and it is the owner's to make. Widening scope beyond the framing
-  the owner was consulted on is exactly what the pre-design gate exists to prevent, so this design
-  will not widen it unilaterally.
+- **Rationale**: The message/value divergence at HEAD is a walk-gap (the message slot holds no
+  expression and `CollectObligations` never visits `.Message`, `ProofEngine.cs:208`), not a designed
+  semantic. There is no reason of Precept's own to keep it: the length machinery makes presence
+  load-bearing in value positions and the same machinery will apply to message positions once they are
+  walked; the survey found no precedent for a positional split; and one rule across all four positions
+  is what the domain expert can hold in their head. Under refuse-uniformly, `"{Opt}"` behaves the same
+  in a `because` and in a `set` two lines away.
+- **Alternatives considered and rejected**:
+  - *(A) Message-only tolerance* — `"{Opt}"` tolerated in `because`/`reject`, refused in `set`.
+    Rejected: its only surviving argument was that a `set` RHS becomes stored governed data while a
+    message is terminal, so a sentinel is worse in storage. That argument is weak — a sentinel in
+    storage is not an invalid configuration unless a rule forbids it (and any such rule still applies),
+    and the length machinery already rejects the interesting case (`notempty` + zero-width sentinel).
+    And it is *unprecedented*: no statically-checked language in the survey splits by string position;
+    Rust refutes it directly. Choosing (A) would be a call *against* the survey, not one it supports.
+  - *(B) All `"..."` holes tolerated (the tolerant spine).* Rejected for the three reasons in
+    § Why the tolerant spine was refuted.
+- **Precedent**: The survey's bottom line, verbatim: *"No statically-checked language in this survey
+  splits its presence rule by string position. The message-vs-value distinction exists in the field but
+  lives at the library/runtime layer … and Jinja2's split is by operation kind."* Refuse-uniformly is
+  the shape Dhall takes (prove `Text` or eliminate the `Optional` first) and the shape Rust's
+  `Display` bound enforces including in message macros.
+- **Tradeoff accepted**: Refuse-uniformly relaxes nothing and *tightens* message positions, which is
+  where the domain-expert-friction cost lands — a human-facing rationale that reads on an optional now
+  needs a guard or the fallback conditional. That is the residual the owner should weigh; it is a
+  friction cost, not a soundness cost.
+- **Sources consulted**:
+  - `research/language/expressiveness/absence-in-string-interpolation-survey-2026-07-23.md` § Bottom
+    line and §§ 1 (Rust), 3 (C#), 5 (SQL cautionary), 8 (Dhall).
+  - `src/Precept/Pipeline/ProofEngine.cs:208`, `Parser.Expressions.cs:558-564` — the walk-gap.
+  - *Spec-first check*: canon's null-coercion trajectory (c4d0abf8 → 9ab60e47 → current) runs toward
+    the strict reading, not away from it; `literal-system.md:145`, `primitive-types.md:118`,
+    `evaluator.md:228`.
+- **Strongest counter-evidence**: Kotlin — a serious null-safe language — exempts the template position
+  (`"$text"` renders `null`), silently and mechanically via `Any?.toString()`. *Response*: it is
+  silent, which the survey rates weaker than Swift's flagged version, and it is a permissive-pole choice
+  Precept's whole null-coercion trajectory has already rejected for its own surface.
+- **The residual**: the domain-expert-friction judgment is left to the owner (§ The residual owner
+  call). Everything else about this decision is settled.
 
-- **The two candidates, stated plainly**:
+### Decision 4: How an author renders an optional — the coalescing idiom already exists
 
-  **(A) Message-only.** `"{Opt}"` is tolerated in a `because` rationale and a `reject` reason. In a
-  `set` right-hand side it still requires proven presence, exactly as today.
+**Stakes**: medium (owner-corrected 2026-07-24; no new surface)
 
-  **(B) All `"..."` holes.** `"{Opt}"` is tolerated wherever a double-quoted string is interpolated.
-  Typed-constant `'...'` holes are excluded either way, per R3.
+The original doc and the design synthesis both held that the only tolerance form would be
+author-supplied fallback text, and that this was **new language surface** needing its own owner
+consultation. **The owner corrected this on 2026-07-24, and it is verified false.**
 
-- **What the survey says.** From
-  `research/language/expressiveness/absence-in-string-interpolation-survey-2026-07-23.md`:
+- **The mechanism already ships.** `if X is set then X else "fallback"` is a keyword conditional in
+  the language, in the corpus at `samples/clinic-appointment-scheduling.precept:62`, and it discharges
+  presence. It works **inside an interpolation hole**:
 
-  > "**No statically-checked language in this survey splits its presence rule by string position.**
-  > The message-vs-value distinction exists in the field but lives at the *library/runtime* layer
-  > (logging must not crash), and Jinja2's split is by *operation kind* (print vs. compute), not by
-  > *which string literal you're in*."
+  ```precept
+  event Stamp(Note as string optional maxlength 100)
+  from Draft on Stamp
+      -> set Log = "note: {if Stamp.Note is set then Stamp.Note else "none"}"   # compiles CLEAN, verified 2026-07-24
+  ```
 
-  and, on the mechanism that makes (B) coherent without a position predicate:
+- **So there is nothing to invest in.** Under refuse-uniformly, an author who wants to render an
+  optional in a message writes the existing conditional. No `??` operator, no `\(x, default:)` syntax,
+  no fallback annotation on the hole — none of it is needed. The "new surface / consultation gate"
+  framing the earlier draft carried is dropped entirely.
+- **The sentinel question is moot.** A language-chosen sentinel only matters if an absent value can
+  reach the renderer; under refuse-uniformly it never does. There is no empty-string / em-dash /
+  field-name / `null` choice to make. Everything the earlier Decision 4 weighed about sentinels is
+  removed as no longer live.
+- **Rationale**: reusing the shipped conditional keeps the language surface flat (Principle 5,
+  keyword-anchored) and puts the human-facing fallback text where Precept already puts human-facing
+  text the language cannot derive — authored by the domain expert (the same category as the mandatory
+  `because`, Principle 9).
+- **Alternatives considered and rejected**:
+  - *A dedicated `??` / hole-default syntax.* Rejected — redundant with the existing conditional, and
+    net-new surface for zero added expressiveness. (Swift shipped `\(x, default:)` only because its
+    `??` does not type-check for non-`String` optionals; Precept's `if…then…else` has no such limit.)
+  - *A language-chosen sentinel.* Rejected — moot under refuse-uniformly, and § Why the tolerant spine
+    was refuted showed no sentinel is sound against the length machinery anyway.
+- **Precedent**: Kotlin's Elvis operator (`${text ?: "…"}`) and Swift's `\(age, default: "missing")`
+  are the field's two shipped "author states the fallback in source" mechanisms; Precept already has
+  the equivalent as `if…then…else`, so it matches the precedent without adding surface.
+- **Tradeoff accepted**: the conditional is more verbose than a `??` operator would be. Accepted —
+  verbosity in exchange for no new surface and one obvious way to do it.
+- **Dependency**: BUG-061 must close for this to cover **field** reads inline (it works for args
+  today; a field operand is currently PRE0116). Until then, a field author falls back to an outer
+  `when … is set` guard.
 
-  > "C# is *not* an example of 'interpolation exempts you from the null checker.' It is an example of
-  > **the hole being an ordinary expression position whose target type happens to accept null**. The
-  > check isn't waived; the requirement isn't there."
-
-  and, as the standing warning against settling this per-construct:
-
-  > "Four widely-deployed implementations, four behaviors … the same spelling `CONCAT()` meaning
-  > opposite things in MySQL and PostgreSQL … Oracle's own doc hedges that its behavior 'may not
-  > continue to be true.' … it must be **one rule, stated in the spec**, not an emergent per-position
-  > accident."
-
-  Rust is the sharpest counter to (A): a `thiserror` `#[error("…")]` message desugars to
-  `write!("{}", self.var)` with the same `Display` bound as any other format string. A message string
-  gets no exemption anywhere in Rust.
-
-- **The argument for (A) that survives the survey.** Not precedent — there is none — but a
-  Precept-specific one. A `set` right-hand side becomes stored, governed data; a sentinel there is
-  indistinguishable from an author who wrote that text. Principle 1 is about what is stored.
-
-  **This argument is weaker than it first looks, and the draft overstated it.** Two checks:
-  1. A sentinel in a stored string is not an *invalid configuration* unless a rule forbids it, and
-     any rule that forbids it still applies — governance is not bypassed.
-  2. The length-interval machinery already catches the interesting case. `field Marker as string notempty`
-     with `set Marker = "{Opt}"` and a zero-width sentinel yields an interval whose floor is 0, which
-     fails the `minlength 1` containment and rejects. The protection (A) was invoked to provide is
-     already provided by machinery that exists.
-
-  So (A)'s remaining content is a judgement that authors *should* be made to guard before rendering
-  into storage, not a soundness requirement.
-
-- **The argument for (B).** One rule, one justification, no position predicate; it is the shape the
-  survey's two most relevant mechanisms (C#'s target-type framing, Jinja2's print-vs-compute axis)
-  both take. It also removes an asymmetry a domain expert would otherwise trip on: under (A),
-  `"{Opt}"` compiles in a `because` and is rejected in a `set` two lines away.
-
-- **The cost of (B), stated honestly.** It relaxes a check that fires correctly today —
-  `set Marker = "note is {Note}"` → PRE0116, verified. Relaxations are where soundness holes hide,
-  and this one has not been adversarially attacked yet.
-
-- **Recommendation**: **(B)**, on the grounds that (A)'s justification did not survive scrutiny and
-  (B) needs no unprecedented positional cut. Recorded as a recommendation, not a decision.
-
-- **Decision needed before**: any spec text is written. Both Decision 1 and Decision 2 are unaffected
-  by which way this lands.
-
-- **The prior-canon trajectory — and it runs against tolerance, not toward it.** An earlier draft of
-  this design read the history backwards; the corrected reading is load-bearing enough to lay out in
-  full, because it is the closest thing canon has to a settled direction on this exact question.
-
-  1. **`git show c4d0abf8:docs/LiteralSystemDesign.md:121`** stated the broad tolerant rule: *"In
-     expressions, `null` … is coerced to empty string `\"\"` in string interpolation contexts"* — all
-     interpolation, silent, no author involvement.
-  2. **`git show 9ab60e47` (EvaluatorDesign.md, "Null Handling")** then *reversed* it: *"`.length` on
-     a `null` value produces an evaluation error … `null` is not coerced to empty string."* This is
-     not a deletion with a void premise — it is a deliberate replacement of silent coercion with
-     error-on-access.
-  3. **Current canon** went further than either. The `null` literal was removed entirely
-     (`docs/compiler/literal-system.md:145` — *"The language has no `null` literal. Optional fields
-     use `is set` / `is not set`"*), absence became a first-class runtime value
-     (`docs/runtime/evaluator.md:228` — `PreceptValue` *"is the unified value representation for every
-     scalar, reference, and absent value"*, with an explicit `IsAbsent`), and access to an optional
-     was made to *require a guard*: `docs/language/primitive-types.md:118` — `.length` *"Requires
-     presence guard (`is set`) for optional fields."*
-
-  Every step moved **away** from silent tolerance of absence in a string. So the deleted rule is not
-  evidence for (B) — it is the position canon has spent three revisions walking back. **This corrects
-  the earlier draft, which cited it as pointing toward (B); it points the other way**, toward the
-  strict reading and toward Decision 4's "no language-chosen sentinel" recommendation.
-
-- **Spec-first check — and canon is not silent, contrary to the earlier draft.** Grepping
-  `primitive-types.md`, `literal-system.md`, and `evaluator.md` for absence/coercion:
-  - Canon **does** settle the general question: absence is *not* silently coerced anywhere, and
-    accessing an optional requires a presence guard (`primitive-types.md:118`, `literal-system.md:145`,
-    `evaluator.md:228`). R2 is consistent with this — an accessor like `.length` is a consumer that
-    needs a guard, which is exactly what `primitive-types.md:118` already says.
-  - Canon is silent on **one** narrower point only: the bare-render position `{Opt}`, where the value
-    is coerced to display text and nothing is accessed. That is the sliver this design occupies, and
-    it is where R1 lives.
-  So this is a genuine design decision on the bare-render sliver — but it is a decision that must
-  **swim upstream against a documented three-revision trajectory**, which is a materially different
-  situation from the "no live canon settles this" the earlier draft claimed. R1 (tolerate the bare
-  render) is the part in tension with that trajectory and needs the strongest justification; R2
-  (consumers need guards) is already canon.
-
-### Decision 4: What an absent value renders as — TBD
-
-**Stakes**: exploratory
-
-- **Exploratory because**: A neutrally-framed survey is running and has not returned. The owner
-  explicitly declined to pre-commit — *"i'm not married to unset, let an unbiased agent run and see
-  what they recommend"* — so committing here would defeat the instruction. Independently, the width
-  finding recorded above means the choice has a proof consequence that no candidate has yet been
-  evaluated against.
-- **The neutral recommendation, returned 2026-07-23**: **no language-chosen sentinel at all.** An
-  absent value renders as text the author wrote at the hole; if the author wrote none and presence is
-  not provable, it does not compile. Every language-chosen sentinel — empty string, word,
-  typographic mark, parenthetical, field name, type-specific — is rejected. Its strongest arguments:
-
-  - **The two systems that lived with this longest both moved away from a language-chosen default,
-    and neither moved toward a better word.** Swift shipped a default with a warning in 2016 and ten
-    years later shipped `\(age, default: "missing")`. Jinja2 shipped the empty string and then shipped
-    `StrictUndefined` because the default was a production footgun. Picking a sentinel now is picking
-    the thing both mature comparators eventually replaced.
-  - **Precept already makes this exact move.** Principle 9 refuses to let the language generate the
-    human text explaining a constraint — `because` is mandatory. Absent-case rendering is the same
-    category of text: human-facing and not derivable from anything in the definition.
-  - **It is the only option that gives the author a lever on the length interval.** A fallback is a
-    literal in the file, so both endpoints of the hole's width interval are author-visible and
-    author-controlled. Every language-chosen sentinel imposes a width the author cannot see or change.
-  - **Specific disqualifications worth recording**: `null` is out — `precept-language-spec.md:610`
-    removed the literal entirely, and rendering the word reintroduces the concept in the surface the
-    domain expert reads. An em dash is out — it is Precept's house message punctuation, so against
-    `customer-profile.precept:27` it renders *"…method is — but no phone number is stored — the
-    preference is unreachable…"*, two em dashes in one sentence, one data and one punctuation. The
-    field's own name is out — it renders as a *broken template*, telling the reader the engine failed
-    when it worked. Refuse-to-compile *alone* is out because Precept has no `??` and no ternary, so
-    an author who wants to name the absent case would have no way to say it.
-
-- **Why this stays exploratory rather than being adopted.** The recommendation introduces **new
-  language surface** — a fallback annotation at the hole. That is a fresh Pre-Design Owner
-  Consultation item in its own right, not something this design can absorb: the owner was consulted
-  on presence tolerance for message rendering, not on adding syntax to the interpolation hole. It
-  also interacts with Decision 3 (the recommendation argues for one rule across both positions) and
-  with the § How big is the problem finding above, which weakens the case for doing anything at all.
-
-- **Exploratory because**: the recommendation is off the candidate list it was given and requires an
-  owner conversation before it can be a decision.
-
-- **Decision needed before**: any spec text is written, and before the obligation-creation sweep
-  implements the value-fault arm — the sweep touches the same code path.
-- **Decision needed before**: any spec text is written, and before the obligation-creation sweep
-  implements the value-fault arm — the sweep touches the same code path.
-- **Open questions**:
-  1. Does the sentinel's character width widen the length interval, or does the design instead
-     require presence-unproven holes to carry an unknown width (failing containment, as collections
-     do today)? These are different answers with different author-visible consequences.
-  2. Must the sentinel be un-collidable with authored data — i.e. must a reader of a rendered message
-     be able to tell "this field was unset" from "this field held that text"? Principle 4 argues yes;
-     no candidate on the list satisfies it except a typographic mark or a refusal.
-  3. Does the answer differ between `because` and `reject`? Nothing found suggests it should, but the
-     survey was asked to say so if it disagrees.
-
-### Decision 5: Where the total-on-absence classification lives
+### Decision 5: Where the enrollment wiring lives
 
 **Stakes**: medium
 
-- **Rationale**: Placeholder — this is a catalog-placement question that depends on Decision 4's
-  shape and on the archaeology of how holes are represented once messages become expressions. It is
-  named here so the doc does not silently omit it; it will be written when those land.
-- **Tradeoff accepted**: TBD.
-- *(This decision is incomplete and blocks Lock.)*
+- **Rationale**: Under refuse-uniformly there is no "total-on-absence render" classification to place
+  (the tolerant spine's Decision 5) — a hole is an ordinary read, so the work is (1) reshape
+  `BecauseClauseSlot.Message` (and the `reject` string) from `string` to an expression the type checker
+  and proof engine already understand, and (2) let `CollectObligations` visit `.Message`, reusing the
+  existing `WalkExpression` interpolation path (`ProofEngine.cs:347-357`) — **after** BUG-057 closes
+  that path's arg-ref hole. No new catalog entry for a render-tolerance classification is needed.
+- **Tradeoff accepted**: the slot-shape change touches every construct that carries a message
+  (`TypedRule`, `TypedEnsure`, reject rows) and the language server's raw-string message handling
+  (`RichHoverFactory.cs:2970-2980`). Accepted — it is the same change the value-fault arm needs, so
+  it is paid once for both arms.
+- **Precedent**: value positions already route interpolation holes through `WalkExpression`; this
+  extends the same path to message positions rather than inventing a second one.
+- *(This decision is implementation-shaped and does not block the design's semantic conclusions; it is
+  named so the plan/execute stages inherit it. It still needs the four-leg treatment filled out at
+  plan time — precedent and reversibility above are sketches.)*
+
+---
+
+## The residual owner call
+
+The original doc framed the owner's decision as "refuse now vs. invest in fallback syntax later."
+**That fork mostly dissolves**: the fallback idiom already exists (Decision 4), so there is nothing to
+invest in and no new surface to gate. The evidence settles soundness and precedent toward refuse
+uniformly (Decisions 1–3). One genuine call remains, and it is a judgment, not a soundness question:
+
+**Refuse-uniformly imposes a guard-or-conditional ceremony on human-facing prose.** A `because`
+rationale that reads on an optional — arguably the most natural thing a failure message does — now
+requires the author to guard the field or write `if Opt is set then Opt else "…"`. The owner said he
+wanted to explore relaxing exactly this friction. The evidence de-risks refusal hard, and this is
+presented neutrally so the owner can weigh the friction against the uniformity:
+
+- **Demonstrated corpus demand is ≤ 11 of 808 interpolation holes.** 83 name an optional; 71 already
+  carry a discharging `is set` guard; 11 are unguarded (§ How big is the problem), and some of those 11
+  are BUG-060's blindness, not authoring need.
+- **Both samples originally cited as motivating do not motivate.** `insurance-claim.precept:96`
+  interpolates `ClaimAmount`, which `:22` declares `money in 'USD' default '0.00 USD'` — required, not
+  optional, so it mints no presence obligation under any reading. `customer-profile.precept:27` already
+  carries `when PreferredContactMethod is set`, which discharges — verified (guarded → `Proved
+  strategy=GuardInPath`; unguarded → `Unresolved` + PRE0116). The design's two live motivating examples
+  both cost zero extra ceremony.
+
+So the owner's residual is: accept the small, bounded prose-ceremony cost for one uniform rule (the
+evidence's recommendation), or ask for a relaxation on message positions — which would be the
+positional split the survey found unprecedented, re-opening Decision 3's rejected alternative (A) as a
+deliberate call against the survey. Framed neutrally; the owner's to make.
+
+## How big is the problem, actually
+
+The premise the design started from was the owner's: enrolling presence at a message hole *"would force
+authors to guard the field they are reporting on."* Measurement weakened it to near-nothing.
+
+- **`samples/insurance-claim.precept:96`** — `-> reject "…(you submitted {ClaimAmount})"`. `ClaimAmount`
+  is `:22` `field ClaimAmount as money in 'USD' default '0.00 USD'` — **required, with a default**. Not
+  optional; mints nothing under any reading. Miscited.
+- **`samples/customer-profile.precept:27`** — interpolates optional `PreferredContactMethod`, but
+  already carries `when PreferredContactMethod is set`, and that guard **discharges**. Verified: guarded
+  → `Proved strategy=GuardInPath`; identical rule without the `when` → `Unresolved` + PRE0116. Zero
+  extra guards.
+
+**The corpus measurement.** Across `samples/`: 808 interpolation holes; 83 name an `optional` field;
+**none of the 83 sit in a value position** (the corpus compiles clean and an unguarded optional in a
+value-position hole is a hard error at HEAD, so there cannot be one); 71 of 83 already carry an
+`is set` guard the engine discharges from; **11 are unguarded** — `Test.precept:51`,
+`academic-course-registration.precept:172`, `calibration-management.precept:173`,
+`hotel-reservation-management.precept:132`, `incoming-material-inspection.precept:78`,
+`library-hold-request.precept:111`, `library-inter-library-loan.precept:275`,
+`maintenance-work-order.precept:98`, `non-profit-membership-renewal.precept:155` and `:163`,
+`prior-auth-appeal.precept:349`. Several of the 11 sit under a state-scoped `ensure X is set` that
+guarantees presence but that the proof engine cannot use — **BUG-060**. Those authors did guard; the
+engine cannot see it.
+
+**What this means.** Refuse-uniformly's demonstrated ceremony cost is ≤ 11 holes out of 808, some
+fraction of which is a compiler gap rather than an authoring need — which is why **BUG-060 must close
+before enrollment**, or a guard-workaround gets adopted for a compiler weakness and calcifies.
 
 ---
 
 ## Sections still to write
 
-This draft is honest about being partial. The following are required by the design skill for a
-language-surface change and are **not yet written**:
+Required by the design skill for a language-surface change and **not yet written** (this stays Draft):
 
-- **Philosophy Alignment** — the eleven-principle matrix. Principles 1, 4, 10, and 11 all have real
-  content here and three of them cut in different directions; the matrix is the place that gets
-  resolved, and it should not be written before Decision 4 lands.
-- **Language Design Grounding** — blocked on the commissioned comparator survey. `research/language/`
-  and `research/INDEX.md` were grepped for "interpolation", "optional", "null", "Option": **no
-  existing study covers this domain.** That gap is now recorded; the survey will either fill it or
-  the design will cite an inline survey.
-- **Audience and Teachability** — worked example, the `set`-position diagnostic wording promised under
-  Decision 3, and the 10-minute path.
-- **Semantic Rules** — R1/R2/R3 stated above in prose need reduction and typing-rule notation, plus
-  the soundness-preservation claim naming Principles 10 and 11 explicitly.
-- **Architecture Grounding** — layer placement (Decision 5), cross-component propagation, external
-  comparator.
+- **Philosophy Alignment** — the eleven-principle matrix. Principles 1, 3, 4, 10, 11 all have content;
+  the strict reading aligns with all five (it prevents rather than tolerates), but the matrix should be
+  written out.
+- **Language Design Grounding** — largely satisfied by the commissioned survey; needs the section
+  written citing it.
+- **Audience and Teachability** — the worked example (`"{Opt}"` → PRE0116 → author writes
+  `{if Opt is set then Opt else "…"}`), the diagnostic wording, and the 10-minute path.
+- **Semantic Rules** — R1/R2/R3 reduced to typing-rule notation, plus the soundness-preservation claim
+  naming Principles 10 and 11.
+- **Architecture Grounding** — Decision 5 filled to four legs; cross-component propagation.
 - **Inventory**, **Acceptance criteria**, **Doc-update enumeration**, **Falsifiers**.
 
 ## Open questions
 
-1. Decision 4 (the sentinel) and Decision 5 (placement) are unresolved. Both block Lock.
-2. Should the correction to `soundness-and-coverage.md:229` — that the value-fault fix is *not* the
-   same shape as the default-expression rows, because the message is not an expression — be applied
-   now as a standalone doc fix, or carried by this design's promotion? It is true independent of this
-   design's outcome, which argues for now.
-3. Four live defects were found while probing and reading source for this design. All are filed and
-   none is absorbed into this design: **BUG-056** (declaration-position typed-constant hole never
-   walked), **BUG-057** (optional event-arg refs treated differently in the two interpolation forms),
-   **BUG-058** (`InvalidInterpolationCoercion` has zero emission sites, so the collection rule is
-   unenforced everywhere), **BUG-059** (string-hole length floor contradicts its own doc comment and
-   feeds a provably-violating verdict). BUG-059 is the one that interacts with this design —
-   Decision 4 cannot be made without knowing which floor is correct.
+1. The residual owner call (§ The residual owner call) — accept the bounded prose-ceremony cost of
+   refuse-uniformly, or ask for a message-position relaxation (the survey-unprecedented positional
+   split). This is the one genuine open decision; it does not block the soundness conclusions.
+2. The correction to `soundness-and-coverage.md:229` — that the value-fault fix is *not* the same shape
+   as the default-expression rows (the message is not an expression), and that the arm is unbuilt — is
+   true independent of this design and could be applied now as a standalone doc fix rather than waiting
+   on this promotion.
+3. Six live defects were found while probing (all filed, none absorbed): **BUG-056** (declaration-position
+   typed-constant hole never walked), **BUG-057** (value walker under-mints optional arg refs),
+   **BUG-058** (PRE0051 dead — collection-in-interpolation unenforced), **BUG-059** (string-hole length
+   floor contradicts its own comment), **BUG-060** (state-scoped `ensure` doesn't discharge),
+   **BUG-061** (conditional narrows for args but not fields). BUG-057, BUG-060, BUG-061 are hard
+   sequencing dependencies (§ Preconditions and dependencies).
 
 ## Review record
 
-- **2026-07-23** — Draft written. Boundary cases probed against HEAD with `precept_compile`; results
-  recorded in § What HEAD actually does rather than asserted. Two brief-supplied cases (a conditional
-  arm, the `deleted-canon precedent as authority`) were struck on evidence: the language has no
-  ternary, and the deleted rule's premise is void. One brief-supplied claim was corrected: the
-  soundness doc's "same fix shape" characterisation of the value-fault fix is wrong.
-- **2026-07-23, second pass** — a commissioned comparator survey and an independent source-archaeology
-  pass both returned, and **both moved the document**:
-  - The survey (now at `research/language/expressiveness/absence-in-string-interpolation-survey-2026-07-23.md`)
-    found the draft's positional justification for Decision 3 **unprecedented** — no statically-checked
-    language in 13 surveyed splits its presence rule by string position, and Rust actively refutes it.
-    It also supplied a better mechanism (C#'s target-type framing, Jinja2's print-vs-compute axis) that
-    reaches the same tolerance without a position predicate. Decision 3 was rewritten from a locked
-    high-stakes decision into an **open two-sided fork** with a recommendation, and R3 was re-derived
-    as the same argument as R1 rather than a separate positional rule.
-  - The archaeology corrected the draft's claim that message holes "are never parsed." They *are*
-    parsed by the same `ParseInterpolatedString` value positions use, then flattened to the literal
-    `{}` and discarded (`Parser.Expressions.cs:558-564`) — the field name does not survive. It also
-    established that **nothing anywhere in the repo renders a message**, and surfaced the length-floor
-    contradiction now filed as BUG-059.
-- **2026-07-23, third pass** — the neutrally-framed sentinel agent returned and delivered **three
-  corrections, two of which were verified independently before being accepted** (the precept MCP
-  server was down, so verification used a direct `Compiler.Compile` harness against
-  `src/Precept/Precept.csproj`):
-  - `samples/insurance-claim.precept:96` interpolates `ClaimAmount`, which `:22` declares
-    `money in 'USD' default '0.00 USD'` — **required, not optional**. Miscited by this design.
-    *Verified by reading both lines.*
-  - `samples/customer-profile.precept:27` already carries `when PreferredContactMethod is set`, and a
-    rule-level guard **discharges** presence. *Verified: guarded rule → `Proved strategy=GuardInPath`;
-    the same rule without the `when` → `Unresolved` + PRE0116.* The design's single live motivating
-    example does not survive; § How big is the problem records this.
-  - A state-scoped `ensure X is set` does **not** discharge presence for a read in that state.
-    *Verified with the harness — `Unresolved` + PRE0116.* Filed as **BUG-060**, and it is a sequencing
-    dependency: it should close before message holes are enrolled.
-  The recommendation itself — no language-chosen sentinel; author-supplied fallback text or refuse —
-  is recorded under Decision 4 and left exploratory, because it introduces new language surface that
-  needs its own owner conversation.
-- **Adversarial pass against R1/R2: NOT YET RUN.** The survey and archaeology attacked the *scope* and
-  the *mechanism claims*; neither tried to find a program that R1 or R2 mis-classifies. Five validity
-  arguments and three cross-cutting rules written in prose without adversarial review on 2026-07-23
-  were all refuted within hours. This draft must not advance past `Draft` until that pass runs.
+- **2026-07-23** — Draft written. Boundary cases probed against HEAD. Two brief-supplied cases (a
+  ternary arm, "deleted-canon as authority") were struck on evidence. The soundness doc's "same fix
+  shape" characterisation was corrected.
+- **2026-07-23, second pass** — commissioned comparator survey + source-archaeology returned. The
+  survey found the positional justification unprecedented; the archaeology corrected "messages are
+  never parsed" (they are parsed then flattened to `{}`) and surfaced BUG-059. Decision 3 was opened
+  into a two-sided fork.
+- **2026-07-23, third pass** — the neutrally-framed sentinel agent returned three corrections, two
+  verified by harness: `insurance-claim.precept:96` interpolates a required field; `customer-profile.precept:27`
+  is already guarded; a state-scoped `ensure` does not discharge (BUG-060). The recommendation then on
+  file — "no language-chosen sentinel; author-supplied fallback is new surface" — was recorded as
+  exploratory.
+- **2026-07-24, turnaround** — the tolerant spine was **refuted three ways** and the recommendation
+  reversed to **refuse uniformly**:
+  - *Length machinery (verified live).* `set Marker = "{Opt}"` with both `Opt` and `Marker` at
+    `minlength 5 maxlength 5` proves length containment on `Opt`'s declared floor of 5; the presence
+    obligation is the *only* diagnostic holding the program (harness, 2026-07-24). Presence is
+    load-bearing; "unnecessary by construction" is false; no single sentinel is simultaneously ≥ every
+    field's minlength and ≤ every field's maxlength, so no sentinel is sound.
+  - *Three-lens panel.* Tolerance re-permits the silent empty-string coercion canon deleted across
+    c4d0abf8 → 9ab60e47 → current (null literal removed, absence first-class, reads require a guard).
+    Disqualified unanimously.
+  - *Red-team confirmed*, and corrected the strict framing: the rule is stated over what a hole
+    **reads**, not what it names (`{Opt is set}` names but does not read — `ProofEngine.cs:340-345`);
+    it is **recursive** at every depth (`{"prefix {Opt}"}` is a nested hole); the value-fault arm it
+    leans on is **unbuilt** (`62479cae` docs-only), not accomplished.
+  - *Owner correction on the fallback (verified live).* The coalescing idiom `if X is set then X else
+    "…"` already exists (`clinic-appointment-scheduling.precept:62`), discharges presence, and works
+    **inside** an interpolation hole (harness, 2026-07-24). Decision 4 dropped the "new surface /
+    consultation gate" framing; the sentinel question is moot under refuse-uniformly.
+  - *Two synthesis corrections folded.* The value-fault ruling did **not** make the two positions
+    symmetric — both arms are equally unbuilt. The business-domain String Coercion rows are **new
+    determinism (P3) surface**, each format a decision needing rationale — an adjacent gap, not a
+    settled prerequisite.
+  - *New verified probes added* (harness, 2026-07-24): the length-machinery refutation; the optional
+    event-arg hole minting nothing in a value position (BUG-057); the conditional fallback working
+    inside a hole for an arg; the field-vs-arg narrowing asymmetry (BUG-061).
+  - *Bugs filed/referenced*: BUG-056 … BUG-061; BUG-057/060/061 are hard sequencing dependencies.
+  - **Status stays Draft.** The one residual is the owner's friction judgment (§ The residual owner
+    call); Sections still to write remain, so this does not lock.
