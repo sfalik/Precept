@@ -27,6 +27,63 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-059: A string hole's length floor uses the field's `minlength` while the code's own comment says it must be 0 for optionals — and that floor drives a *provably violating* verdict (SOUNDNESS)
+
+- **Discovered**: 2026-07-23, during source archaeology for the presence-tolerant-rendering design pass.
+- **Symptom**: `HoleLengthInterval` (`src/Precept/Pipeline/ProofEngine.Lengths.cs:163-168`) documents a zero lower bound and gives the reason:
+
+  > "The lower bound is 0 (a hole could render empty for an optional/edge value), which is sound for a maxlength-direction proof"
+
+  That floor is applied only on the **non-string** path (`:180` — `return (0, digits);`). A string hole bypasses it at `:171-172` and inherits the field's declared `minlength` via `LengthIntervalFromModifiers` (`:235-241`). The file has **no reference to presence or optionality anywhere** — `grep -n "Presence\|Optional" src/Precept/Pipeline/ProofEngine.Lengths.cs` returns nothing.
+- **Why it is a soundness concern, not a cosmetic one**: the floor is not advisory. `TryLengthContainmentProof` uses it to return a **provably violating** verdict rather than an unresolved one — `:33-34`, `if (req.DeclaredMaxLength.HasValue && min > req.DeclaredMaxLength.Value) return false;`. If an absent optional renders as empty (which the comment at `:163-168` assumes), the computed floor overstates the true minimum, and the provably-violating branch can fire on a satisfiable program.
+- **Not yet reproduced with a witness.** The inconsistency is established from source; a live counterexample has not been constructed. That is the next step before this is treated as confirmed.
+- **Blocked on**: what an absent optional renders as is an open design decision (`docs/Working/presence-tolerant-message-rendering-2026-07-23.md`, Decision 4). Which floor is *correct* depends on it. The **inconsistency** between the two paths is a defect either way.
+- **Status**: Active — soundness, unwitnessed.
+
+### BUG-058: `InvalidInterpolationCoercion` (PRE0051) has zero emission sites, so "collections are a type error inside string interpolation" is unenforced everywhere
+
+- **Discovered**: 2026-07-23, during source archaeology for the presence-tolerant-rendering design pass. **Confirmed via `precept_compile` at HEAD.**
+- **Symptom**: canon states the rule twice — `docs/language/precept-language-spec.md:1553` (*"Collections are a type error inside string interpolation"*) and `docs/compiler/literal-system.md § String Coercion Table` (`Collection | **Compile error** — use .count`). Neither is enforced:
+
+  ```precept
+  precept ProbeF
+  field Tags as set of string maxlength 20
+  field Amount as decimal default 1
+  rule Amount > 0 because "tags are {Tags}"     # compiles clean
+  ```
+
+  and in a value position, `set Marker = "tags {Tags}"` produces only `PRE0135` (*"String value has ? character(s)"*) — a length-containment failure caused by the unknown width, not the type error canon specifies.
+- **Root cause**: `ResolveInterpolatedString` (`src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs:845-869`) performs no type validation on hole types at all; it resolves each hole and propagates error only. `InvalidInterpolationCoercion` (PRE0051, *"A {0} value cannot appear inside a text interpolation"*, `src/Precept/Language/Diagnostics.cs:489`) is allow-listed as never emitted: `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs:39` — `"InvalidInterpolationCoercion", // TypeMismatch fires instead (precision upgrade)`. `TypeMismatch` does not fire; nothing does.
+- **Note**: this is another instance of the false-tracking-comment pathology already recorded against this allow-list (see BUG-055).
+- **Status**: Active — canon states a compile error that no code emits.
+
+### BUG-057: Optional **event-arg** refs get a presence obligation inside a typed-constant hole but not inside a plain string hole
+
+- **Discovered**: 2026-07-23, during source archaeology for the presence-tolerant-rendering design pass.
+- **Symptom**: the two interpolation forms are walked with different flags in `CollectObligations`. `src/Precept/Pipeline/ProofEngine.cs:347-353` walks a plain `TypedInterpolatedString`'s holes passing `includeOptionalArgRefs` through unchanged (default `false`), while `:355-357` forces it on for an `InterpolatedTypedConstant` — `WalkExpression(slot.Expression, ctx, obligations, semantics, includeOptionalArgRefs: true)`. So `"{E.Arg}"` mints nothing for an optional event argument while `'{E.Arg} hours'` mints a presence obligation for the same reference.
+- **Relationship to BUG-053**: BUG-053 records an optional event argument read in arithmetic minting nothing. This is the same `includeOptionalArgRefs` gate seen from the interpolation side, and the two should be assessed together — they may share one fix.
+- **Not yet reproduced with a witness.** Established from source; the paired compile has not been run.
+- **Status**: Active — unwitnessed, likely a sibling of BUG-053.
+
+### BUG-056: A typed-constant interpolation hole in a **declaration** position is never walked, so an optional field flows into a qualifier unchecked
+
+- **Discovered**: 2026-07-23, while probing interpolation positions for the presence-tolerant-rendering design pass. **Confirmed via `precept_compile` at HEAD.**
+- **Symptom**:
+
+  ```precept
+  precept ProbeQ
+
+  field BaseCurrency as currency optional
+  field QuoteCurrency as currency default 'EUR'
+  field Rate as exchangerate in '{BaseCurrency}' to '{QuoteCurrency}' optional maxplaces 8
+  ```
+
+  → compiles with **zero proof obligations**. An unset `BaseCurrency` would flow into the exchange-rate qualifier.
+- **Contrast that establishes it is a gap, not a policy**: the identical construct in a *write* position is handled correctly — `set Window = '{Days} hours'` with `Days as integer optional` mints `Presence` and reports `PRE0116`.
+- **Root cause**: `CollectObligations` (`src/Precept/Pipeline/ProofEngine.cs:208`) enumerates construct surfaces by hand — transition/handler/hook actions, rule and ensure conditions, computed-field expressions, defaults, arg defaults. A field declaration's **qualifier** expressions are not among them.
+- **Related shape**: `samples/currency-exchange-rates.precept:24` uses exactly this construct in the shipped corpus (with `optional` on the `Rate` field itself, not on the qualifier sources), so the pattern is idiomatic and the gap is reachable.
+- **Status**: Active — fail-open obligation position.
+
 ### BUG-055: A function-argument constraint violation reports the wrong diagnostic, naming a function the call does not contain
 
 - **Discovered**: 2026-07-23, while re-checking whether owner-fork OF2 was already ruled. **Confirmed via `precept_compile` at HEAD.**
