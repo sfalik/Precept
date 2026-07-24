@@ -27,6 +27,25 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-054: The default-bound establishment check converts "undecided" into `Proved` (SOUNDNESS hole, and it fails open on the one obligation the establishment story rests on)
+
+- **Discovered**: 2026-07-23, while adversarially verifying a proposed cross-cutting rule that leaned on this obligation being trustworthy. It is not. **Confirmed via `precept_compile` at HEAD.**
+- **Symptom**:
+
+  ```precept
+  precept UndecidedProved
+
+  field Src as integer min -5 max 5 default 0
+  field Q as quantity in 'kg' nonzero default '{Src} kg'
+  ```
+
+  → `success: true`, `Default value of 'Q' must satisfy 'nonzero'` **Proved** by `Literal`. The default resolves statically to `0 kg`, which violates `nonzero`. Writing `default '0 kg'` directly is correctly rejected (`PRE0079`), so the engine can decide the predicate — it just does not, once the value arrives through interpolation.
+- **Root cause**: `ProofEngine.cs:1063-1065` treats the tri-state result as two-valued — `TryNumericDefaultBoundProof(...) == false ? Unresolved : Proved`. The helper returns `null` for undecided (`ProofEngine.Strategies.cs:66`, `:79`), and `null` is not `false`, so undecided becomes **Proved**. The safe mapping is the opposite: undecided must be `Unresolved`.
+- **Why it matters more than its size suggests**: the default-value obligation is the *only* establishment check that exists for a declared field modifier. Every argument that consumes a modifier as a premise leans on it, and it fails open. So the one row of the establishment story that looked solid is discharge-on-undecided.
+- **Scope / class**: SOUNDNESS, over-accept, on establishment.
+- **Fix complexity**: small — map `null` to `Unresolved`. Corpus impact wants measuring first, since anything currently riding the undecided path will start rejecting.
+- **Status**: Active — soundness hole.
+
 ### BUG-053: An optional event ARGUMENT read in a value position mints no presence obligation at all (SOUNDNESS hole)
 
 - **Discovered**: 2026-07-23, probe pass before drafting the presence validity argument. **Confirmed via `precept_compile` at HEAD — zero diagnostics and an empty obligation list.**
