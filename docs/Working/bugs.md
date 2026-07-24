@@ -27,6 +27,31 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-053: An optional event ARGUMENT read in a value position mints no presence obligation at all (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, probe pass before drafting the presence validity argument. **Confirmed via `precept_compile` at HEAD — zero diagnostics and an empty obligation list.**
+- **Symptom**:
+
+  ```precept
+  precept OptionalArgNoObligation
+
+  field Length as integer default 0
+
+  event Publish(Extra as integer optional)
+
+  on Publish
+      -> set Length = Publish.Extra + 1
+  ```
+
+  → `success: true`, **no diagnostics**, `proofObligations: []`. `Extra` is optional, is never checked, and is read in arithmetic. Fire `Publish()` without it and the addition operates on an absent value.
+- **The asymmetry that makes it a hole rather than a design choice**: the identical shape on a *field* is covered. An optional field read in a value position mints a `Presence` obligation and surfaces `PRE0116` when unproven. Fields are governed here and arguments are not, with nothing recording the distinction.
+- **Not enumerated anywhere either**: the argument position does not appear in `docs/compiler/soundness-and-coverage.md` § 3.2, so this is a position the coverage analysis does not know exists — which is why no test catches it.
+- **Second position with the same shape**: interpolation holes in message positions — a `because` clause and a `reject` message — also mint nothing. Same family: a syntactic position that expressions reach and that obligation collection never visits.
+- **Relationship to known work**: this is the obligation-position incompleteness class already identified as a standing soundness-infrastructure item, with two concrete new instances. The recorded fix shape for that class — catalog-declared child-expression positions plus a build-time checker that every position is visited — covers both.
+- **Scope / class**: SOUNDNESS, over-accept, by omission rather than by faulty reasoning.
+- **Fix complexity**: small per instance, but the instances are found one at a time by hand, which is the actual problem the position-catalog work addresses.
+- **Status**: Active — soundness hole.
+
 ### BUG-052: The collection count interval is re-seeded per action chain, so two chains in one operation each prove a bound the pair breaks (SOUNDNESS hole)
 
 - **Discovered**: 2026-07-23, probe pass before drafting the count-containment validity argument. **Confirmed via `precept_compile` at HEAD — zero diagnostics.**
