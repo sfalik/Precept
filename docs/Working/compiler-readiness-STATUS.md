@@ -33,9 +33,11 @@ The matrix is populated in slices. Ratification is an owner act, not a drafting 
 | **type-requirement family** | `Dimension` + `Modifier`, re-homed per the 07-21 scope ruling | its **own work item**, owes its own denominator | after slice 3 |
 | **4** | next constraint family | ⏸ **Gated** | verified-complete rule layer + weekly credit reset |
 
-The fault-family denominator is **ten** kinds (dropped from eleven when
-`IntervalContainment` re-homed from a minted kind to a discharge *strategy*, per the
-locked constraint-establishment/preservation design).
+The fault-family denominator is **provisionally ten** kinds (dropped from eleven when
+`IntervalContainment` re-homed from a minted kind to a discharge *strategy*). That re-home is
+Decision 2 of the constraint-establishment/preservation design — which is **unlocked**, and
+whose Decision 2 the adversarial review flagged as defective (scope mismatch). So the ten-kind
+count is contingent on that design re-locking; treat it as provisional until then.
 
 ## Rule layer status — the current bottleneck
 
@@ -88,9 +90,21 @@ stale 07-13 snapshot with a ⚠ header; the per-fork stamps below it are current
   family with `Dimension`/`Modifier` re-homed.
 
 **Locked designs (do not build against — they carry their own status):**
-- `obligation-linkage-and-completeness-2026-07-23.md` — **Locked 2026-07-23**.
-- `constraint-establishment-preservation-obligations-2026-07-23.md` — **Locked 2026-07-23**.
 - `presence-tolerant-message-rendering-2026-07-23.md` — refuse uniformly, **Locked 2026-07-24**, promoted (`63e4faeb`).
+
+**Unlocked / in rework (NOT landed — do not build against):**
+- `obligation-linkage-and-completeness-2026-07-23.md` — **UNLOCKED (Draft)**. Was locked for
+  a few hours 2026-07-23, then re-opened by adversarial review. Recorded defects: the
+  admissibility condition has no rejection power; `Expected(C)` misses `Update`/`Restore`;
+  misattributed witnesses; the DU has thirteen kinds, not eleven. See its `## Review record`.
+- `constraint-establishment-preservation-obligations-2026-07-23.md` — **UNLOCKED (Draft)**,
+  same story. Recorded defects: Decision 2 opens a soundness hole at non-handler write sites
+  (state entry/exit); scope collapses one kind and leaves `Length`/`CountContainment`; the WP
+  rule is not total (11 of 15 action kinds are not `field := expr`). See its `## Review record`.
+
+These two are the machinery that would make premise class (d) safe for the fault family
+(they provide the preservation obligation). **Re-locking them is the current blocker** — see
+the Resume pointer.
 
 ## Open owner questions (the real forks that gate progress)
 
@@ -102,22 +116,30 @@ From `…-cells/slice-3-boundary-report.md` (ranked by how much each unblocks):
 2. **Q2 — is premise class (d) (a rule holding in the pre-state) available to the fault
    family?** It is the exact path the known false-proof runs through; widening to (d)
    without a preservation obligation writes that bug into the definition. Blocks ~40 cells.
+   **This hinges on the establishment/preservation re-lock** (above) — those designs supply
+   the preservation obligation (d) needs, and they are unlocked with defects. Q2 is
+   answerable *from* those designs once re-locked, not a standalone open fork.
 3. The six smaller boundary questions (temporal-deferral scope; two premise classes with
    no vocabulary home; self-discharge inside one expression; two-sided index bounds;
    whether `mincount 1` discharges without its own establishment; base minimality).
 
 ## Resume pointer — ordered next steps
 
+0. **Re-lock the two establishment/preservation designs** (the current blocker) — fix the
+   Review-record defects in both, re-run adversarial review, owner sign-off. Until this
+   lands, premise class (d) is not safely available and the fault arguments below cannot be
+   authored soundly.
 1. **Finish the rule layer** — author the four argument-less kinds (`Numeric`, `Presence`,
    `CountContainment`, `AssignmentQualifier`) + redo the five refuted, **with adversarial
    rounds**.
-2. **Rule Q1 and Q2** (owner) — they govern the shape of those arguments and ~215 cells.
+2. **Rule Q1** (owner); **Q2** is answered by step 0's re-lock. These govern ~215 cells.
 3. **Regenerate the denominators** — the ten-kind fault family + the type-requirement family.
 4. **Re-author + re-ratify slice 3** (owner read, per the ratification protocol).
 5. **Slice 4** — gated on a verified-complete rule layer + credit reset.
 
-The establishment/preservation `/design` fork (which premise-(d) hinges on) is **done** —
-the two designs above are locked, so it is no longer a blocker.
+The establishment/preservation `/design` fork (which premise-(d) hinges on) is **NOT done** —
+both designs were locked for a few hours 2026-07-23, then re-opened by adversarial review and
+are Draft with recorded defects. Step 0 above is that re-lock.
 
 ## Pointers (what each source doc owns)
 
