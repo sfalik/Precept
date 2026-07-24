@@ -269,7 +269,23 @@ Two locked texts give incompatible answers for `field Tags as set of string note
 
 **Frank's recommendation (not ratified — owner must rule):** **string-only; `primitive-types.md:582` is the drift.** Three locked surfaces say string-only (`precept-language-spec.md:1150, :1671, :435`; `collection-types.md:794`) against primitive-types.md's one overreach. Architecturally decisive: collection cardinality vocabulary is deliberately single-source (`mincount`/`maxcount` in the Constraints catalog); making `notempty` a second spelling of `mincount 1` creates two ways to say one thing and muddies the inner-type-vs-field-level distinction (`set of string notempty` already means *each element* non-empty). Frank would downgrade this from owner-fork to **doc-drift-with-forced-resolution** — fix `primitive-types.md:582` to string-only — but keep it surfaced because it touches Constraints-catalog applicability metadata (language surface).
 
-### OF4 — Are `in`-qualified periods orderable? *(Re-extract #9)* — ⚠️ **RE-CHECKED 2026-07-23: NOT already ruled, and this entry understates it. It is a behavioural fork with three outcomes, not a doc fix.**
+### OF4 — Are `in`-qualified periods orderable? *(Re-extract #9)* — ✅ **RULED BY THE OWNER 2026-07-24: outcome (a) — orderable when same-basis-pinned, enforced at the comparison site.**
+
+> **Ruling (owner, 2026-07-24):** `in`-qualified periods are **orderable exactly when both operands share one declared single basis** (`period in 'days'` vs `period in 'days'`), scalar and collection alike. Cross-basis (`days` vs `months`) and unqualified periods are **not** orderable and must be rejected at the comparison site. This is outcome (a) with the same-basis guard; it subsumes (c) (the collection-accessor position is the special case where a single basis is structurally guaranteed).
+>
+> **Deciding evidence — NodaTime 3.3.3, verified by reflection (2026-07-24).** `NodaTime.Period` implements `IEquatable` but **not** `IComparable`/`IComparable<Period>` — no `CompareTo`, no `op_LessThan`. NodaTime deliberately omits period ordering for D14's own reason (no fixed length without a reference date). `NodaTime.Duration` *is* fully orderable (`IComparable`, `IComparisonOperators`, `<`) because it is a fixed span. **But** a single-basis period's live component is a plain integer (`Period.FromDays(5).Days` → `Int32`), so same-basis ordering never calls `Period.CompareTo` — it reduces to integer comparison of the one extracted component, which is total and well-defined. Cross-basis comparison is exactly what NodaTime refuses and what has no coherent answer. So the ruling draws the orderable/not line precisely where NodaTime (and arithmetic) draws it: same basis yes, mixed basis no.
+>
+> **Downstream consequences (build, not settled here):**
+> - **D14 (`temporal-type-system.md:1476`) needs the same-basis carve-out** — it currently reads as an absolute "no ordering, `==`/`!=` only." `collection-types.md:533` is *not* drift under this ruling; it is the same-basis rule already applied in the accessor position.
+> - **New mechanism required → `/design`.** `TypeTrait` is a flat per-`TypeKind` flag; a qualifier-conditional, same-basis-checked ordering trait does not exist. This is new language surface (ordering operators on a type that has none today) and routes through the pre-design gate before build. Neither reading is implemented at HEAD.
+> - **Close the business-type false-clean in the same rule.** `set of money` **unqualified** → `.max` compiles today (`collection-types.md:530` says it should be a type error — a live false-clean cross-currency ordering). The same "orderable only when a single basis/currency is shared" rule should govern both the temporal and the business lanes; design them together.
+> - **BUG-047 is no longer mechanical.** Its `positive`-on-`period` strip was justified as a mechanical D14 correction; under (a) a qualified period *is* orderable against `Period.Zero`, so `positive`/`nonnegative` on a same-basis period is meaningful. Do not action the strip; re-evaluate it under this ruling.
+
+---
+
+*(Original 2026-07-23 re-check retained below for the reasoning that led here.)*
+
+> **⚠️ RE-CHECKED 2026-07-23: NOT already ruled, and this entry understates it. It is a behavioural fork with three outcomes, not a doc fix.**
 
 > **The 2026-05-30 owner Resolution rules the premise, not the conclusion.** That Resolution permits a single-basis `period` *divisor* because it has "a well-defined unit *and* count". That is the premise the YES reading needs, and it is owner-authored. It also disposes of the objection that D14 already considered this: D14's rejected alternatives are *reference-date* and *approximate* ordering, and single-basis ordering is neither.
 >
