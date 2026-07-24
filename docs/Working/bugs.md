@@ -27,6 +27,45 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-036: A dynamic (interpolated) TEMPORAL qualifier (`period of '{Dim}'`, `period in '{Unit}'`) builds no qualifier meta and is dropped silently — no enforcement, no diagnostic (coverage/soundness-adjacent)
+
+- **Discovered**: 2026-07-21, while re-attacking the type-structural context validity argument. **Source-derived (code reading), symptom repro pending** — an attempt to reproduce hit `choice`-declaration syntax errors, so the clean witness is not yet confirmed via `precept_compile`; the code path below is the evidence.
+- **Root cause** (reported from source): the interpolated-qualifier meta builder `MapInterpolatedQualifier` (`TypeChecker.cs:389-398`) has arms for the Currency and Unit axes but **none for `TemporalDimension` / `TemporalUnit`**. A `period of '{Dim}'` / `period in '{Unit}'` parses (`Parser.Types.cs:346-354` accepts a `TypedConstantStart` for any catalog slot; period's `QS_TemporalUnitOrDimension` carries both slots, `Types.cs:34-38`), the switch returns `null`, and the null is dropped with no diagnostic (`TypeChecker.cs:313-320`).
+- **Symptom (predicted, unconfirmed)**: a declared dynamic temporal qualifier neither mints a compatibility/dimension obligation nor raises a diagnostic — the qualifier silently vanishes, so a temporal-dimension mismatch over such fields would not be caught. Same *family* as BUG-035 (dynamic qualifier mishandled) but a different failure mode: BUG-035 *over-proves* a dynamic currency/unit fact; this one *never creates* the temporal fact at all.
+- **Scope / class**: coverage gap with a soundness edge — an obligation that should exist is never minted, silently. Confirm the direction (silent-accept vs. type-error) once a clean repro lands.
+- **Fix complexity**: small — add the `TemporalDimension` / `TemporalUnit` arms to `MapInterpolatedQualifier`, and emit a diagnostic (not a silent null) for any interpolated-qualifier axis the builder does not handle, so a future missing arm fails loudly.
+- **Priority**: quality bar (pending confirmation it is a live silent-accept rather than caught elsewhere).
+- **Repro**: pending correct `choice`/dynamic-temporal syntax.
+- **Status**: Active — source-derived, repro pending.
+
+### BUG-035: Dynamic (interpolated) qualifier compatibility is proved by symbolic equality with no frame check on the source field — a false `Proved` when the source field is written mid-handler (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-21, while red-teaming the type-structural context validity argument; **symptom behaviorally confirmed via `precept_compile`** (compile-clean, obligation `Proved`), root cause reported from source reading, not line-verified here.
+- **Scope**: qualifiers whose value is interpolated from a runtime field — `money in '{Curr}'`, `quantity in '{Unit}'` (the Tier-2 "Dynamic — requires narrowing" class, `business-domain-types.md` § interpolated qualifiers). Two operands both carrying `SourceFieldName = "Curr"` are accepted as currency-compatible by *symbolic* equality ("both are `{Curr}`"), independent of `Curr`'s value.
+- **Wider than the bare-identifier form (confirmed via `precept_compile`)**: the hole is not limited to holes that resolve to a clean source-field name. `ExtractSourceFieldName` (`TypeChecker.cs:406-434`) returns `null` — with no diagnostic — for any hole that is not a bare identifier or root member access (grouped `'{(Curr)}'`, unary, multi-hole, text-bearing), while the qualifier meta is still built as a dynamic brace-template (`TypeChecker.cs:388-397`). `money in '{(Curr)}'` in the repro above compiles clean, `QualifierCompatibility` **Proved**, currency-carrying write on the route — the same mixed-currency addition through a second dynamic spelling. So both the compatibility proof (this bug) and any fix that keys on `SourceFieldName` being populated must treat *every* dynamic brace-template as a value-fact, not only the ones whose source field extracts.
+- **Narrowing / resolved discharge paths miss the source-field kill entirely (PLAUSIBLE, source-derived while writing the transport validity argument)**: even where staleness *is* checked, it checks the wrong field. `NarrowedValueFromGuard` keys its `ReassignedBefore` check to the **subject operand's field only** (`ProofEngine.QualifierNarrowing.cs:136/:142/:158`), so a reassignment of an *interpolation source* field (the `SourceFieldName`, distinct from the subject) escapes the kill. Worse, the resolved/declared discharge paths — `TryAssignmentQualifierProof` (`:46-49`) and `TryQualifierAxisNarrowingProof` (`:104-116`) — take `ExtractComparableValue(declared)` with **no `ReassignedBefore` consultation for either operand**, and interpolated qualifiers resolve down this declared path, so their source-field reassignment is checked by nothing. Reachable to a stale `Proved` only when the source field is itself open/narrowed (else the interpolated qualifier is transitively immutable) — hence PLAUSIBLE, pending a witness program. The definition-side fix is the transport rule's `deps(φ) = mention-set ∪ provdeps(φ)` closure (provdeps closes over the qualifier's provenance source fields); the compiler under-implements that closure, symmetric to the BUG-033 write-surface residue.
+- **Symptom / confirmation**: writing the source field between an operand's provenance and the compatibility site is not framed out, so the stale "same `{Curr}`" fact still discharges:
+
+  ```precept
+  precept CurrencyLedger2
+  field Curr as currency default 'USD'
+  field Balance as money in '{Curr}' default '0 {Curr}' nonnegative
+  event Rebase(NewCurr as currency, Deposit as money in '{Curr}')
+  on Rebase
+      -> set Curr = Rebase.NewCurr
+      -> set Balance = Balance + Rebase.Deposit
+  ```
+
+  → `success: true`, `QualifierCompatibility` **Proved** (strategy `QualifierCompatibility`). `Deposit` entered under the old `Curr`; `set Curr = NewCurr` relabels `Balance` to the new currency; `Balance + Deposit` then adds values whose currencies have been decoupled, yet is proved compatible. Same failure shape as the guard-fact transport bugs, on the qualifier axis.
+- **Scope / class**: **SOUNDNESS** — the over-accept / false-clean direction. A silently mixed-currency addition.
+- **Root cause** (reported, not line-verified here): the symbolic/interpolated-equality path in `ProofEngine.Qualifiers.cs` (`QualifiersAreCompatible` / `ChainQualifiersMatch`, reported ~:105-179) accepts two operands sharing a `SourceFieldName` without checking that the source field is not written on the route between each operand's provenance and the compatibility site — the qualifier axis has no analogue of the `ReassignedBefore` / frame-and-kill the numeric guard strategies use.
+- **Related**: this is the interpolated-qualifier case of the 2026-07-21 structural-fact citation ruling — an interpolated qualifier is a *value-fact* (an operation can invalidate it), not a type-structural context fact; the definition treats it under the full establish/preserve citation duty, which the shipped symbolic-equality proof does not honor. The transport rule's frame-and-kill is the mechanism the fix should reuse on the qualifier axis.
+- **Workaround used**: none.
+- **Fix complexity**: small-to-medium — extend the qualifier compatibility proof with the same source-field frame/kill the numeric strategies carry.
+- **Priority**: live false-clean on the fault guarantee (qualifier axis).
+- **Repro**: as above.
+- **Status**: Active — soundness hole.
+
 ### BUG-033: An action's `into` binding target is not treated as a write site — a guard fact survives a write to the field it constrains, giving a false `Proved` (SOUNDNESS hole)
 
 - **Discovered**: 2026-07-21, while establishing whether the set of in-operation writers is closed; **behaviorally confirmed via `precept_compile`**, not grep-only.
