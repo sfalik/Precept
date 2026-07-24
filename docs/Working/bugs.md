@@ -27,6 +27,39 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-051: A `mincount` is consumed as proof a collection is non-empty, with no establishment obligation anywhere (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, probe pass before drafting the collection-non-empty validity argument. **Confirmed via `precept_compile` at HEAD.**
+- **Symptom**:
+
+  ```precept
+  precept MincountNeverEstablished
+
+  field Items as list of decimal mincount 1 maxcount 5
+  field Picked as decimal default 0.0
+
+  event Look()
+
+  on Look
+      -> set Picked = Items.first
+  ```
+
+  → `success: true`, `List must be non-empty` **Proved** by `DeclarationAttribute`. The obligation list contains **no establishment obligation for `Items`**. The collection has no default and no write site anywhere in the file, so it can only ever be empty — and `.first` on it is proved safe.
+- **Same class as BUG-048**, on a different declaration: a declared fact is consumed as a premise while nothing anywhere establishes it. Together they are two instances of the machinery the constraint-establishment design was meant to build, which is currently unlocked.
+- **Fix complexity**: blocked on that machinery. Until it exists, a `mincount` cannot soundly discharge a non-empty precondition.
+- **Status**: Active — soundness hole.
+
+### BUG-050: The declaration-attribute discharge never checks whether the field was reassigned, so a declared fact survives the write that breaks it (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, across two independent probe passes — the non-negative-operand and collection-non-empty argument drafts found it on different obligations. **Confirmed via `precept_compile` at HEAD.**
+- **Root cause, and it is one missing check**: `TryDeclarationAttributeProof` (`ProofEngine.Strategies.cs:85-228`) never consults `ReassignedBefore`, while `TryGuardInPathProof` does (`:771`). So a fact taken from a declaration survives a write in the same chain that falsifies it, where the identical program written with a guard is correctly rejected.
+- **Symptom A — sign**: `field A as number nonnegative` with `set A = approximate(0.0 - 4.0)` followed by `set R = sqrt(A)` in the same chain compiles with zero diagnostics, `Proved` by `DeclarationAttribute`. The mirror program using a guard instead of a declaration is rejected.
+- **Symptom B — collection**: `field Items as list of decimal mincount 1` with `set Items = Other` (where `Other` carries no `mincount`) followed by `Items.first` reports `List must be non-empty` **Proved**. Full-value replacement emits no count obligation, and the discharge consults neither `ReassignedBefore` nor `CountInvalidatedBefore`.
+- **Why it matters beyond these two**: this is the declaration-sourced half of the sequential-proof-flow guarantee the spec claims is implemented — *"When a field is reassigned, prior proof facts about that field are invalidated before the new assignment's facts are stored"* (`precept-language-spec.md` § 0.6, Proof philosophy 7). It holds for guard-sourced facts and not for declaration-sourced ones, so the guarantee is half-built and the docs do not say which half.
+- **Scope / class**: SOUNDNESS, over-accept, reaching every obligation that can discharge from a declaration — divisor, non-negative, non-empty, and the qualifier kinds.
+- **Fix complexity**: small in mechanism — consult `ReassignedBefore` on the declaration path as the guard path already does — but it will surface wherever a declared fact is currently doing work it has not earned, so the corpus impact wants measuring before it lands.
+- **Status**: Active — soundness hole.
+
 ### BUG-049: Unit normalization silently rounds every conversion to 24 decimal places, contradicting two canonical exactness guarantees
 
 - **Discovered**: 2026-07-23, by a canon search checking whether the quantity/price bound question was already ruled. It was not — but the rounding turns out to contradict locked spec, so this is a bug rather than an open ruling.
