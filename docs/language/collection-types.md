@@ -530,7 +530,7 @@ All temporal and business-domain types are valid collection inner types. Orderin
 | `period` | ✗ — type error | Equality-only (unqualified). Structural components are not directly comparable — `'1 month'` has no fixed length. See Decision #14 in temporal-type-system.md. |
 | `period of 'date'` | ✗ — type error | Equality-only. Category constraint (years/months/weeks/days only). Used as arithmetic-safety qualifier for `date ± period` — not an ordering qualifier. |
 | `period of 'time'` | ✗ — type error | Equality-only. Category constraint (hours/minutes/seconds only). Used as arithmetic-safety qualifier for `time ± period` — not an ordering qualifier. |
-| `period in 'days'` | ✓ | Unit-qualified: all elements are single-basis periods. Ordering is by single component value (`.days`). Valid bases: `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`. |
+| `period in 'days'` | ✗ — type error | Equality-only. Unit-pins to a single basis (valid bases: `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`) — an arithmetic/assignment qualifier, not an ordering qualifier. Periods do not order regardless of basis. See Decision #14 in temporal-type-system.md. |
 | `timezone` | ✗ — type error | Equality-only. No natural ordering across timezone identifiers. |
 | `zoneddatetime` | ✗ — type error | Equality-only. NodaTime native equality compares instant + calendar + zone; two values representing the same moment in different timezones are different elements. |
 
