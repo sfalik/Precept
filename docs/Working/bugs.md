@@ -27,6 +27,37 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-060: A state-scoped `ensure X is set` does not discharge presence for reads in that state (over-rejection)
+
+- **Discovered**: 2026-07-23, verifying an independent agent's claim during the presence-tolerant-rendering design pass. **Confirmed at HEAD via a direct `Compiler.Compile` harness** (the precept MCP server was disconnected; the harness references `src/Precept/Precept.csproj` and prints `Compilation.Diagnostics` plus `Proof.Obligations`).
+- **Symptom**:
+
+  ```precept
+  precept StateEnsurePresence
+
+  field Opt as string optional maxlength 20
+  field Note as string maxlength 60 default ""
+
+  state Ready initial
+  state Done terminal
+
+  in Ready ensure Opt is set because "Opt must be present in Ready"
+
+  event Go()
+
+  from Ready on Go
+      -> set Note = "value is {Opt}"
+      -> transition Done
+  ```
+
+  → `UnprovedPresenceRequirement` (PRE0116) — *"Cannot prove that 'Opt' is present (used on event 'Go' from state 'Ready') — guard with 'when Opt is set', initialize it earlier, or make it required"*, obligation `Unresolved`, no strategy.
+
+  The state invariant guarantees `Opt` is present at every read while in `Ready`, and the read is on a transition out of `Ready`. The engine cannot see it.
+- **Contrast that isolates the gap**: a **rule-level** guard does discharge. Verified in the same harness — `rule Pref == "email" or Phone is set when Pref is set because "…"` yields `PresenceProofRequirement Proved strategy=GuardInPath`, while the identical rule without the `when` yields `Unresolved` + PRE0116. So guard-sourced presence works; **state-invariant-sourced presence does not participate**.
+- **Class**: completeness gap / over-rejection, not a soundness hole — it rejects valid programs rather than accepting invalid ones.
+- **Why it is load-bearing right now**: `docs/Working/presence-tolerant-message-rendering-2026-07-23.md` would enroll presence at interpolation holes. A corpus scan found several sample files whose message holes rely on exactly this shape — a state-scoped `ensure X is set` upstream of the read. If holes are enrolled before this gap closes, those authors get an error caused by the engine's blindness rather than by their own omission, and any fallback syntax added by that design becomes a permanent workaround for a compiler weakness. **This should close before message holes are enrolled.**
+- **Status**: Active — over-rejection; sequencing dependency for the rendering design.
+
 ### BUG-059: A string hole's length floor uses the field's `minlength` while the code's own comment says it must be 0 for optionals — and that floor drives a *provably violating* verdict (SOUNDNESS)
 
 - **Discovered**: 2026-07-23, during source archaeology for the presence-tolerant-rendering design pass.

@@ -233,6 +233,42 @@ assume typed-constant holes are uniformly handled.
 
 ---
 
+## How big is the problem, actually
+
+This section exists because the design's motivating premise did not survive measurement, and that has
+to be visible rather than buried.
+
+The premise was the owner's: enrolling presence at a message hole *"would force authors to guard the
+field they are reporting on."* The draft cited two shipped samples as live instances. **Neither is
+one.**
+
+- **`samples/insurance-claim.precept:96`** — `-> reject "Police-report claims are capped at $100,000 (you submitted {ClaimAmount})"`. `ClaimAmount` is declared at `:22` as `field ClaimAmount as money in 'USD' default '0.00 USD'` — **required, with a default**. It is not optional, so it would mint no presence obligation under any reading. Miscited.
+- **`samples/customer-profile.precept:27`** — the rule interpolates the optional `PreferredContactMethod`, but it already carries `when PreferredContactMethod is set`, and **that guard discharges the obligation.** Verified at HEAD in a direct-harness probe: a rule-level `when X is set` yields `PresenceProofRequirement Proved strategy=GuardInPath`, while the identical rule without the `when` yields `Unresolved` + PRE0116. So enrolling this message would cost **zero** extra guards. The design's single live motivating example does not survive.
+
+**The corpus measurement.** Across `samples/`: 808 interpolation holes; 83 name an `optional` field;
+**none of the 83 sit in a value position**; 71 of 83 already carry an `is set` guard in scope that
+the engine discharges from; **11 are unguarded in scope** — `Test.precept:51`,
+`academic-course-registration.precept:172`, `calibration-management.precept:173`,
+`hotel-reservation-management.precept:132`, `incoming-material-inspection.precept:78`,
+`library-hold-request.precept:111`, `library-inter-library-loan.precept:275`,
+`maintenance-work-order.precept:98`, `non-profit-membership-renewal.precept:155` and `:163`,
+`prior-auth-appeal.precept:349`.
+
+*(The "none in a value position" figure is not merely counted — it follows: the corpus compiles clean,
+and an unguarded optional in a value-position hole is a hard error at HEAD, so there cannot be one.)*
+
+**And several of the 11 are not authoring gaps at all.** They sit under a state-scoped
+`ensure X is set` that guarantees presence but that the proof engine cannot use — filed as
+**BUG-060**, verified at HEAD. Those authors did guard; the engine cannot see it.
+
+**What this means for the design.** The real, unforced demand is at most 11 holes out of 808, and
+some fraction of those 11 is a proof-engine gap rather than an authoring need. That does not make the
+design wrong — the rules below still have to be *stated* somewhere, because the message position is
+currently unchecked in every respect and the already-ruled value-fault arm forces it open regardless.
+But it does mean the design should not be justified as relieving author burden, and **BUG-060 should
+close before message holes are enrolled**, or a fallback annotation will get adopted as a workaround
+for a compiler weakness and become permanent noise in the corpus.
+
 ## The proposal
 
 ### The core semantic
@@ -371,10 +407,10 @@ incomplete in a second, unrelated way.
   classification has to live somewhere durable rather than in the walker's control flow.
 - **Alternatives considered**:
   - *Enroll presence like any other read.* Rejected on the owner's stated ground: it forces an author
-    to guard the field the message is reporting on. `samples/customer-profile.precept:27` is a live
-    corpus instance — `rule PreferredContactMethod == "email" or Phone is set when PreferredContactMethod is set because "Preferred contact method is {PreferredContactMethod} but no phone number is stored"`
-    — where the message interpolates the very optional whose absence the rule is about. Under this
-    alternative that rule requires a second guard for the message alone.
+    to guard the field the message is reporting on. **But see § How big is the problem, actually —
+    that ground is much weaker than this design assumed, and the two corpus instances originally
+    cited for it do not support it.** This alternative is closer to live than the draft first
+    suggested, and Decision 1 should not be locked until § How big is the problem is resolved.
   - *A positional carve-out ("messages are exempt from presence").* Rejected because it states an
     exception to Principle 10 rather than satisfying it. An exception is a place where the totality
     guarantee is known not to hold, which is precisely what the philosophy refuses to accumulate.
@@ -546,11 +582,43 @@ pass. It needs an owner ruling; the analysis below is complete enough to make th
   what they recommend"* — so committing here would defeat the instruction. Independently, the width
   finding recorded above means the choice has a proof consequence that no candidate has yet been
   evaluated against.
-- **Working hypothesis**: None. The candidates under survey, in no order: the empty string; a word
-  such as `unset` / `none` / `n/a`; a typographic mark such as `—`; a parenthetical such as
-  `(not set)`; the field's own name; a type-specific rendering; an author-specified fallback; and
-  refuse-to-compile (no sentinel at all). Each has a different interaction with the length interval
-  and a different exposure to Principle 4's inspectability objection raised under Decision 1.
+- **The neutral recommendation, returned 2026-07-23**: **no language-chosen sentinel at all.** An
+  absent value renders as text the author wrote at the hole; if the author wrote none and presence is
+  not provable, it does not compile. Every language-chosen sentinel — empty string, word,
+  typographic mark, parenthetical, field name, type-specific — is rejected. Its strongest arguments:
+
+  - **The two systems that lived with this longest both moved away from a language-chosen default,
+    and neither moved toward a better word.** Swift shipped a default with a warning in 2016 and ten
+    years later shipped `\(age, default: "missing")`. Jinja2 shipped the empty string and then shipped
+    `StrictUndefined` because the default was a production footgun. Picking a sentinel now is picking
+    the thing both mature comparators eventually replaced.
+  - **Precept already makes this exact move.** Principle 9 refuses to let the language generate the
+    human text explaining a constraint — `because` is mandatory. Absent-case rendering is the same
+    category of text: human-facing and not derivable from anything in the definition.
+  - **It is the only option that gives the author a lever on the length interval.** A fallback is a
+    literal in the file, so both endpoints of the hole's width interval are author-visible and
+    author-controlled. Every language-chosen sentinel imposes a width the author cannot see or change.
+  - **Specific disqualifications worth recording**: `null` is out — `precept-language-spec.md:610`
+    removed the literal entirely, and rendering the word reintroduces the concept in the surface the
+    domain expert reads. An em dash is out — it is Precept's house message punctuation, so against
+    `customer-profile.precept:27` it renders *"…method is — but no phone number is stored — the
+    preference is unreachable…"*, two em dashes in one sentence, one data and one punctuation. The
+    field's own name is out — it renders as a *broken template*, telling the reader the engine failed
+    when it worked. Refuse-to-compile *alone* is out because Precept has no `??` and no ternary, so
+    an author who wants to name the absent case would have no way to say it.
+
+- **Why this stays exploratory rather than being adopted.** The recommendation introduces **new
+  language surface** — a fallback annotation at the hole. That is a fresh Pre-Design Owner
+  Consultation item in its own right, not something this design can absorb: the owner was consulted
+  on presence tolerance for message rendering, not on adding syntax to the interpolation hole. It
+  also interacts with Decision 3 (the recommendation argues for one rule across both positions) and
+  with the § How big is the problem finding above, which weakens the case for doing anything at all.
+
+- **Exploratory because**: the recommendation is off the candidate list it was given and requires an
+  owner conversation before it can be a decision.
+
+- **Decision needed before**: any spec text is written, and before the obligation-creation sweep
+  implements the value-fault arm — the sweep touches the same code path.
 - **Decision needed before**: any spec text is written, and before the obligation-creation sweep
   implements the value-fault arm — the sweep touches the same code path.
 - **Open questions**:
@@ -631,6 +699,23 @@ language-surface change and are **not yet written**:
     `{}` and discarded (`Parser.Expressions.cs:558-564`) — the field name does not survive. It also
     established that **nothing anywhere in the repo renders a message**, and surfaced the length-floor
     contradiction now filed as BUG-059.
+- **2026-07-23, third pass** — the neutrally-framed sentinel agent returned and delivered **three
+  corrections, two of which were verified independently before being accepted** (the precept MCP
+  server was down, so verification used a direct `Compiler.Compile` harness against
+  `src/Precept/Precept.csproj`):
+  - `samples/insurance-claim.precept:96` interpolates `ClaimAmount`, which `:22` declares
+    `money in 'USD' default '0.00 USD'` — **required, not optional**. Miscited by this design.
+    *Verified by reading both lines.*
+  - `samples/customer-profile.precept:27` already carries `when PreferredContactMethod is set`, and a
+    rule-level guard **discharges** presence. *Verified: guarded rule → `Proved strategy=GuardInPath`;
+    the same rule without the `when` → `Unresolved` + PRE0116.* The design's single live motivating
+    example does not survive; § How big is the problem records this.
+  - A state-scoped `ensure X is set` does **not** discharge presence for a read in that state.
+    *Verified with the harness — `Unresolved` + PRE0116.* Filed as **BUG-060**, and it is a sequencing
+    dependency: it should close before message holes are enrolled.
+  The recommendation itself — no language-chosen sentinel; author-supplied fallback text or refuse —
+  is recorded under Decision 4 and left exploratory, because it introduces new language surface that
+  needs its own owner conversation.
 - **Adversarial pass against R1/R2: NOT YET RUN.** The survey and archaeology attacked the *scope* and
   the *mechanism claims*; neither tried to find a program that R1 or R2 mis-classifies. Five validity
   arguments and three cross-cutting rules written in prose without adversarial review on 2026-07-23
