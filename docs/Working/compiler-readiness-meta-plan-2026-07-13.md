@@ -19,6 +19,8 @@ reconciles: >
   meta-plan-design-conformance-2026-07-13.md (re-extraction totality gate; bidirectional no-orphan traceability).
 ---
 
+> **Current status / where-are-we is tracked in [`compiler-readiness-STATUS.md`](compiler-readiness-STATUS.md) — read it first.** This doc owns the whole-compiler methodology spine; the STATUS page owns current state.
+
 # Meta-Plan — Methodology for a Complete-Compiler Readiness Plan
 
 ## What this document is (and is not)
