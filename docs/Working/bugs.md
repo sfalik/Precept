@@ -27,6 +27,25 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-055: A function-argument constraint violation reports the wrong diagnostic, naming a function the call does not contain
+
+- **Discovered**: 2026-07-23, while re-checking whether owner-fork OF2 was already ruled. **Confirmed via `precept_compile` at HEAD.**
+- **Symptom**:
+
+  ```precept
+  precept PowExponent
+
+  field B as integer default 2 editable
+  field P as integer <- pow(B, -1)
+  ```
+
+  → `PRE0084` — *"'-'1'' can be negative in the computed expression for field 'P', so **sqrt(...) is unsafe**"*. There is no `sqrt` in the file. The underlying obligation is correct and correctly named — `Exponent must be non-negative for integer pow`, `Unresolved` — so the proof machinery works; only the reporting is wrong.
+- **Root cause**: `ProofEngine.Diagnostics.cs:390-392` picks the diagnostic code from the *threshold shape* rather than from what the obligation is about — a `>= 0` comparison against zero is assumed to be `sqrt`, anything else `DivisionByZero`. There is no arm for a requirement whose subject is a function parameter.
+- **The correct code already exists and is unused.** `FunctionArgConstraintViolation` (PRE0022) is defined, carries `[StaticallyPreventable]`, and has zero emission sites. It is also allow-listed with a comment claiming *"TypeMismatch fires instead (precision upgrade)"* — nothing fires; `round(X, -1)` compiles clean. That is a fourth instance of the false-tracking-comment pathology already recorded against this allow-list.
+- **Scope / class**: wrong diagnostic on a correct rejection — not a soundness hole, but actively misleading, since it sends the author looking for a function that is not there.
+- **Fix complexity**: small — route on the requirement's subject rather than its threshold shape, then drop the allow-list entry.
+- **Status**: Active — misreporting.
+
 ### BUG-054: The default-bound establishment check converts "undecided" into `Proved` (SOUNDNESS hole, and it fails open on the one obligation the establishment story rests on)
 
 - **Discovered**: 2026-07-23, while adversarially verifying a proposed cross-cutting rule that leaned on this obligation being trustworthy. It is not. **Confirmed via `precept_compile` at HEAD.**
