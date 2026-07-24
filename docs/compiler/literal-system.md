@@ -549,6 +549,10 @@ When an expression inside `{...}` in a string literal evaluates to a non-string 
 | `period` | NodaTime canonical string |
 | Collection | **Compile error** — use `.count` |
 
+**No absence row.** Under the read rule for interpolation holes (an optional read at a hole enrolls presence — `precept-language-spec.md § String interpolation`), an absent `optional` never reaches the renderer: an unguarded optional at a hole is refused at compile time, so "what does absence render as" does not arise and the table needs no absence entry.
+
+**Adjacent gap (unfinished P3 surface).** This table covers thirteen scalar types; it omits the seven business-domain types (`money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`) and `choice`. How a *present* value of those types renders to display text is a cluster of determinism decisions (precision, symbol vs. code, unit rendering), each owing its own rationale — not a mechanical fill-in, and out of scope for the interpolation-read rule.
+
 ---
 
 ## Future Extensibility

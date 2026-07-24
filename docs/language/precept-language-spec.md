@@ -1550,7 +1550,7 @@ Type is the type of the inner expression. Transparent.
 
 #### String interpolation
 
-Each `{expr}` inside `"..."` is type-checked independently. Any scalar type is coercible to string. Collections are a type error inside string interpolation.
+Each `{expr}` inside `"..."` is type-checked independently. Any scalar type is coercible to string. Collections are a type error inside string interpolation. **An interpolation hole is a read:** an `optional` field read at a hole enrolls a presence obligation exactly as it would in any value position, so an unguarded optional at a hole is refused — the author guards it (`when … is set`) or supplies fallback text with the `if … then … else …` conditional. This rule does not vary by string position: it is identical in a `because`/`reject` message and in a `set` right-hand side. A field appearing only as the operand of a presence test (`{Opt is set}`) is *named, not read*, and enrolls nothing.
 
 #### Typed constant interpolation
 

@@ -791,6 +791,7 @@ The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarant
 > `Diagnostic` carries `ImmutableArray<RelatedSpan> RelatedSpans { get; init; } = ImmutableArray<RelatedSpan>.Empty;`. The additive init-only property keeps every existing `Diagnostics.Create(...)` call site compiling unchanged while giving pipeline stages a first-class place to attach secondary source locations and per-location messages.
 > *Resolved: 2026-05-06 — CC#20*
 - **Drift test: diagnostic emission coverage.** For every `DiagnosticCode` referenced by a `[StaticallyPreventable]`, verify that at least one call to `Diagnostics.Create()` with that code exists somewhere in the pipeline. This confirms the compile-time diagnostic isn't just registered — it's actually emitted.
+- **`UnprovedPresenceRequirement` (PRE0116) recovery hint at a display position (pending).** Owner ruling 2026-07-24 (refuse uniformly — `precept-language-spec.md § String interpolation`, `soundness-and-coverage.md`): an interpolation hole is a read, so an unguarded optional at a message hole (`because`/`reject`) will emit PRE0116 once message holes are enrolled. When that enrollment ships, PRE0116's `RecoverySteps` (in `Diagnostics.cs`) should, for a display-position occurrence, name the `if … then … else …` coalescing conditional as the inline fallback alongside the existing `when … is set` guard option — the conditional is the shipped no-new-surface way to render an optional in a message. Wording change deferred to the enrollment sweep; recorded here so it is not lost.
 
 ---
 
