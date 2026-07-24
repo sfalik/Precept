@@ -27,6 +27,32 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-047: `nonzero` on a `period` establishes structural non-equality, but a `period` divisor needs elapsed length — a clean-compiling divide by zero (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, adversarial attack on the divisor validity argument, on a lane the draft never mentioned. **Behaviourally confirmed via `precept_compile` at HEAD — zero diagnostics.**
+- **Symptom**:
+
+  ```precept
+  precept PeriodDivisor
+
+  field Amount as money in 'USD' default '100 USD' editable
+  field Gap as period nonzero default '1 days + -24 hours' editable
+  field Rate as price in 'USD' optional
+
+  event Compute()
+
+  on Compute
+      -> set Rate = Amount / Gap
+  ```
+
+  → `success: true`, **no diagnostics at all**, `Divisor must be non-zero` **Proved** by `DeclarationAttribute`, and `Default value of 'Gap' must satisfy 'nonzero'` also `Proved`. `'1 days + -24 hours'` has an elapsed length of exactly zero.
+- **Root cause — the predicate the modifier establishes is not the predicate the operation needs.** A `period` has no magnitude to compare against zero: `temporal-type-system.md:1478` records that there is no ordering on `period` because NodaTime's `Period` has no `IComparable`, and `:1487` that its equality is structural — *"'24 hours' ≠ '1 day'"*. So `nonzero` on a `period` can only mean "structurally not the zero period", which `1 days + -24 hours` satisfies. The consuming operation, `MoneyDividePeriod`, divides by the **elapsed length**. The obligation is discharged by a fact about a different quantity than the one that ends up in the denominator.
+- **Related oddity, same root**: `field Term as period positive default '30 days'` also compiles and proves, on a type the spec says has no ordering. `Modifiers.cs:19-21` puts `TypeKind.Period` in `ZeroBoundNumericTypes`, which is what makes both modifiers declarable there.
+- **Reach**: `period` is a divisor in two catalog operations — `MoneyDividePeriod` and `QuantityDividePeriod`.
+- **Scope / class**: SOUNDNESS, over-accept, on the headline fault. Distinct from BUG-045: that one is finite-representation underflow through arithmetic, this one is a type-level mismatch between a modifier's meaning and an operation's requirement, and it fires on a bare field reference with no arithmetic at all.
+- **Fix complexity**: medium, and it is a language question as much as an engine one — either `period` leaves `ZeroBoundNumericTypes` so the modifiers are not declarable there, or the divisor requirement on a period operand names the elapsed-length predicate rather than the structural one. The second needs a length notion the type deliberately does not expose.
+- **Status**: Active — soundness hole.
+
 ### BUG-046: A divisor whose declared interval excludes zero is not proved non-zero — the file is rejected saying it "can be zero" (false rejection)
 
 - **Discovered**: 2026-07-23, fact-checking the divisor validity argument. **Behaviourally confirmed via `precept_compile` at HEAD.**
