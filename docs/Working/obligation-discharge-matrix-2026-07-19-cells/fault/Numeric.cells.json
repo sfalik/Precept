@@ -1,0 +1,2168 @@
+{
+  "$schema": "../cell.schema.json",
+  "familyId": "fault-numeric",
+  "title": "Fault family — ProofRequirementKind.Numeric (division/modulo by zero, collection non-empty, and default-bound obligations), all occasions x type families",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "citations": [
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the Fault-family case-shape row: obligation is the catalog-declared safety precondition at the evaluation site; discharge by premise classes per catalog ProofSatisfactions" },
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "the 2026-07-21 citation-duty ruling: declared field modifiers (a) and pre-state constraints (d) are admitted as premises for a fault obligation only under a citation duty naming the establishing + every preserving obligation, each discharged" },
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule", "note": "site identity is an evaluation occasion, not a syntactic position: one written division reached by N routes mints N fault obligations" },
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate: no cell ratifies whose derivation cites an argument-less rule" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104", "note": "faults get the identical premise-and-certificate treatment as constraint obligations" },
+    { "kind": "spec", "ref": "docs/language/precept-language-spec.md:110", "note": "Principle 10, totality: every expression evaluates to a result — never a silent NaN/Infinity; the source of the fault-prevention target at every evaluation site" },
+    { "kind": "code", "ref": "src/Precept/Language/ProofRequirementKind.cs:10", "note": "ProofRequirementKind.Numeric — the fault axis member this file covers" },
+    { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:306", "note": "bin.ProofRequirements instantiation site (binary-op minting)" },
+    { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [
+      {
+        "spelling": "when Split.Parts != 0 (row guard, divisor read directly off the arg)",
+        "whyLicensed": "A guard conjunct normal-form-equal to the divisor obligation Parts != 0 discharges by Guard normal-form match; premise class (c), strategy GuardInPath (live-verified). Licensed as written, so not in the sound-but-unprovable band.",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Guard normal-form match" }
+        ]
+      }
+    ],
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "Family 4 (fault, arg-constraint discharge) respellability is analogous to Family 1's — every sound band member's business intent respells into a licensed guard or arg-bound form" },
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol", "note": "layer 4 hard gate: a family verdict ratifies only when it agrees with the classified sample corpus; NOT run for this family in this pass" }
+    ],
+    "notes": [
+      "This verdict governs the (b) arg-bound and (c) guard discharge contracts only — the classes for which a named validity argument exists. It does NOT extend to the (a)/(d) declared-fact discharge, whose validity argument is missing (see openFlags); a family respellability verdict over discharge paths the definition cannot yet license would be premature.",
+      "Model-derived only. Per the ratification protocol's stated limits, corpus agreement is necessary, not sufficient, and is not citable as coverage."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault-numeric/transition-action-primitive",
+      "label": "Divisor != 0 at a transition-row set RHS — primitive lane (integer/decimal/number)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger / DecimalDivideDecimal / NumberDivideNumber (and the modulo siblings)",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:119", "note": "IntegerDivideInteger declares the divisor-non-zero NumericProofRequirement (NotEquals 0m); DecimalDivideDecimal at :150, NumberDivideNumber at :181" }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Parts != 0",
+        "metavariables": [
+          { "name": "Split.Parts", "standsFor": "the divisor operand at this catalog site — here the triggering event's own declared integer argument" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold (NumericProofRequirement.Threshold = 0m, Comparison = NotEquals)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md", "note": "no rule rewrites not (a == b) to a != b, so an equality-negation guard is not normal-form-equal to the direct comparison" }
+        ],
+        "wp": { "statement": "Split.Parts != 0" }
+      },
+      "applicablePremiseClasses": ["b", "c"],
+      "premiseAvailability": "The divisor is read directly off the triggering event's own argument with no intervening computation (spec:170 purity, spec:164 sequential assignment). Premise (b) is available because governance enforces the argument's declared modifier at the event door before any computation reads it (spec:268); by the transport rule an argument fact is never killed — nothing in a write plan writes an argument. Premise (c) is available because the row's guard evaluates true before the action runs (spec:1897) and reaches the operand under the transport rule, provided no construct on the route between the guard's evaluation and the site writes a field the guard mentions (the 2026-07-21 three-argument soundness correction). Premises (a) field modifiers and (d) pre-state constraints are also admissible in principle (a field-typed divisor), under the 2026-07-21 citation duty — but no discharge contract for them is authored here because no named validity argument covers a declared-fact fault discharge (see openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the divisor arg's declared modifier before any computation reads it; a nonzero (or positive) bound excludes 0 from its interval -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers (a finite set); if 0 is inside the interval, or no bound excludes it, reject. The single-operand degenerate case of the summed-bound governance-before-computation argument.",
+          "citations": [
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "governance enforces every declared constraint on every value entering as an event arg, before any computation derives from it" },
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation duty: the (b) fact's establishing obligation is ingress governance at the event door; an argument carries no preserving obligation because no write site mutates it" }
+          ]
+        },
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard conjunct normal-form-equal to the WP (Split.Parts != 0) -> guard-match, transported to the operand across an empty write prefix",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the WP against the row's guard conjuncts (a finite set); no match rejects. The transport check (4. The transport rule) additionally requires deps(guard fact) disjoint from the fields any construct writes between the guard (phase 2) and the operand (phase 5) — here the divisor is the arg and the exit-action/state-change prefix writes no field the guard mentions.",
+          "citations": [
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1897", "note": "guards select — a row's actions run only if its guard evaluated true" },
+            { "kind": "matrix", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 4. The transport rule", "note": "route-indexed frame and kill: a guard fact reaches the operand only if no construct on the route between guard and site writes a field the fact depends on" }
+          ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["b"], "schema": "bound the divisor arg (nonzero, or positive) so its interval excludes 0" },
+        { "premiseClasses": ["c"], "schema": "add a row guard normal-form-equal to <divisor> != 0" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultTransA\n\nfield Ratio as decimal default 0.0 nonnegative\n\nstate Draft initial\nstate Done\n\nevent Split(Parts as integer)\n\nfrom Draft on Split -> set Ratio = 100 / Split.Parts -> transition Done",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        },
+        "discharges": [
+          {
+            "id": "arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Parts as integer positive",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer positive" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "positive excludes 0 from the divisor interval -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Split.Parts != 0",
+            "application": { "locus": "row-guard", "eventName": "Split" },
+            "premiseClasses": ["c"],
+            "derivation": "guard normal-form-equal to Split.Parts != 0 -> guard-match",
+            "strategy": "GuardInPath",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-positive",
+            "addition": "Parts as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer nonnegative" } ] },
+            "whyStillRejects": "nonnegative still admits 0 — divisor interval includes 0; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Split.Parts > -1",
+            "application": { "locus": "row-guard", "eventName": "Split" },
+            "whyStillRejects": "the guard does not exclude 0 (0 > -1 holds) and is not normal-form-equal to the WP; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "Family 4 — fault, arg-constraint discharge (the precedent this cell instantiates)" }
+      ],
+      "notes": [
+        "The site-identity ruling makes each route into this row a distinct occasion; the witness has a single route (one from-row), so one obligation.",
+        "For temporal/business divisors the same (b) mechanism holds; the (c) guard path is lane-sensitive (see the temporal cell's builtStatus note)."
+      ]
+    },
+    {
+      "id": "fault-numeric/transition-action-business",
+      "label": "Divisor != 0 at a transition-row set RHS — business-domain lane (Money/Quantity/Price divisor)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency / QuantityDivideQuantitySameDimension / PriceDivideQuantity (divisor is the business-domain magnitude)",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:452", "note": "MoneyDivideMoneySameCurrency declares the divisor-non-zero NumericProofRequirement on the Money divisor; QuantityDivideQuantitySameDimension at :553" }
+        ]
+      },
+      "obligation": {
+        "statement": "Rate.Budget != 0",
+        "metavariables": [
+          { "name": "Rate.Budget", "standsFor": "the business-domain divisor magnitude (a Money argument here)" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Rate.Budget != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "The divisor is a Money-typed event argument; governance enforces its declared modifier at the door (spec:268), so premise (b) is available and route-independent (an argument is never killed). Premise (c) (a guard normal-form-equal to Budget != 0) is admissible under the model but the shipped guard-matcher does not reduce a business-magnitude comparison to the numeric-zero threshold (see the temporal cell); (a)/(d) admitted under the citation duty but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "a nonzero bound on the Money divisor arg excludes 0 from its interval -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance enforces the arg's declared modifier before computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the divisor arg nonzero so its interval excludes 0" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultBusinessTransBase\n\nfield Fraction as decimal default 0.0\n\nstate Draft initial\nstate Done\n\nevent Rate(Cost as money in 'USD', Budget as money in 'USD')\n\nfrom Draft on Rate -> set Fraction = Rate.Cost / Rate.Budget -> transition Done",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "Budget as money in 'USD' nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes 0 from the divisor interval -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "Budget as money in 'USD' nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonnegative" } ] },
+            "whyStillRejects": "nonnegative still admits 0.00 USD; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "MoneyDivideMoneySameCurrency yields decimal; the field written is decimal. The divisor (Budget) is the Money magnitude, per the coordinate map's business-domain divisor schema." ]
+    },
+    {
+      "id": "fault-numeric/transition-action-temporal",
+      "label": "Divisor != 0 at a transition-row set RHS — temporal lane (Period/Duration divisor)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DurationDivideDuration (divisor Duration) / DurationDivideInteger",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:372", "note": "DurationDivideDuration declares the divisor-non-zero NumericProofRequirement on the Duration divisor; DurationDivideInteger at :354" }
+        ]
+      },
+      "obligation": {
+        "statement": "Rate.SpanB != 0",
+        "metavariables": [
+          { "name": "Rate.SpanB", "standsFor": "the Duration divisor magnitude" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Rate.SpanB != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "The divisor is a Duration event argument; governance enforces its declared modifier at the door (spec:268), so premise (b) is available and route-independent. Premise (c) is admissible under the model but unresolved at HEAD (see the (c) builtStatus note); (a)/(d) admitted under the citation duty but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "a nonzero bound on the Duration divisor arg excludes the zero span from its interval -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; the zero span inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance enforces the arg's declared modifier before computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the Duration divisor arg nonzero so its interval excludes the zero span" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultTemporalTransBase\n\nfield Ratio as number default 0.0\n\nstate Draft initial\nstate Done\n\nevent Rate(SpanA as duration, SpanB as duration)\n\nfrom Draft on Rate -> set Ratio = Rate.SpanA / Rate.SpanB -> transition Done",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "SpanB as duration nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "SpanB", "declaration": "SpanB as duration nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes the zero span from the divisor interval -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "SpanB as duration nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "SpanB", "declaration": "SpanB as duration nonnegative" } ] },
+            "whyStillRejects": "nonnegative still admits the zero span; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [
+        "(c) builtStatus, live-verified 2026-07-21: a guard `when Rate.SpanB != '0 seconds'` does NOT discharge the divisor obligation (PRE0083 remained, disposition Unresolved) — the shipped guard-matcher does not reduce a Duration-vs-temporal-literal comparison to the numeric-zero threshold. Under the model the (c) path is licensed by Guard normal-form match once the normal form covers temporal-zero literals; it is unbuilt-today. Recorded, not claimed proven."
+      ]
+    },
+    {
+      "id": "fault-numeric/state-hook-primitive",
+      "label": "Divisor != 0 at a state entry/exit hook action RHS — primitive lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger / DecimalDivideDecimal / NumberDivideNumber",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:119", "note": "primitive divide sites" }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Parts != 0",
+        "metavariables": [
+          { "name": "Split.Parts", "standsFor": "the divisor operand — the triggering event's argument, in scope in the state action" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Split.Parts != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "The triggering event's argument is in scope in the entry action (live-verified). Premise (b) is available via governance and is route-independent. Premise (c) is per-route (a state hook is reached by potentially several transitions, each with its own guard — the site-identity ruling makes each a distinct occasion), so a (c) discharge must transport the specific route's guard fact across the exit-action / state-change / mutation prefix (phases 3-5) to the entry action (phase 6); that transport is authored per route, not once, and is not exercised in this witness. (a)/(d) admitted under the citation duty but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the divisor arg's declared modifier before the state action reads it -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before any dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the divisor arg nonzero/positive" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStateHookBase\n\nfield Ratio as decimal default 0.0 nonnegative\n\nstate Draft initial\nstate Done\n\nevent Split(Parts as integer)\n\nto Done -> set Ratio = 100 / Split.Parts\n\nfrom Draft on Split -> transition Done",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Parts as integer positive",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer positive" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "positive excludes 0 -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-positive",
+            "addition": "Parts as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [
+        "The state-hook discharge (b, arg positive) is live-verified via the FaultStateHook program (to Done -> set Ratio = 100 / Split.Parts, arg positive -> CompositionalConstraint proved). The base row (unconstrained arg) is recorded model-derived as the addition's counterpart; the discharge run confirms event args reach state actions.",
+        "state-hook covers both entry (`to S`) and exit (`from S`) actions; exit actions run at phase 3, entry at phase 6 (transport rule / spec 3A.4)."
+      ]
+    },
+    {
+      "id": "fault-numeric/state-hook-business",
+      "label": "Divisor != 0 at a state hook action RHS — business-domain lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency / QuantityDivideQuantitySameDimension",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:452", "note": "MoneyDivideMoneySameCurrency divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Rate.Budget != 0",
+        "metavariables": [
+          { "name": "Rate.Budget", "standsFor": "the Money divisor magnitude, in scope in the state action" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Rate.Budget != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "As the primitive state-hook cell: premise (b) via governance on the Money divisor arg is available and route-independent; (c) is per-route; (a)/(d) admitted under the citation duty but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "nonzero bound on the Money divisor arg excludes 0 -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the Money divisor arg nonzero" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStateHookBiz\n\nfield Fraction as decimal default 0.0\n\nstate Draft initial\nstate Done\n\nevent Rate(Cost as money in 'USD', Budget as money in 'USD')\n\nto Done -> set Fraction = Rate.Cost / Rate.Budget\n\nfrom Draft on Rate -> transition Done",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "Budget as money in 'USD' nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes 0 -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "Budget as money in 'USD' nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0.00 USD; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Discharge mechanism (b via governance) is lane-independent and live-verified in the transition-action-business cell; recorded model-derived here since the exact state-hook program was not re-compiled." ]
+    },
+    {
+      "id": "fault-numeric/state-hook-temporal",
+      "label": "Divisor != 0 at a state hook action RHS — temporal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DurationDivideDuration / DurationDivideInteger",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:372", "note": "DurationDivideDuration divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Rate.SpanB != 0",
+        "metavariables": [
+          { "name": "Rate.SpanB", "standsFor": "the Duration divisor magnitude, in scope in the state action" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Rate.SpanB != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "As the primitive state-hook cell; (b) via governance on the Duration divisor arg is route-independent; (c) per-route and lane-limited today; (a)/(d) admitted but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "nonzero bound on the Duration divisor arg excludes the zero span -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; zero span inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the Duration divisor arg nonzero" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStateHookTemporal\n\nfield Ratio as number default 0.0\n\nstate Draft initial\nstate Done\n\nevent Rate(SpanA as duration, SpanB as duration)\n\nto Done -> set Ratio = Rate.SpanA / Rate.SpanB\n\nfrom Draft on Rate -> transition Done",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "SpanB as duration nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "SpanB", "declaration": "SpanB as duration nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes the zero span -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "SpanB as duration nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "SpanB", "declaration": "SpanB as duration nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits the zero span; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "(b) discharge via duration nonzero is live-verified in the transition-action-temporal cell; recorded model-derived here for the state-hook placement." ]
+    },
+    {
+      "id": "fault-numeric/stateless-hook-primitive",
+      "label": "Divisor != 0 in a stateless handler set RHS — primitive lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger / DecimalDivideDecimal / NumberDivideNumber",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:150", "note": "DecimalDivideDecimal divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Allocate.Units != 0",
+        "metavariables": [
+          { "name": "Allocate.Units", "standsFor": "the divisor operand — the stateless handler's own event argument" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Allocate.Units != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "A stateless event handler carries no `when` guard (spec:1007), so premise (c) is NOT available at a stateless-hook site — the sole guard-family premise the occasion admits is absent. Premise (b) via governance on the divisor arg is available and route-independent. (a)/(d) admitted under the citation duty but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the divisor arg's declared modifier before the handler reads it -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the divisor arg nonzero/positive" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStatelessBase\n\nfield UnitCost as decimal default 0.0 nonnegative\n\nevent Allocate(Amount as decimal nonnegative, Units as integer)\n\non Allocate -> set UnitCost = Allocate.Amount / Allocate.Units",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Units as integer positive",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "Units", "declaration": "Units as integer positive" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "positive excludes 0 -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-positive",
+            "addition": "Units as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "Units", "declaration": "Units as integer nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }, { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1007", "note": "stateless event handlers carry no when guard — the reason (c) is absent here" } ],
+      "notes": [ "The full discharge (Units positive) was live-verified against the FaultStateless program (CompositionalConstraint proved, zero diagnostics); the base with an unconstrained Units is the addition's model-derived counterpart." ]
+    },
+    {
+      "id": "fault-numeric/stateless-hook-business",
+      "label": "Divisor != 0 in a stateless handler set RHS — business-domain lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency / QuantityDivideQuantitySameDimension",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:452", "note": "MoneyDivideMoneySameCurrency divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Allocate.Budget != 0",
+        "metavariables": [
+          { "name": "Allocate.Budget", "standsFor": "the Money divisor magnitude — the stateless handler's own event argument" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Allocate.Budget != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "Stateless handlers carry no guard (spec:1007), so (c) is absent. (b) via governance on the Money divisor arg is available. (a)/(d) admitted but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "nonzero bound on the Money divisor arg excludes 0 -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the Money divisor arg nonzero" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStatelessBiz\n\nfield Fraction as decimal default 0.0\n\nevent Allocate(Cost as money in 'USD', Budget as money in 'USD')\n\non Allocate -> set Fraction = Allocate.Cost / Allocate.Budget",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "Budget as money in 'USD' nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes 0 -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "Budget as money in 'USD' nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0.00 USD; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "(b) discharge is lane-independent and live-verified in the transition-action-business cell." ]
+    },
+    {
+      "id": "fault-numeric/stateless-hook-temporal",
+      "label": "Divisor != 0 in a stateless handler set RHS — temporal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DurationDivideDuration / DurationDivideInteger",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:372", "note": "DurationDivideDuration divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Allocate.SpanB != 0",
+        "metavariables": [
+          { "name": "Allocate.SpanB", "standsFor": "the Duration divisor magnitude — the handler's own event argument" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Allocate.SpanB != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "Stateless handlers carry no guard (spec:1007), so (c) is absent. (b) via governance on the Duration divisor arg is available. (a)/(d) admitted but not authorable (openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "nonzero bound on the Duration divisor arg excludes the zero span -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; zero span inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the Duration divisor arg nonzero" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStatelessTemporal\n\nfield Ratio as number default 0.0\n\nevent Allocate(SpanA as duration, SpanB as duration)\n\non Allocate -> set Ratio = Allocate.SpanA / Allocate.SpanB",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "SpanB as duration nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "SpanB", "declaration": "SpanB as duration nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes the zero span -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "SpanB as duration nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "SpanB", "declaration": "SpanB as duration nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits the zero span; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "(b) discharge via duration nonzero is live-verified in the transition-action-temporal cell." ]
+    },
+    {
+      "id": "fault-numeric/rule-condition-primitive",
+      "label": "Divisor != 0 inside a rule condition — primitive lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal / IntegerDivideInteger inside a rule condition",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "the 2026-07-21 citation-duty ruling admits (a)/(d) for faults but supplies no validity argument and no establishment/preservation machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate: a derivation citing an argument-less rule cannot ratify — and § Validity arguments carries no argument for premise-(a)/(d) fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Count != 0",
+        "metavariables": [
+          { "name": "Count", "standsFor": "the divisor field inside the rule condition" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Count != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "A rule condition is evaluated globally on every operation (except restore) with no event args and no in-scope handler guard (the rule's own `when` is the separate rule-activation-guard occasion). So the divisor is necessarily a field, and the only in-scope premises are (a) the field's own declared modifier (e.g. `nonzero`/`positive` on Count) and (d) another constraint bounding Count. Both are admitted by the 2026-07-21 citation-duty ruling but neither is authorable as a discharge contract: § Validity arguments enumerates seven arguments and none covers a declared field-modifier or constraint fact discharging a *fault* Numeric obligation, and the citation duty's establishing + preserving obligations do not exist as machinery (ProofRequirement carries no establishment/preservation subtype). See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultRuleCondition\n\nfield Total as decimal default 0.0 nonnegative\nfield Count as integer default 1\n\nrule Total / Count >= 0 because \"per-unit total must be nonnegative\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited", "notes": [ "The band question is not reachable while the discharge side is open — no licensed derivation exists to draw the boundary against." ] },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [
+        "The obligation IS minted and the base rejects (verified via a parallel in-S-ensure/computed-field division: PRE0083, divisor obligation Unresolved). The build DOES discharge a field modifier on the divisor via the DeclarationAttribute strategy (live-verified: `field Count as integer default 1 positive` -> Divisor obligation Proved, strategy DeclarationAttribute). But that acceptance rests on a premise (a) whose citation-duty preservation is unchecked — exactly the false-proof shape the matrix's open design hole documents (a later handler setting Count = 0 would void the fact). The definition cannot mark this discharge `defined` without the missing validity argument and machinery; disposition open, not a fabricated contract.",
+        "This program used `rule Total / Count >= 0` — a rule condition base; the ensure/computed parallels (state-ensure, computed-field cells) were the compiled witnesses for the PRE0083 reject and the DeclarationAttribute accept."
+      ]
+    },
+    {
+      "id": "fault-numeric/rule-condition-business",
+      "label": "Divisor != 0 inside a rule condition — business-domain lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency inside a rule condition",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Budget != 0",
+        "metavariables": [
+          { "name": "Budget", "standsFor": "the Money divisor field inside the rule condition" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Budget != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "As the primitive rule-condition cell: the Money divisor is a field, the only in-scope premises are (a)/(d), and neither is authorable (no validity argument, no machinery). See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultRuleCondBiz\n\nfield Cost as money in 'USD' default '0.00 USD' nonnegative\nfield Budget as money in 'USD' default '1.00 USD'\n\nrule Cost / Budget >= 0 because \"per-budget cost must be nonnegative\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Money/Money division reject is live-verified (FaultBusiness computed-field: PRE0083). The rule-condition placement inherits the same open discharge gap." ]
+    },
+    {
+      "id": "fault-numeric/rule-condition-temporal",
+      "label": "Divisor != 0 inside a rule condition — temporal lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DurationDivideDuration inside a rule condition",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "SpanB != 0",
+        "metavariables": [
+          { "name": "SpanB", "standsFor": "the Duration divisor field inside the rule condition" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "SpanB != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "As the primitive rule-condition cell; Duration divisor is a field; only (a)/(d), neither authorable. See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultRuleCondTemporal\n\nfield SpanA as duration default '0 seconds'\nfield SpanB as duration default '1 second'\n\nrule SpanA / SpanB >= 0 because \"ratio must be nonnegative\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Duration/Duration division reject is live-verified (FaultTemporal computed-field: PRE0083). Rule-condition placement inherits the same open discharge gap." ]
+    },
+    {
+      "id": "fault-numeric/state-ensure-primitive",
+      "label": "Divisor != 0 inside an in-S-ensure condition — primitive lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal / IntegerDivideInteger inside a residency ensure",
+        "evaluationSiteCategory": "state-ensure-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Count != 0",
+        "metavariables": [
+          { "name": "Count", "standsFor": "the divisor field inside the residency ensure condition" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Count != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "A residency ensure condition has no event args and no in-scope handler guard (the residency fact `in S` is itself not a guard fact — `ensure-vs-rule-analysis-2026-07-20.md`; whether it is available as a premise at all is an open matrix item). So the divisor is a field and the only in-scope premises are (a)/(d), neither authorable (no validity argument, no machinery). See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStateEnsure\n\nfield Total as decimal default 0.0 nonnegative\nfield Count as integer default 1\n\nstate Active initial\n\nin Active ensure Total / Count >= 0 because \"per-unit total must be nonnegative\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }, { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Constraint kinds", "note": "in S ensure (StateResident); the residency-fact-as-premise question is recorded open in the matrix's per-family case-shape table" } ],
+      "notes": [
+        "Live-verified: the base rejects (PRE0083, 'Division is unsafe: Count can be zero while evaluating ensure for Active', divisor obligation Unresolved). Adding `positive` to Count makes the shipped build accept via strategy DeclarationAttribute (live-verified) — a premise (a) discharge whose citation-duty preservation is unchecked. Disposition open because the definition has no validity argument for that acceptance; the prevention (reject) side is sound and verified."
+      ]
+    },
+    {
+      "id": "fault-numeric/state-ensure-business",
+      "label": "Divisor != 0 inside an in-S-ensure condition — business-domain lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency inside a residency ensure",
+        "evaluationSiteCategory": "state-ensure-condition",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Budget != 0",
+        "metavariables": [
+          { "name": "Budget", "standsFor": "the Money divisor field inside the residency ensure" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Budget != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "As the primitive state-ensure cell; Money divisor is a field; only (a)/(d), neither authorable. See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStateEnsureBiz\n\nfield Cost as money in 'USD' default '0.00 USD' nonnegative\nfield Budget as money in 'USD' default '1.00 USD'\n\nstate Active initial\n\nin Active ensure Cost / Budget >= 0 because \"per-budget cost must be nonnegative\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Money/Money reject verified in the business computed-field cell; residency-ensure placement inherits the open discharge gap." ]
+    },
+    {
+      "id": "fault-numeric/state-ensure-temporal",
+      "label": "Divisor != 0 inside an in-S-ensure condition — temporal lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DurationDivideDuration inside a residency ensure",
+        "evaluationSiteCategory": "state-ensure-condition",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "SpanB != 0",
+        "metavariables": [
+          { "name": "SpanB", "standsFor": "the Duration divisor field inside the residency ensure" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "SpanB != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "As the primitive state-ensure cell; Duration divisor is a field; only (a)/(d), neither authorable. See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultStateEnsureTemporal\n\nfield SpanA as duration default '0 seconds'\nfield SpanB as duration default '1 second'\n\nstate Active initial\n\nin Active ensure SpanA / SpanB >= 0 because \"ratio must be nonnegative\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Duration/Duration reject verified in the temporal computed-field cell; residency-ensure placement inherits the open discharge gap." ]
+    },
+    {
+      "id": "fault-numeric/event-ensure-primitive",
+      "label": "Divisor != 0 inside an on-E-ensure condition — primitive lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal / IntegerDivideInteger inside an event precondition",
+        "evaluationSiteCategory": "event-ensure-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "on E ensure (EventPrecondition): the condition holds of E's args before any mutation; ingress evaluation" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:150", "note": "DecimalDivideDecimal divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Rate.Divisor != 0",
+        "metavariables": [
+          { "name": "Rate.Divisor", "standsFor": "the divisor operand — the event's own argument (the ensure's subject is the args)" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Rate.Divisor != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "An event ensure is evaluated against the event's arguments before any mutation (the on-E-ensure case shape: no RHS axis, the args are the subject). Premise (b) is available via governance enforcing each arg's declared modifier at the door (spec:268), before the ensure condition is evaluated. No handler guard is in scope on an ensure, and the divisor is an arg (not a field), so (a)/(d) do not apply to this witness.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the divisor arg's declared modifier before the ensure condition is evaluated -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance enforces the arg's declared modifier before dependent evaluation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the divisor arg nonzero/positive" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultEventEnsure\n\nfield X as decimal default 0.0 nonnegative\n\nstate Active initial\n\nevent Rate(Amount as decimal nonnegative, Divisor as integer)\n\non Rate ensure Rate.Amount / Rate.Divisor >= 0 because \"rate must be nonnegative\"\n\nfrom Active on Rate -> set X = Rate.Amount -> no transition",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        },
+        "discharges": [
+          {
+            "id": "arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Divisor as integer positive",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Divisor", "declaration": "Divisor as integer positive" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "positive excludes 0 -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-positive",
+            "addition": "Divisor as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Divisor", "declaration": "Divisor as integer nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Both polarities live-verified: unconstrained Divisor -> PRE0083; Divisor positive -> CompositionalConstraint proved, zero diagnostics." ]
+    },
+    {
+      "id": "fault-numeric/event-ensure-business",
+      "label": "Divisor != 0 inside an on-E-ensure condition — business-domain lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency inside an event precondition",
+        "evaluationSiteCategory": "event-ensure-condition",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "on E ensure (EventPrecondition)" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:452", "note": "MoneyDivideMoneySameCurrency divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Rate.Budget != 0",
+        "metavariables": [
+          { "name": "Rate.Budget", "standsFor": "the Money divisor argument" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Rate.Budget != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "As the primitive event-ensure cell: premise (b) via governance on the Money divisor arg, evaluated before the ensure condition. The divisor is an arg, so (a)/(d) do not apply.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "nonzero bound on the Money divisor arg excludes 0 -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before ensure evaluation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the Money divisor arg nonzero" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultEventEnsureBiz\n\nfield X as decimal default 0.0\n\nstate Active initial\n\nevent Rate(Cost as money in 'USD', Budget as money in 'USD')\n\non Rate ensure Rate.Cost / Rate.Budget >= 0 because \"per-budget cost must be nonnegative\"\n\nfrom Active on Rate -> set X = 1.0 -> no transition",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "Budget as money in 'USD' nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes 0 -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "Budget as money in 'USD' nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "Budget", "declaration": "Budget as money in 'USD' nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0.00 USD; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "(b) discharge is lane-independent; the primitive event-ensure cell live-verifies the mechanism." ]
+    },
+    {
+      "id": "fault-numeric/event-ensure-temporal",
+      "label": "Divisor != 0 inside an on-E-ensure condition — temporal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DurationDivideDuration inside an event precondition",
+        "evaluationSiteCategory": "event-ensure-condition",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "on E ensure (EventPrecondition)" },
+          { "kind": "code", "ref": "src/Precept/Language/Operations.cs:372", "note": "DurationDivideDuration divisor-non-zero obligation" }
+        ]
+      },
+      "obligation": {
+        "statement": "Rate.SpanB != 0",
+        "metavariables": [
+          { "name": "Rate.SpanB", "standsFor": "the Duration divisor argument" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Rate.SpanB != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "As the primitive event-ensure cell: premise (b) via governance on the Duration divisor arg. The divisor is an arg, so (a)/(d) do not apply.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "nonzero bound on the Duration divisor arg excludes the zero span -> arg-bound discharge",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; zero span inside, or no bound excluding it, rejects.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before ensure evaluation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the Duration divisor arg nonzero" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultEventEnsureTemporal\n\nfield X as number default 0.0\n\nstate Active initial\n\nevent Rate(SpanA as duration, SpanB as duration)\n\non Rate ensure Rate.SpanA / Rate.SpanB >= 0 because \"ratio must be nonnegative\"\n\nfrom Active on Rate -> set X = 1.0 -> no transition",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-nonzero",
+            "kind": "arg-modifier",
+            "addition": "SpanB as duration nonzero",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "SpanB", "declaration": "SpanB as duration nonzero" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "nonzero excludes the zero span -> arg-bound discharge",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-nonzero",
+            "addition": "SpanB as duration nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Rate", "argName": "SpanB", "declaration": "SpanB as duration nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits the zero span; must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "(b) discharge is lane-independent; the primitive event-ensure cell live-verifies the mechanism, and duration nonzero discharge is verified in the transition-action-temporal cell." ]
+    },
+    {
+      "id": "fault-numeric/computed-field-primitive",
+      "label": "Divisor != 0 inside a computed-field expression — primitive lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal / IntegerDivideInteger inside a computed (<-) expression",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Count != 0",
+        "metavariables": [
+          { "name": "Count", "standsFor": "the divisor field read by the computed expression" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Count != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "A computed field is recomputed on every operation with no event args and no handler guard in scope; its inputs are fields. So the divisor is a field and the only in-scope premises are (a) the divisor field's own modifier and (d) another constraint. Both are admitted by the 2026-07-21 citation-duty ruling but neither is authorable (no validity argument, no machinery). See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultComputed\n\nfield Subtotal as decimal default 0.0 nonnegative\nfield Count as integer default 0 nonnegative\nfield PerUnit as decimal <- Subtotal / Count",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [
+        "Live-verified: the base rejects (PRE0083, 'Division is unsafe: Count can be zero in the computed expression for field PerUnit', divisor obligation Unresolved). Changing Count to `default 1 positive` makes the shipped build accept via strategy DeclarationAttribute (live-verified) — premise (a), preservation unchecked. Open on the definition side per the missing validity argument; the reject (prevention) side is sound.",
+        "Note the PRE0158 no-write-site warnings on Subtotal/Count in the isolated witness are incidental (a data-only fragment); they do not bear on the divisor obligation."
+      ]
+    },
+    {
+      "id": "fault-numeric/computed-field-business",
+      "label": "Divisor != 0 inside a computed-field expression — business-domain lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency inside a computed (<-) expression",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Budget != 0",
+        "metavariables": [
+          { "name": "Budget", "standsFor": "the Money divisor field read by the computed expression" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Budget != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "As the primitive computed-field cell; Money divisor is a field; only (a)/(d), neither authorable. See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultBusiness\n\nfield Cost as money in 'USD' default '0.00 USD' nonnegative\nfield Budget as money in 'USD' default '1.00 USD'\nfield Fraction as decimal <- Cost / Budget",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Live-verified reject (PRE0083, Budget can be zero in the computed expression for Fraction). Open discharge gap as in the primitive cell." ]
+    },
+    {
+      "id": "fault-numeric/computed-field-temporal",
+      "label": "Divisor != 0 inside a computed-field expression — temporal lane (field divisor; discharge open)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DurationDivideDuration inside a computed (<-) expression",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "SpanB != 0",
+        "metavariables": [
+          { "name": "SpanB", "standsFor": "the Duration divisor field read by the computed expression" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "SpanB != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "As the primitive computed-field cell; Duration divisor is a field; only (a)/(d), neither authorable. See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept FaultTemporal\n\nfield SpanA as duration default '0 seconds'\nfield SpanB as duration default '1 second'\nfield Ratio as number <- SpanA / SpanB",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Live-verified reject (PRE0083, SpanB can be zero in the computed expression for Ratio). Open discharge gap as in the primitive cell." ]
+    },
+    {
+      "id": "fault-numeric/action-precondition-collection",
+      "label": "collection.count > 0 — dequeue/pop precondition, operand-free action",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Dequeue / Pop / DequeueBy / RemoveAt count>0 precondition (CollectionCountAccessor > 0)",
+        "evaluationSiteCategory": "operand-free-action-precondition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape; the operand-free precondition site" },
+          { "kind": "code", "ref": "src/Precept/Language/Actions.cs:116", "note": "Dequeue declares NumericProofRequirement(CollectionCountAccessor, GreaterThan, 0m); Pop at :140, DequeueBy at :261" },
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:447", "note": "action.ProofRequirements instantiation site" }
+        ]
+      },
+      "obligation": {
+        "statement": "Q.count > 0",
+        "metavariables": [
+          { "name": "Q", "standsFor": "the queue/stack collection the action mutates" },
+          { "name": "0", "standsFor": "the catalog-declared count threshold (GreaterThan 0m)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Q.count > 0" }
+      },
+      "applicablePremiseClasses": ["c"],
+      "premiseAvailability": "The obligation is minted with no written operand expression — the occasion unit is an evaluation event at a catalog-stamped precondition, not an occurrence of a written expression (transport rule § 3, the operand-free observation). Premise (c) is available via the row's guard `when Q.count > 0`, which the transport rule carries to the mutation action (no intervening write to Q between guard and action). Premise (a) is also available — a `notempty` modifier on the collection field establishes count >= 1 (the shipped diagnostic even suggests it) — but as with the division field-divisor cells the (a) fault discharge has no named validity argument and no citation-duty machinery; it is recorded as a gap, not authored (see openFlags).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard conjunct normal-form-equal to Q.count > 0 -> guard-match, transported to the mutation action across an empty write prefix (nothing writes Q between guard and dequeue)",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the count precondition against the row's guard conjuncts; no match rejects. Transport requires no construct between the guard (phase 2) and the action (phase 5) to grow/shrink Q.",
+          "citations": [
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1897", "note": "guards select" },
+            { "kind": "matrix", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 7. What kills", "note": "collection shrink/grow are the write constructs that kill a count fact; a guard count fact survives to the action if nothing on the route mutates the collection" }
+          ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["c"], "schema": "add a row guard normal-form-equal to <collection>.count > 0 before the mutation" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultDequeue\n\nfield Cur as string optional\nfield Q as queue of string maxlength 200\n\nstate Open initial\nstate Busy\n\nevent Next\n\nfrom Open on Next -> dequeue Q into Cur -> transition Busy",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        },
+        "discharges": [
+          {
+            "id": "guard-count",
+            "kind": "guard",
+            "addition": "when Q.count > 0 (with a sibling reject row for the empty case)",
+            "application": { "locus": "row-guard", "eventName": "Next" },
+            "premiseClasses": ["c"],
+            "derivation": "guard normal-form-equal to Q.count > 0 -> guard-match",
+            "strategy": "GuardInPath",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [ "Live-verified against FaultDequeueGuarded: `from Open on Next when Q.count > 0 -> dequeue ...` + a reject sibling -> Queue-must-be-non-empty obligation Proved, strategy GuardInPath." ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-count",
+            "addition": "when Q.count > -1",
+            "application": { "locus": "row-guard", "eventName": "Next" },
+            "whyStillRejects": "count > -1 holds for the empty queue (count 0), so the guard does not establish count > 0 and is not normal-form-equal to the precondition; must still reject (PRE0064), same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "matrix", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 3. Where a site is evaluated", "note": "operand-free-action-precondition reached by fire, inspect-fire, construction and its mirror; the occasion unit is an evaluation event at a catalog-stamped site" }
+      ],
+      "notes": [ "The count>0 obligation surfaces as diagnostic PRE0064 (not PRE0083); the obligation kind is still Numeric (CollectionCountAccessor > 0)." ]
+    },
+    {
+      "id": "fault-numeric/field-default-primitive",
+      "label": "Default literal satisfies its declared numeric bound — primitive field default",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "CollectNumericDefaultObligations (declared/implied value modifier vs the default literal)",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:626", "note": "CollectNumericDefaultObligations: reads the field's declared+implied modifiers' ProofSatisfactions (Modifiers catalog) and stamps a NumericProofRequirement against the default literal, with BoundModifierLabel" }
+        ]
+      },
+      "obligation": {
+        "statement": "-5 satisfies nonnegative (i.e. -5 >= 0)",
+        "metavariables": [
+          { "name": "-5", "standsFor": "the authored default literal for the field" },
+          { "name": "nonnegative", "standsFor": "the declared value modifier whose ProofSatisfaction sets the bound (>= 0)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "<default-literal> <cmp> <declared-bound>" }
+      },
+      "applicablePremiseClasses": [],
+      "premiseAvailability": "The obligation compares a literal default against a declared bound; discharge needs no authored premise class — it is a constant fold of the literal against the bound. (This mirrors Witness Family 1's establishment-defaults cell.)",
+      "dischargeContract": [
+        {
+          "premiseClasses": [],
+          "derivation": "constant-fold the default literal against the declared bound (from the modifier's ProofSatisfaction)",
+          "strategy": "Literal",
+          "validityArguments": ["Literal constant-fold for defaults"],
+          "decisionProcedure": "Fold the literal against the bound under the evaluator's comparison semantics; a fold that evaluates false leaves the obligation undischarged: reject (PRE0079).",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Literal constant-fold for defaults" } ]
+        }
+      ],
+      "suggestions": [],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultDefaultPrim\n\nfield Qty as integer default -5 nonnegative",
+          "expected": { "outcome": "reject", "missingPremiseClasses": [], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        },
+        "discharges": [
+          {
+            "id": "default-in-range",
+            "kind": "default-constant-fold",
+            "addition": null,
+            "premiseClasses": [],
+            "derivation": "default 5 folds against nonnegative (5 >= 0) -> Literal",
+            "strategy": "Literal",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [ "The discharge is the same declaration with an in-range default (default 5); the shipped build proves the Literal default-bound obligation for in-range primitive defaults. A null addition marks a standing discharge; no near-miss is owed under the one-per-addition rule — the base IS the out-of-range counterpart." ]
+          }
+        ],
+        "nearMisses": []
+      },
+      "respellability": { "resolution": "family-inherited", "notes": [ "No authorable premise class exists (constant fold); the band question does not arise for a literal-vs-literal fold." ] },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [
+        "Live-verified: `field Qty as integer default -5 nonnegative` rejects with PRE0079 ('Default value -5 for field Qty violates declared nonnegative'), the NumericProofRequirement 'Default value of Qty must satisfy nonnegative' Unresolved.",
+        "Base minimality: the PRE0158 no-write-site warning is incidental to a data-only fragment; the target rejection is PRE0079 on the default bound.",
+        "applicablePremiseClasses is empty, so suggestions is empty (schema rule: empty exactly when the applicable-class set is empty)."
+      ]
+    },
+    {
+      "id": "fault-numeric/field-default-business",
+      "label": "Default literal satisfies its declared numeric bound — business-domain field default",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "CollectNumericDefaultObligations on a Money/Quantity/Price field default",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:626", "note": "CollectNumericDefaultObligations stamps the bound obligation against the default literal (business-domain magnitude uses UCUM-normalized bounds)" }
+        ]
+      },
+      "obligation": {
+        "statement": "'-5.00 USD' satisfies nonnegative",
+        "metavariables": [
+          { "name": "'-5.00 USD'", "standsFor": "the authored Money default literal" },
+          { "name": "nonnegative", "standsFor": "the declared value modifier's bound (>= 0)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "<default-literal:Money|Quantity|Price> <cmp> <declared-bound>" }
+      },
+      "applicablePremiseClasses": [],
+      "premiseAvailability": "As the primitive field-default cell: a literal-vs-bound constant fold, no authorable premise class.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [],
+          "derivation": "constant-fold the Money default literal against the declared bound",
+          "strategy": "Literal",
+          "validityArguments": ["Literal constant-fold for defaults"],
+          "decisionProcedure": "Fold the literal against the bound; false or non-completing leaves it undischarged: reject (PRE0079).",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Literal constant-fold for defaults" } ]
+        }
+      ],
+      "suggestions": [],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultDefaultBiz\n\nfield Balance as money in 'USD' default '-5.00 USD' nonnegative",
+          "expected": { "outcome": "reject", "missingPremiseClasses": [], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "default-in-range",
+            "kind": "default-constant-fold",
+            "addition": null,
+            "premiseClasses": [],
+            "derivation": "default '5.00 USD' folds against nonnegative -> Literal",
+            "strategy": "Literal",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [ "Standing discharge (null addition); the base is the out-of-range counterpart." ]
+          }
+        ],
+        "nearMisses": []
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Mechanism is the same Literal fold verified for the primitive default (PRE0079); recorded model-derived for the Money placement." ]
+    },
+    {
+      "id": "fault-numeric/arg-default-primitive",
+      "label": "Event-arg default literal satisfies its declared numeric bound — primitive",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "CollectNumericDefaultObligations on an event-arg default",
+        "evaluationSiteCategory": "event-arg-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:626", "note": "CollectNumericDefaultObligations applies to a declared arg default against the arg's modifier bound" }
+        ]
+      },
+      "obligation": {
+        "statement": "-1 satisfies nonnegative",
+        "metavariables": [
+          { "name": "-1", "standsFor": "the authored default literal on the event arg" },
+          { "name": "nonnegative", "standsFor": "the arg's declared value modifier bound (>= 0)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "<arg-default-literal> <cmp> <declared-bound>" }
+      },
+      "applicablePremiseClasses": [],
+      "premiseAvailability": "A literal-vs-bound constant fold on the arg's declared default; no authorable premise class.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [],
+          "derivation": "constant-fold the arg default literal against the arg's declared bound",
+          "strategy": "Literal",
+          "validityArguments": ["Literal constant-fold for defaults"],
+          "decisionProcedure": "Fold the literal against the bound; false or non-completing leaves it undischarged: reject (PRE0079).",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Literal constant-fold for defaults" } ]
+        }
+      ],
+      "suggestions": [],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultArgDefault\n\nfield Started as boolean default false\n\nevent Begin(Retries as integer default -1 nonnegative)\n\non Begin -> set Started = true",
+          "expected": { "outcome": "reject", "missingPremiseClasses": [], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        },
+        "discharges": [
+          {
+            "id": "arg-default-in-range",
+            "kind": "default-constant-fold",
+            "addition": null,
+            "premiseClasses": [],
+            "derivation": "arg default 0 folds against nonnegative (0 >= 0) -> Literal",
+            "strategy": "Literal",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [ "Standing discharge (null addition): `Retries as integer default 0 nonnegative`; the base is the out-of-range counterpart." ]
+          }
+        ],
+        "nearMisses": []
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Live-verified: `Retries as integer default -1 nonnegative` rejects with PRE0079 ('Default value -1 for field Retries violates declared nonnegative'). (The diagnostic reuses the field-default message form for the arg default.)" ]
+    },
+    {
+      "id": "fault-numeric/arg-default-business",
+      "label": "Event-arg default literal satisfies its declared numeric bound — business-domain",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "CollectNumericDefaultObligations on a Money/Quantity/Price event-arg default",
+        "evaluationSiteCategory": "event-arg-modifier-value-expression",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "fault case shape" },
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:626", "note": "CollectNumericDefaultObligations on a business-domain arg default" }
+        ]
+      },
+      "obligation": {
+        "statement": "'-1.00 USD' satisfies nonnegative",
+        "metavariables": [
+          { "name": "'-1.00 USD'", "standsFor": "the authored Money default literal on the event arg" },
+          { "name": "nonnegative", "standsFor": "the arg's declared value modifier bound (>= 0)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "<arg-default-literal:Money|Quantity|Price> <cmp> <declared-bound>" }
+      },
+      "applicablePremiseClasses": [],
+      "premiseAvailability": "A literal-vs-bound constant fold on the arg's declared Money default; no authorable premise class.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [],
+          "derivation": "constant-fold the Money arg default literal against the declared bound",
+          "strategy": "Literal",
+          "validityArguments": ["Literal constant-fold for defaults"],
+          "decisionProcedure": "Fold the literal against the bound; false or non-completing leaves it undischarged: reject (PRE0079).",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Literal constant-fold for defaults" } ]
+        }
+      ],
+      "suggestions": [],
+      "witnesses": {
+        "base": {
+          "program": "precept FaultArgDefaultBiz\n\nfield Started as boolean default false\n\nevent Begin(Deposit as money in 'USD' default '-1.00 USD' nonnegative)\n\non Begin -> set Started = true",
+          "expected": { "outcome": "reject", "missingPremiseClasses": [], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-default-in-range",
+            "kind": "default-constant-fold",
+            "addition": null,
+            "premiseClasses": [],
+            "derivation": "arg default '0.00 USD' folds against nonnegative -> Literal",
+            "strategy": "Literal",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [ "Standing discharge (null addition): `Deposit as money in 'USD' default '0.00 USD' nonnegative`; the base is the out-of-range counterpart." ]
+          }
+        ],
+        "nearMisses": []
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Same Literal fold verified for primitive arg defaults; recorded model-derived for the Money arg placement." ]
+    },
+    {
+      "id": "fault-numeric/quantifier-collection",
+      "label": "Divisor != 0 inside a quantifier predicate over a collection — proof-surface status open (Q10)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal / IntegerDivideInteger inside a quantifier predicate",
+        "evaluationSiteCategory": "quantifier-predicate",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Edge cells", "note": "A constraint quantified over a collection: canon classifies quantifier predicates as runtime governance (collection-types.md:796), conflicting with no-deferral — disposition Conflicted -> open (Q10)" },
+          { "kind": "spec", "ref": "docs/language/collection-types.md:796", "note": "element-constraint / quantifier-governance passage; whether quantified constraints are proof surface at all is open (Q10)" }
+        ]
+      },
+      "obligation": {
+        "statement": "x.Divisor != 0 (for each element x the quantifier ranges over)",
+        "metavariables": [
+          { "name": "x.Divisor", "standsFor": "the divisor operand inside the quantifier predicate, per element" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "x.Divisor != 0" }
+      },
+      "applicablePremiseClasses": [],
+      "openDependencies": ["Q10"],
+      "premiseAvailability": "Whether a quantifier predicate is proof surface at all is open (Q10): canon (collection-types.md:796) classifies quantifier predicates as runtime governance, which conflicts with the no-deferral principle. Until Q10 resolves, neither the minting nor the discharge of a fault obligation inside a quantifier predicate is settled — the transport rule (§ 8) notes element multiplicity would be handled by universal quantification, not by the route, but that presupposes the site mints at compile time. No discharge contract is authored; the cell is open pending Q10.",
+      "respellability": { "resolution": "family-inherited", "notes": [ "Not reachable while the site's proof-surface status is open." ] },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "matrix", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 3. Where a site is evaluated", "note": "quantifier-predicate: its enclosing position's route set; element multiplicity handled by universal quantification, not by the route" }
+      ],
+      "notes": [ "No witness authored — a base program would presuppose an answer to Q10 (does the site mint?). Recorded open, not fabricated." ]
+    },
+    {
+      "id": "fault-numeric/transition-guard-primitive-GAP",
+      "label": "Divisor != 0 inside a transition-row when guard — NOT minted at HEAD (build gap)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger inside a transition-row when guard",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "spec", "ref": "docs/language/precept-language-spec.md:110", "note": "Principle 10 totality makes the fault obligation a target at every expression, including a division inside a guard" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "open design hole: nothing detects an obligation that was never minted — the class of gap this cell exhibits" }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Parts != 0",
+        "metavariables": [
+          { "name": "Split.Parts", "standsFor": "the divisor operand inside the row's guard expression (an event arg)" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Split.Parts != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "If the site were minted, the divisor is an event arg evaluated as the guard runs, so premise (b) via governance (spec:268) discharges it — the same contract as the transition-action cell. The gap is purely that the site is NOT walked for fault obligations at HEAD.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the divisor arg's declared modifier before the guard evaluates -> arg-bound discharge (were the site minted)",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects. Requires the guard expression to be walked for fault obligations first (the build gap).",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before the guard's dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the divisor arg nonzero/positive (once guard-expression fault minting exists)" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept GapGuard\n\nfield Ratio as decimal default 0.0 nonnegative\n\nstate Draft initial\nstate Done\n\nevent Split(Parts as integer)\n\nfrom Draft on Split when 100 / Split.Parts > 0 -> set Ratio = 1.0 -> transition Done\nfrom Draft on Split -> reject \"no\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Parts as integer positive",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer positive" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "positive excludes 0 -> arg-bound discharge (once the guard site mints)",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "The guard-expression division is not minted at HEAD, so neither the base rejection nor this discharge is exercised — the clean compile is vacuous, not a proof.",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-positive",
+            "addition": "Parts as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0; must reject once the guard site mints, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [
+        "BUILD GAP verified live 2026-07-21: the GapGuard program compiles clean (success:true) with ZERO divisor obligations — the guard expression `100 / Split.Parts` is not walked for fault obligations. This is a P11 static-completeness hole (the fault obligation is a target under Principle 10 but never minted). Definition-side answer is `defined` (the obligation must exist and discharge/reject via (b)); the build does not yet mint it. See openFlags."
+      ]
+    },
+    {
+      "id": "fault-numeric/state-hook-guard-primitive-GAP",
+      "label": "Divisor != 0 inside a state hook's own when guard — NOT minted at HEAD (build gap)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger inside a state hook when guard",
+        "evaluationSiteCategory": "state-hook-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "spec", "ref": "docs/language/precept-language-spec.md:110", "note": "Principle 10 totality: the obligation is a target at a guard-embedded division" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "open design hole: an obligation never minted is undetected" }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Parts != 0",
+        "metavariables": [
+          { "name": "Split.Parts", "standsFor": "the divisor operand inside the state hook's guard (an event arg in scope during the transition)" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Split.Parts != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "If minted, the divisor is the triggering event's arg (in scope in the state hook, live-verified for hook actions), so premise (b) via governance discharges it. The gap is that the hook-guard expression is not walked for fault obligations at HEAD (the same class of gap as the transition-row-guard cell).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the divisor arg's modifier before the hook guard evaluates -> arg-bound discharge (were the site minted)",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects. Requires hook-guard fault minting first.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before the hook guard's dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the divisor arg nonzero/positive (once hook-guard fault minting exists)" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept GapStateHookGuard\n\nfield Ratio as decimal default 0.0 nonnegative\n\nstate Draft initial\nstate Done\n\nevent Split(Parts as integer)\n\nto Done when 100 / Split.Parts > 0 -> set Ratio = 1.0\n\nfrom Draft on Split -> transition Done",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Parts as integer positive",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer positive" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "positive excludes 0 -> arg-bound discharge (once the hook-guard site mints)",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Hook-guard fault sites are not minted at HEAD (parallel to the transition-row-guard gap verified via GapGuard); the discharge is unexercised.",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-positive",
+            "addition": "Parts as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0; must reject once the hook-guard site mints, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [
+        "BUILD GAP (inferred from the verified transition-row-guard gap: guard expressions are not walked for fault obligations). The exact `to Done when ...` guard syntax on a state hook was not separately compiled; the base is recorded model-derived. A P11 completeness hole regardless of the exact hook-guard syntax accepted. See openFlags."
+      ]
+    },
+    {
+      "id": "fault-numeric/rule-activation-guard-primitive-GAP",
+      "label": "Divisor != 0 inside a conditional rule's when activation guard — NOT minted; field divisor, discharge open",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger inside a rule when activation guard",
+        "evaluationSiteCategory": "rule-activation-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "open design hole (never-minted obligation undetected) AND citation-duty ruling admits (a)/(d) with no validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Count != 0",
+        "metavariables": [
+          { "name": "Count", "standsFor": "the divisor field inside the rule's activation guard (no event in scope on a rule)" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Count != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "Doubly gapped: (1) the activation-guard expression is not walked for fault obligations at HEAD (the never-minted class, verified for guards via GapGuard); and (2) even were it minted, a rule activation guard has no event args and no handler guard, so the divisor is a field and the only premises are (a)/(d) — neither authorable (no validity argument, no machinery). See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept GapRuleActivationGuard\n\nfield Count as integer default 0\nfield Flag as boolean default false\n\nrule Flag == false when 100 / Count > 0 because \"activation divides by a field\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Open on two independent grounds (never-minted AND (a)/(d)-only discharge). The guard-not-minted half is verified via GapGuard; the discharge-argument-missing half is the same finding as the rule-condition cells. Base recorded model-derived (exact activation-guard-with-division syntax not separately compiled)." ]
+    },
+    {
+      "id": "fault-numeric/ensure-activation-guard-primitive-GAP",
+      "label": "Divisor != 0 inside an ensure's when activation guard — NOT minted; field divisor, discharge open",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger inside an ensure when activation guard",
+        "evaluationSiteCategory": "ensure-activation-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "open design hole (never-minted) AND citation-duty ruling admits (a)/(d) without validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Count != 0",
+        "metavariables": [
+          { "name": "Count", "standsFor": "the divisor field inside the ensure's activation guard" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Count != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "Doubly gapped, as the rule-activation-guard cell: the activation-guard expression is not minted at HEAD, and even if minted the divisor is a field with only (a)/(d) available — neither authorable. See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept GapEnsureActivationGuard\n\nfield Count as integer default 0\nfield Total as decimal default 0.0 nonnegative\n\nstate Active initial\n\nin Active ensure Total >= 0 when 100 / Count > 0 because \"activation divides by a field\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" } ],
+      "notes": [ "Open on two grounds (never-minted AND (a)/(d)-only). Base recorded model-derived; the exact ensure-with-activation-guard-division syntax was not separately compiled." ]
+    },
+    {
+      "id": "fault-numeric/reject-interpolation-primitive-GAP",
+      "label": "Divisor != 0 inside a reject-row message interpolation — NOT minted (reject rows never walked)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger inside a reject-row message interpolation hole",
+        "evaluationSiteCategory": "reject-message-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "spec", "ref": "docs/language/precept-language-spec.md:110", "note": "Principle 10 totality: a division in a reject message interpolation is still an expression that must evaluate safely" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault site may sit in a reject-row interpolation with no write at all (want :72 example)" }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Parts != 0",
+        "metavariables": [
+          { "name": "Split.Parts", "standsFor": "the divisor operand inside the reject message hole (the reject row's event arg)" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Split.Parts != 0" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "If the site were minted, the divisor is the reject row's event arg, so premise (b) via governance discharges it. The gap is structural: reject rows are never walked for fault obligations at HEAD.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the divisor arg's modifier before the reject message is interpolated -> arg-bound discharge (were the site minted)",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the divisor arg's interval from its declared modifiers; 0 inside, or no bound excluding it, rejects. Requires reject-row interpolations to be walked for fault obligations first.",
+          "citations": [ { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "ingress governance before dependent computation" } ]
+        }
+      ],
+      "suggestions": [ { "premiseClasses": ["b"], "schema": "bound the divisor arg nonzero/positive (once reject-row interpolations are walked)" } ],
+      "witnesses": {
+        "base": {
+          "program": "precept GapReject\n\nfield Ratio as decimal default 0.0 nonnegative\n\nstate Draft initial\nstate Done\n\nevent Split(Parts as integer)\n\nfrom Draft on Split -> transition Done\nfrom Draft on Split -> reject \"bad ratio {100 / Split.Parts}\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Parts as integer positive",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer positive" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "positive excludes 0 -> arg-bound discharge (once reject-row interpolations mint)",
+            "strategy": "CompositionalConstraint",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Reject rows are never walked at HEAD, so the interpolated division mints no obligation (verified via GapReject: clean compile, zero divisor obligations). The discharge is unexercised.",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-positive",
+            "addition": "Parts as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Split", "argName": "Parts", "declaration": "Parts as integer nonnegative" } ] },
+            "whyStillRejects": "nonnegative admits 0; must reject once reject-row interpolations mint, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }, { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:72", "note": "the reject-row interpolation example the want doc uses ({-Balance / PlanRepayment.Months})" } ],
+      "notes": [
+        "BUILD GAP verified live 2026-07-21: GapReject compiles clean with ZERO divisor obligations — the reject message interpolation `{100 / Split.Parts}` is not walked. Structural P11 hole (reject rows never walked). Definition-side answer is `defined` (the obligation is a target and would discharge via (b)); the build does not mint it. See openFlags."
+      ]
+    },
+    {
+      "id": "fault-numeric/constraint-rationale-interpolation-primitive-GAP",
+      "label": "Divisor != 0 inside a rule/ensure because-message interpolation — NOT minted; field divisor, discharge open",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger inside a because-message interpolation hole",
+        "evaluationSiteCategory": "constraint-rationale-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "open design hole (never-minted) AND citation-duty ruling admits (a)/(d) without validity argument / machinery" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "ratification gate blocks a (a)/(d)-only fault discharge" }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0",
+        "metavariables": [
+          { "name": "Divisor", "standsFor": "the divisor field inside the because-message interpolation (no event in scope on a rule)" },
+          { "name": "0", "standsFor": "the catalog-declared zero threshold" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": { "statement": "Divisor != 0" }
+      },
+      "applicablePremiseClasses": ["a", "d"],
+      "premiseAvailability": "Doubly gapped: (1) the because-message interpolation is not walked for fault obligations at HEAD (verified via GapBecause: clean compile, zero obligations); and (2) on a rule/state-ensure because clause there are no event args, so the divisor is a field with only (a)/(d) available — neither authorable (no validity argument, no machinery). See openFlags.",
+      "witnesses": {
+        "base": {
+          "program": "precept GapBecause\n\nfield Divisor as integer default 0\nfield Value as decimal default 0.0\n\nrule Value >= 0 because \"scaled {100 / Divisor}\"",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182" }
+        }
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [ { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }, { "kind": "spec", "ref": "docs/language/precept-language-spec.md:110", "note": "Principle 10 totality: the because-message division is an expression that must evaluate safely" } ],
+      "notes": [
+        "BUILD GAP verified live 2026-07-21: GapBecause compiles clean with ZERO proof obligations — the because interpolation `{100 / Divisor}` is not walked. Open on two grounds (never-minted AND, on a rule because clause, (a)/(d)-only discharge). For a because clause on an event ensure the divisor could instead be an arg, giving (b); that variant is not the coordinate map's primitive/rule case and is not authored here."
+      ]
+    }
+  ]
+}

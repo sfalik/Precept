@@ -1,0 +1,786 @@
+{
+  "$schema": "../cell.schema.json",
+  "familyId": "fault-intervalcontainment",
+  "title": "Fault family — ProofRequirementKind.IntervalContainment: an assigned/computed numeric value's interval must fit the target field's (or element band's) declared bounds",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "Fault family: the catalog-declared safety precondition at the evaluation site; premise classes (b)/(c)/(a) per catalog ProofSatisfactions, with (a)/(d) admitted for the fault family under the 2026-07-21 citation duty"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+      "note": "Fault minting: each evaluation site in a plan mints its own fault obligations; site identity is an occasion, not a syntactic position"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+      "note": "2026-07-21 citation-duty ruling (class (a)/(d) admitted for the fault family only under a named establishing + preserving obligation set, each discharged) and the open design hole that nothing detects an unminted obligation"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+      "note": "Ratification gate: no cell ratifies whose derivation cites an argument-less rule"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+      "note": "The seven named validity arguments; 'Arg-bound interval arithmetic' (with its guard-spelled variant) and 'Literal constant-fold for defaults' are the two this family's defined cells rest on"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/ProofRequirement.cs:190",
+      "note": "IntervalContainmentProofRequirement — the DU subtype: Subject, TargetField, DeclaredMin/Max, AuthoredMin/Max. hasCatalogSite is false — no operator/function/action carries an IntervalContainment slot in its ProofRequirements; the instance is engine-synthesized from declared bounds"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/ProofRequirement.cs:343",
+      "note": "ProofRequirementMeta.IntervalContainment -> DiagnosticCode.NumericOverflow (PRE0078) — the diagnostic every rejection in this family carries"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.Intervals.cs:22",
+      "note": "IntervalOfNarrowed — the single interval computation all three mint sites discharge through: literal -> point; TypedArgRef -> ExtractArgInterval (class b); TypedFieldRef -> ExtractFieldInterval (class a); guard narrowing via the narrowed dict (class c, field reads only)"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+      "note": "the transport dependency the discharges rest on: ingress-governed argument facts are earned at phase 1 and never killed (nothing in a plan writes an argument); guard facts are killed by an intervening write to deps — the frame-and-kill rule the matrix's 2026-07-21 soundness correction depends on, restated in docs/Working/transport-rule-restatement-2026-07-21.md § What earns a fact"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [
+      {
+        "spelling": "a hook/handler guard bounding a read field per-term (`when Source <= 100`)",
+        "whyLicensed": "a per-term bound conjunct feeds the same interval arithmetic that discharges an arg-modifier bound (matrix band ruling; 'Arg-bound interval arithmetic' guard-spelled variant) — it is licensed, not a band member. Live-verified proving on the state-hook cell.",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the sound-but-unprovable band bullet: per-term bound conjuncts are licensed, not band members; only algebraic rearrangement lands in the band"
+          }
+        ]
+      }
+    ],
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4: a family verdict ratifies only when it agrees with the classified sample corpus; not yet run for this family"
+      }
+    ],
+    "notes": [
+      "Interval-containment band members are algebraic rearrangements of a bound that the interval arithmetic does not cover — e.g. a bound spelled as `interval(RHS) <= declaredMax - Offset` (a term moved across the inequality) is sound but no interval derivation follows the move. Its respelling is the direct bound (`RHS + Offset` bounded, or a per-term guard/arg bound) — the same respelling shape as Witness Family 1. Verdict inherited by every defined cell; model-derived only, corpus pending."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault-intervalcontainment-transition-primitive",
+      "label": "IntervalContainment — primitive scalar set in a transition-row action, RHS reads the triggering event's own arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — scalar set into a numeric-bounded field",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "code",
+            "ref": "src/Precept/Language/Actions.cs:76",
+            "note": "ActionMeta for Set carries DynamicObligationGenerator: GenerateIntervalContainmentObligations — the dispatch is catalog-registered (Action.cs:30/46), the obligation instance is built dynamically from the target field's declared bounds"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Language/Actions.cs:297",
+            "note": "GenerateIntervalContainmentObligations -> BuildIntervalContainmentObligation (Actions.cs:452) for a scalar Set on a field whose GetFieldBounds is non-empty; invoked from ProofEngine.cs:454-469"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(SetRatio.Value) ⊆ [⟨declaredMin⟩ .. ⟨declaredMax⟩] for field Ratio",
+        "metavariables": [
+          { "name": "SetRatio.Value", "standsFor": "the assigned right-hand-side expression at the scalar set — instantiated here as the triggering event's own declared arg" },
+          { "name": "declaredMin", "standsFor": "the target field's normalized declared lower bound (−∞ when only max is declared); IntervalContainmentProofRequirement.DeclaredMin" },
+          { "name": "declaredMax", "standsFor": "the target field's normalized declared upper bound; IntervalContainmentProofRequirement.DeclaredMax" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet; containment is decided by interval arithmetic (subset test), not by a spelling match" }
+        ],
+        "wp": { "statement": "IntervalOfNarrowed(SetRatio.Value) ⊆ [DeclaredMin .. DeclaredMax] — the assigned-value interval is a subset of the declared band" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "The RHS reads the triggering event's own argument directly, with no intervening computation (spec:164, :170 purity), so premise (b) is available: governance enforces the arg's declared bound at ingress before the write reads it (spec:268; transport § What earns a fact — an ingress-governed argument fact is earned at phase 1 and never killed). ExtractArgInterval (ProofEngine.Intervals.cs:312) turns the arg's declared min/max into the operand interval the containment test consumes. Premise (c) via a guard bounding the arg is provable under the model (the 'Arg-bound interval arithmetic' guard-spelled variant), but is NOT offered as a built discharge arm here: BuildNarrowedIntervals (ProofEngine.Intervals.cs:519) narrows FIELD reads only — IntervalOfNarrowed's TypedArgRef case (:99) ignores the narrowing dict — so a guard on the arg does not tighten its interval in the shipped engine. Premise (a) (field modifiers on the RHS) is not exercised: the RHS is an arg, not a field, so no field sits in the read position. Premise (d) is not part of this cell's contract for the same reason recorded across the division fault group: the matrix names no validity argument for a rule-premised (CompositionalConstraint) discharge of a fault obligation, and the citation-duty machinery it would require does not exist (matrix § Rule validity gate; § The cell open design hole).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the event arg's declared bound before the write reads it; ExtractArgInterval yields [argMin .. argMax]; containment holds iff that interval ⊆ [declaredMin .. declaredMax] -> IntervalContainment strategy",
+          "strategy": "IntervalContainment",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the RHS interval from the arg's declared bounds (ExtractArgInterval, a finite read of declared modifiers). Accept iff [argMin .. argMax] ⊆ [declaredMin .. declaredMax] (subset test); an arg interval whose lower is below declaredMin or whose upper exceeds declaredMax, or an unbounded operand, rejects with NumericOverflow (PRE0078).",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Arg-bound interval arithmetic — governance enforces every declared arg constraint before any computation derives from it; the containment subset test is the degenerate (single-operand, no-combination) case of the same governance-before-computation reasoning" },
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:268", "note": "governance enforced on every value entering as an event argument, before any computation derives from it" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Intervals.cs:312", "note": "ExtractArgInterval — reads the arg's DeclarationValue bounds into the operand interval" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "bound the arg such that its declared interval is contained in the field's declared band [⟨declaredMin⟩ .. ⟨declaredMax⟩]",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet — a schema over the band metavariables, never a constant" }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept W\n\nfield Ratio as integer nonnegative max 100 default 0\n\nstate Active initial\n\nevent Create() initial\nevent SetRatio(Value as integer)\n\non Create\n    -> set Ratio = 0\n\nfrom Active on SetRatio\n    -> set Ratio = SetRatio.Value\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" }
+        },
+        "discharges": [
+          {
+            "id": "arg-bound",
+            "kind": "arg-modifier",
+            "addition": "Value as integer nonnegative max 100",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "SetRatio", "argName": "Value", "declaration": "Value as integer nonnegative max 100" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "the arg's declared [−∞ .. 100] interval is contained in the field band [−∞ .. 100] -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-bound",
+            "addition": "Value as integer nonnegative max 200",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "SetRatio", "argName": "Value", "declaration": "Value as integer nonnegative max 200" } ] },
+            "whyStillRejects": "the arg's declared upper 200 exceeds the field band upper 100, so [−∞ .. 200] ⊄ [−∞ .. 100] — must still reject, same obligation (NumericOverflow). Live-verified: computed interval [-79228… .. 200], disposition Unresolved.",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape this cell instantiates" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:452", "note": "BuildIntervalContainmentObligation — the shared builder for the scalar set and the element-write paths" }
+      ],
+      "notes": [
+        "The obligation is engine-synthesized from the target field's declared bounds, not carried in any catalog ProofRequirements slot (hasCatalogSite: false) — a catalog-only enumeration would miss it entirely.",
+        "No BUG-033 / write-surface exposure: the discharge reads the arg directly at its own write site, consuming an ingress-governed fact that no in-operation write can kill; there is no `into` binding target and no cross-write-surface guard survival in this witness.",
+        "precept MCP serves its last-spawn build, which may lag the working tree; results were cross-checked against source (Actions.cs:281-330, ProofEngine.Intervals.cs) and are internally consistent."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-transition-business",
+      "label": "IntervalContainment — business-domain (Money) scalar set in a transition-row action, RHS reads the event's own money arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — scalar set into a numeric-bounded Money/Quantity field",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Language/Actions.cs:297", "note": "same scalar Set path; GetFieldBounds returns the money field's normalized (UCUM base-unit) bounds — business-domain magnitudes flow the identical containment path" }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(SetFee.Amount) ⊆ [⟨declaredMin⟩ .. ⟨declaredMax⟩] for money field Fee",
+        "metavariables": [
+          { "name": "SetFee.Amount", "standsFor": "the assigned money RHS — the event's own declared money arg (same currency qualifier as the target)" },
+          { "name": "declaredMin", "standsFor": "the field's normalized (UCUM base-unit) lower bound; AuthoredMin carries the raw written value for diagnostics" },
+          { "name": "declaredMax", "standsFor": "the field's normalized upper bound; e.g. max '1000 USD' normalizes to 1000" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet; money bounds are compared in normalized base-unit space (ProofRequirement.cs:184-188)" }
+        ],
+        "wp": { "statement": "IntervalOfNarrowed(SetFee.Amount) ⊆ [DeclaredMin .. DeclaredMax] in normalized currency-base space" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "Identical to the primitive scalar cell: the RHS reads a money arg directly, so premise (b) is available via governance at ingress (spec:268) and ExtractArgInterval yields the arg's declared money interval. The interpolated money constant path (InterpolatedTypedConstant, ProofEngine.Intervals.cs:35-65) carries the magnitude into the same interval space. Premise (a)/(c)/(d) are excluded for the same reasons as the primitive cell (RHS is an arg, not a field; guard narrowing does not reach args; no validity argument for a field-modifier/rule-premised fault discharge). QualifierCompatibility (matching currency) is a separate, orthogonally-discharged obligation — not part of this cell.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the money arg's declared bound before the write reads it; ExtractArgInterval yields the normalized money interval; containment holds iff it ⊆ the field's normalized band -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the money RHS interval from the arg's declared money bounds (normalized to currency base units); accept iff contained in the field's normalized band; unbounded or over-band rejects with NumericOverflow (PRE0078).",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Arg-bound interval arithmetic; the argument notes extraction is exact and bounds never round (business-domain-types.md:426)" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Intervals.cs:312", "note": "ExtractArgInterval on the money arg" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "bound the money arg such that its declared interval is contained in the field's declared band [⟨declaredMin⟩ .. ⟨declaredMax⟩] (same currency)",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" } ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept W\n\nfield Fee as money in 'USD' nonnegative max '1000 USD' default '0 USD'\n\nstate Active initial\n\nevent Create() initial\nevent SetFee(Amount as money in 'USD')\n\non Create\n    -> set Fee = '0 USD'\n\nfrom Active on SetFee\n    -> set Fee = SetFee.Amount\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" }
+        },
+        "discharges": [
+          {
+            "id": "arg-bound-money",
+            "kind": "arg-modifier",
+            "addition": "Amount as money in 'USD' nonnegative max '1000 USD'",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "SetFee", "argName": "Amount", "declaration": "Amount as money in 'USD' nonnegative max '1000 USD'" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "the money arg's declared [−∞ .. 1000] interval is contained in the field band [−∞ .. 1000] -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-bound-money",
+            "addition": "Amount as money in 'USD' nonnegative max '2000 USD'",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "SetFee", "argName": "Amount", "declaration": "Amount as money in 'USD' nonnegative max '2000 USD'" } ] },
+            "whyStillRejects": "the arg's declared upper 2000 exceeds the field band upper 1000, so the money interval ⊄ [−∞ .. 1000] — must still reject, same obligation (NumericOverflow). Model-derived (near-miss not separately live-run this pass; the base and the 1000-bound discharge were).",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape" },
+        { "kind": "code", "ref": "src/Precept/Language/ProofRequirement.cs:184", "note": "DeclaredMin/Max carry normalized (UCUM base-unit) bounds; AuthoredMin/Max carry the raw written values for diagnostic display — for non-quantity fields the pairs are identical" }
+      ],
+      "notes": [
+        "Live compile confirmed money bounds normalize (max '1000 USD' -> declaredMax 1000) and the bounded money arg proves via strategy IntervalContainment; the unbounded-arg base rejects with PRE0078.",
+        "No BUG-033 / write-surface exposure (direct arg read at its own write site)."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-transition-collection",
+      "label": "IntervalContainment — element-introducing action into a numeric-bounded collection in a transition row, element expr reads the event's own arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — per-element write into a numeric-bounded collection (add/enqueue/append/push/insert/put — the catalog Grows+EstablishesValue set)",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Language/Actions.cs:409", "note": "GenerateElementIntervalContainmentObligation -> BuildIntervalContainmentObligation, gated on ActionMeta.Effect == Grows && WriteSemantics == EstablishesValue (catalog-derived, not an action-kind list); invoked from ProofEngine.cs:487-489" }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(AddScore.Value) ⊆ [⟨elementMin⟩ .. ⟨elementMax⟩] for the inner numeric type of collection Scores",
+        "metavariables": [
+          { "name": "AddScore.Value", "standsFor": "the element expression introduced by the growing action — here the event's own declared arg" },
+          { "name": "elementMin", "standsFor": "the collection inner type's declared lower bound (GetElementNumericBounds; note the element band folds nonnegative/positive into a real lower bound, unlike a scalar field's GetFieldBounds)" },
+          { "name": "elementMax", "standsFor": "the collection inner type's declared upper bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet; subset test over the element band" }
+        ],
+        "wp": { "statement": "IntervalOfNarrowed(AddScore.Value) ⊆ [ElementMin .. ElementMax]" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "The introduced element reads the event's own arg, so premise (b) is available exactly as in the scalar cell (ingress governance + ExtractArgInterval). Premise (a)/(c)/(d) excluded for the same reasons. One built-behavior nuance recorded, not a definition claim: the element band folds nonnegative/positive into a real lower bound (GetElementNumericBounds, ProofEngine.Intervals.cs:279), whereas ExtractArgInterval does NOT fold the arg's nonnegative flag — so a `nonnegative max N` arg gives [−∞ .. N], which fails an element band [0 .. N] on the lower bound. To discharge, the arg needs an explicit `min` (a DeclarationValue lower bound) or the element band must omit the lower bound. This is a built-engine asymmetry, not part of the discharge contract, and is why the witness uses a `max N` element band (band [−∞ .. N]) so the arg's [−∞ .. N] is contained.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the element arg's declared bound at ingress; ExtractArgInterval yields its interval; containment holds iff it ⊆ the element band -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the element expression's interval from the arg's declared bounds; accept iff ⊆ [elementMin .. elementMax]; unbounded or out-of-band rejects with NumericOverflow (PRE0078).",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Arg-bound interval arithmetic — the same governance-before-computation reasoning; the element is a governed ingress value written into the collection" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Intervals.cs:279", "note": "GetElementNumericBounds — the element band source" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "bound the introduced element's source arg such that its declared interval is contained in the collection's element band [⟨elementMin⟩ .. ⟨elementMax⟩]",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" } ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept W\n\nfield Scores as set of integer max 100\n\nstate Active initial\n\nevent Create() initial\nevent AddScore(Value as integer)\n\non Create\n    -> clear Scores\n\nfrom Active on AddScore\n    -> add Scores AddScore.Value\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" }
+        },
+        "discharges": [
+          {
+            "id": "element-arg-bound",
+            "kind": "arg-modifier",
+            "addition": "Value as integer max 100",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "AddScore", "argName": "Value", "declaration": "Value as integer max 100" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "the element arg's declared [−∞ .. 100] interval is contained in the element band [−∞ .. 100] -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "element-arg-bound",
+            "addition": "Value as integer max 200",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "AddScore", "argName": "Value", "declaration": "Value as integer max 200" } ] },
+            "whyStillRejects": "the arg's declared upper 200 exceeds the element band upper 100, so [−∞ .. 200] ⊄ [−∞ .. 100] — must still reject, same obligation (NumericOverflow).",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape" },
+        { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:487", "note": "the element-interval obligation is minted per growing element-introducing action on a TypedInputAction" }
+      ],
+      "notes": [
+        "The write-site occasion here is the growing action, not a scalar set — but it flows the SAME BuildIntervalContainmentObligation builder (Actions.cs:452), so the discharge contract is identical to the scalar cell modulo the bound source (element band vs field band).",
+        "`set` uses `add`; `list` uses `append` (PRE0048 if crossed) — a grammar detail, not a proof-surface one.",
+        "No BUG-033 / write-surface exposure (direct arg read at the element write site)."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-state-hook-primitive",
+      "label": "IntervalContainment — primitive scalar set in a state entry/exit action; discharge by a hook guard narrowing the read field",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — scalar set into a numeric-bounded field",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Language/Actions.cs:297", "note": "the same scalar Set dynamic-obligation path; the obligation's Context is a StateHookContext, so BuildNarrowedIntervals reads s.Hook.Guard (ProofEngine.Intervals.cs:526)" }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(Source) ⊆ [⟨declaredMin⟩ .. ⟨declaredMax⟩] for field Ratio, at a set inside a `to`/`from` state action",
+        "metavariables": [
+          { "name": "Source", "standsFor": "the assigned RHS — a field read (a state action cannot bind a specific event's args, so its RHS reads fields/literals, not args)" },
+          { "name": "declaredMin", "standsFor": "the target field's declared lower bound (−∞ when only max)" },
+          { "name": "declaredMax", "standsFor": "the target field's declared upper bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "IntervalOfNarrowed(Source, narrowed-by-hook-guard) ⊆ [DeclaredMin .. DeclaredMax]" }
+      },
+      "applicablePremiseClasses": ["c"],
+      "premiseAvailability": "A state entry/exit action runs on any transition into/out of its anchor state and is NOT bound to a specific event, so its RHS cannot read event args — premise (b) is structurally unavailable here (confirmed against samples: `to Investigation -> set InvestigatedAt = now()`, `to ReadyToReturn -> set ShippingLabelSent = true` — hooks read fields/literals). The available discharge is premise (c): the hook's own `when` guard narrows a read field. BuildNarrowedIntervals reads the state hook's guard (StateHookContext -> s.Hook.Guard, ProofEngine.Intervals.cs:526) and IntervalOfNarrowed applies the narrowed interval to the TypedFieldRef (:67-69). The guard fact is earned at the hook's guard evaluation (phase 6, entry) and reaches the hook's own action with no intervening write to the read field (transport § What earns a fact / § The transport rule — frame-and-kill: deps(φ) ∩ mayWrite between guard and action is empty). Premise (a) (reading the field's OWN declared bound as the operand interval, via ExtractFieldInterval) is a real built mechanism but is EXCLUDED from the contract: the matrix admits class (a) for the fault family only under the 2026-07-21 citation duty (name the establishing + every preserving obligation, each discharged), no such machinery exists, and no named validity argument covers a field-modifier interval read of a fault obligation — recorded as a missing rule (openFlag), not resolved here.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "the hook's `when` guard supplies a per-term bound on the read field; BuildNarrowedIntervals narrows that field's interval; containment holds iff the narrowed interval ⊆ the declared band -> IntervalContainment (guard-spelled variant of arg-bound interval arithmetic)",
+          "strategy": "IntervalContainment",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Extract the hook guard's per-term bound conjuncts over the read field (a finite set), narrow the field's interval, and accept iff the narrowed RHS interval ⊆ [declaredMin .. declaredMax]; a guard that does not bound the field on the failing side, or none, rejects with NumericOverflow (PRE0078). Sound only if no construct on the route between the guard and the action writes the read field (transport frame-and-kill) — satisfied here (entry-hook guard and action are adjacent at phase 6).",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Arg-bound interval arithmetic — 'the same argument carries the guard-spelled variant — the per-term bound conjuncts the band ruling licenses'; inherits the 2026-07-21 no-intervening-write soundness correction" },
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "the 2026-07-21 no-intervening-write soundness correction; the route-indexed frame-and-kill it depends on (the guard fact holds at the action iff deps(φ) ∩ mayWrite(guard, action) is empty) is restated in docs/Working/transport-rule-restatement-2026-07-21.md § 4. The transport rule" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Intervals.cs:519", "note": "BuildNarrowedIntervals reads the StateHookContext hook guard and narrows field reads" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a `when` guard on the hook that bounds the read field per-term so its narrowed interval is contained in [⟨declaredMin⟩ .. ⟨declaredMax⟩]",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" } ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept W\n\nfield Ratio as integer nonnegative max 100 default 0\nfield Source as integer default 0\n\nstate Active initial\nstate Ready terminal\n\nevent Create() initial\nevent Go(Value as integer)\n\non Create\n    -> set Ratio = 0\n\nto Ready\n    -> set Ratio = Source\n\nfrom Active on Go\n    -> set Source = Go.Value\n    -> transition Ready\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" }
+        },
+        "discharges": [
+          {
+            "id": "hook-guard-narrow",
+            "kind": "guard",
+            "addition": "to Ready when Source <= 100 -> set Ratio = Source  (adds `when Source <= 100` to the entry hook)",
+            "premiseClasses": ["c"],
+            "derivation": "the hook guard narrows Source to [−∞ .. 100]; [−∞ .. 100] ⊆ [−∞ .. 100] -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "Live-verified as a standalone program (the base with the entry hook rewritten to `to Ready when Source <= 100`): success:true, 0 diagnostics, IntervalContainment Proved, computed interval [-79228… .. 100]. The `application` field is omitted: the schema's application DU supports only row-guard (event-row) and event-arg-declarations loci — a STATE-HOOK guard addition is not mechanically expressible, so the cell→test converter cannot auto-apply it. Flagged as an application-DU coverage gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "hook-guard-narrow",
+            "addition": "to Ready when Source <= 200 -> set Ratio = Source",
+            "whyStillRejects": "the guard narrows Source only to [−∞ .. 200]; [−∞ .. 200] ⊄ [−∞ .. 100] — must still reject, same obligation (NumericOverflow).",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape; the write-site category is a state entry/exit action" },
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "the citation-duty ruling under which the excluded class-(a) field-bound-read would have to be discharged, and the machinery that does not exist" }
+      ],
+      "notes": [
+        "The state-hook occasion is reachable on fire/inspect-fire routes with a transition outcome touching the anchor state (transport § 3, state-hook rows). This cell's discharge is route-independent (the hook guard is on every route that runs the hook).",
+        "openFlag: reading the RHS field's OWN declared bound (class a, ExtractFieldInterval) would also discharge in the built engine, but has no validity argument and no citation-duty machinery — an unlicensed over-acceptance under exact-power. Not authored as a contract arm."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-stateless-hook-primitive",
+      "label": "IntervalContainment — primitive scalar set in a stateless handler, RHS reads the event's own arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — scalar set into a numeric-bounded field",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Language/Actions.cs:297", "note": "the same scalar Set path; a stateless `on E -> set` handler reads event args, so the discharge is class (b), identical to the transition-row cell" }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(Allocate.Amount) ⊆ [⟨declaredMin⟩ .. ⟨declaredMax⟩] for field UnitCost, in a stateless `on E` handler",
+        "metavariables": [
+          { "name": "Allocate.Amount", "standsFor": "the assigned RHS — the stateless handler's own event arg" },
+          { "name": "declaredMin", "standsFor": "the field's declared lower bound (−∞ when only max)" },
+          { "name": "declaredMax", "standsFor": "the field's declared upper bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "IntervalOfNarrowed(Allocate.Amount) ⊆ [DeclaredMin .. DeclaredMax]" }
+      },
+      "applicablePremiseClasses": ["b"],
+      "premiseAvailability": "A stateless handler (`on E -> ...`, no transition rows) reads its event's args directly, so premise (b) is available exactly as in the transition-row cell (ingress governance at spec:268; ExtractArgInterval). Stateless precepts are first-class in the route enumeration (transport § Routes are finitely enumerable — the stateless handler class), so this occasion is not a special case. Premise (a)/(c)/(d) excluded as in the primitive transition cell.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["b"],
+          "derivation": "governance enforces the arg's declared bound before the handler's write reads it; ExtractArgInterval yields its interval; containment holds iff ⊆ the declared band -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Compute the RHS interval from the arg's declared bounds; accept iff ⊆ [declaredMin .. declaredMax]; unbounded or over-band rejects with NumericOverflow (PRE0078).",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Arg-bound interval arithmetic" },
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1007", "note": "stateless event handlers carry no `when` guard; the stateless handler class is a first-class route source (restated in docs/Working/transport-rule-restatement-2026-07-21.md § Routes are finitely enumerable), so this fault occasion is not a special case" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "bound the handler's event arg such that its declared interval is contained in the field's declared band [⟨declaredMin⟩ .. ⟨declaredMax⟩]",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" } ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StatelessArgInterval\n\nfield UnitCost as integer nonnegative max 100 default 0\n\nevent Allocate(Amount as integer)\n\non Allocate\n    -> set UnitCost = Allocate.Amount\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" }
+        },
+        "discharges": [
+          {
+            "id": "arg-bound",
+            "kind": "arg-modifier",
+            "addition": "Amount as integer nonnegative max 100",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "Amount", "declaration": "Amount as integer nonnegative max 100" } ] },
+            "premiseClasses": ["b"],
+            "derivation": "the arg's declared [−∞ .. 100] interval is contained in the field band [−∞ .. 100] -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-bound",
+            "addition": "Amount as integer nonnegative max 200",
+            "application": { "locus": "event-arg-declarations", "replacements": [ { "eventName": "Allocate", "argName": "Amount", "declaration": "Amount as integer nonnegative max 200" } ] },
+            "whyStillRejects": "the arg's declared upper 200 exceeds the field band upper 100 — [−∞ .. 200] ⊄ [−∞ .. 100], must still reject, same obligation (NumericOverflow).",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape" }
+      ],
+      "notes": [
+        "Live-verified: unbounded-arg base rejects with PRE0078; bounded-arg discharge proves via strategy IntervalContainment (0 diagnostics).",
+        "No BUG-033 / write-surface exposure (direct arg read in the handler)."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-field-default-collection",
+      "label": "IntervalContainment — each element of a default-list literal on a numeric-bounded collection must fit the element band",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — per default-list-element containment (constant fold)",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:518", "note": "CollectElementIntervalDefaultObligations — engine-synthesized per element of a `default [...]` list literal on a collection whose numeric inner type declares a bound; gated on `field.DefaultExpression is TypedListLiteral` (so this fires ONLY for collection list-literal defaults, never a scalar default)" }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(⟨each default-list element literal⟩) ⊆ [⟨elementMin⟩ .. ⟨elementMax⟩]",
+        "metavariables": [
+          { "name": "element", "standsFor": "one literal element of the `default [...]` list; each element mints its own obligation (site identity = occasion)" },
+          { "name": "elementMin", "standsFor": "the collection inner type's declared lower bound" },
+          { "name": "elementMax", "standsFor": "the collection inner type's declared upper bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet; each element is a literal, so containment is a point-in-interval test" }
+        ],
+        "wp": { "statement": "for each element e: NumericInterval.Point(e) ⊆ [ElementMin .. ElementMax]" }
+      },
+      "applicablePremiseClasses": [],
+      "premiseAvailability": "The default-list elements are literals, so no authored premise is consumed — the obligation discharges by constant folding (each element's point interval is tested against the element band). This is the fault-family analogue of the standing establishment fold: no premise class instantiates, so the applicable-class set is empty and the suggestion is a schema over the offending element's value, not a premise addition.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [],
+          "derivation": "constant-fold each literal element and test point-membership in the element band -> IntervalContainment (literal path)",
+          "strategy": "IntervalContainment",
+          "validityArguments": ["Literal constant-fold for defaults"],
+          "decisionProcedure": "For each list element, materialize its literal value (finite parse) and accept iff it lies in [elementMin .. elementMax]; any element outside the band rejects with NumericOverflow (PRE0078). Each element is an independent occasion.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Literal constant-fold for defaults — construction materializes the declared literal, and the fold compares that exact value against the bound under the evaluator's comparison semantics; extended here from a scalar default to each element of a list default (same argument, per element)" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:503", "note": "the collector: one obligation per list element, discharged by the shared narrowed interval-containment prover" }
+          ]
+        }
+      ],
+      "suggestions": [],
+      "witnesses": {
+        "base": {
+          "program": "precept W\n\nfield Scores as list of integer max 100 default [50, 150]\n\nstate Active initial\n\nevent Create() initial\nevent AddScore(Value as integer max 100)\n\non Create\n    -> clear Scores\n\nfrom Active on AddScore\n    -> append Scores AddScore.Value\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": [], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" }
+        },
+        "discharges": [
+          {
+            "id": "in-band-default",
+            "kind": "default-constant-fold",
+            "addition": "default [50, 75]  (replaces the out-of-band default [50, 150])",
+            "premiseClasses": [],
+            "derivation": "both element points 50, 75 lie in [−∞ .. 100] -> IntervalContainment (literal fold)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "Live-verified as a standalone program (base with the default replaced by [50, 75]): success:true, 0 diagnostics, both element obligations Proved. `application` omitted: the schema's application DU has no default-value-replacement locus, so this addition (a whole-default rewrite, not an appended clause) cannot be mechanically auto-applied by the cell→test converter. Flagged as an application-DU coverage gap. Both polarities were live-run as separate programs."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "in-band-default",
+            "addition": "default [50, 101]",
+            "whyStillRejects": "element 101 exceeds the band upper 100 — its point interval ⊄ [−∞ .. 100], must still reject, same obligation (NumericOverflow). (The base's 150 element is the live-verified instance of this polarity.)",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape; the evaluation-site category is a field default value expression" },
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule", "note": "site identity — each list element is its own occasion, minting its own obligation" }
+      ],
+      "notes": [
+        "Live compile: `set of integer default [...]` raises PRE0018 (a `[...]` list literal is not a set value) — only `list of ...` accepts a `[...]` default, so the collection here is a `list`. The mint site (Analysis.cs:503) fires for any collection field whose DefaultExpression is a TypedListLiteral with a numeric-bounded inner type.",
+        "This is the ONE default-position cell in this family that genuinely mints IntervalContainment AND has a named validity argument — contrast the two scalar-default cells below, which mint Numeric (OutOfRange), not IntervalContainment."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-computed-field-primitive",
+      "label": "IntervalContainment — a computed primitive field's result must fit its OWN declared bound; discharge would consume the input fields' declared bounds (class a) — no validity argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — computed field result vs its own declared bound",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "the ratification gate — no cell ratifies whose derivation cites an argument-less rule; the only discharge for a field-reading computed expression is a class-(a) field-modifier interval read, for which the matrix names no validity argument" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "the 2026-07-21 citation duty admits class (a) for the fault family only under a named establishing + preserving obligation set, each discharged — and that machinery (establishment/preservation ProofRequirement subtypes) does not exist" }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(⟨computed expr⟩) ⊆ [⟨declaredMin⟩ .. ⟨declaredMax⟩] for the computed field's own declared bound",
+        "metavariables": [
+          { "name": "computed expr", "standsFor": "the `<-` expression; it reads other fields (never event args — computed fields have no arg scope and no guard)" },
+          { "name": "declaredMin", "standsFor": "the computed field's own declared lower bound (−∞ when only max)" },
+          { "name": "declaredMax", "standsFor": "the computed field's own declared upper bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "IntervalOfNarrowed(computed expr) ⊆ [DeclaredMin .. DeclaredMax], where the operand intervals come from the input fields' declared bounds" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "A computed field expression reads other FIELDS only — it has no event-arg scope and no `when` guard — so neither premise (b) (arg bounds) nor premise (c) (guard narrowing) is available. The sole discharge path is premise (a): reading each input field's OWN declared bound as an operand interval (ExtractFieldInterval, ProofEngine.Intervals.cs:202) and combining via the operators' IntervalTransfer functions. The built engine DOES perform this (live-verified: `field Sum as integer max 100 <- A + B` with A,B `nonnegative max 50` proves, computed interval [0 .. 100]; with A,B unbounded it rejects, PRE0078). BUT under the matrix this class-(a) discharge of a fault obligation is licensed only under the 2026-07-21 citation duty (name the establishing and every preserving obligation of each input field's bound, each discharged) — and (1) that machinery does not exist (no establishment/preservation ProofRequirement subtype, matrix § Obligation family), and (2) no named validity argument covers a field-modifier interval read for a fault obligation ('Arg-bound interval arithmetic' is grounded in ingress governance of event args, not in a field's declared bound being true of its runtime value across writes). Per the ratification gate, this cell CANNOT record a discharge contract without citing an argument-less rule. Left OPEN — a missing rule for the owner.",
+      "witnesses": {
+        "base": {
+          "program": "precept W\n\nfield A as integer default 0\nfield B as integer default 0\nfield Sum as integer max 100 <- A + B\n\nstate Active initial\n\nevent Create() initial\nevent SetInputs(AVal as integer, BVal as integer)\n\non Create\n    -> set A = 0\n\nfrom Active on SetInputs\n    -> set A = SetInputs.AVal\n    -> set B = SetInputs.BVal\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" }
+        }
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape; evaluation-site category = computed-field expression" },
+        { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:562", "note": "CollectComputedFieldBoundObligations — engine-synthesized IntervalContainment for a computed numeric field against its own declared bounds" }
+      ],
+      "notes": [
+        "openFlag (missing rule, routed to owner): the built engine discharges this obligation by consuming the input fields' declared bounds (class a) via ExtractFieldInterval, but the matrix names no validity argument for a class-(a) field-modifier interval read of a fault obligation, and the citation-duty machinery it requires does not exist. Under exact-power this is an unlicensed OVER-ACCEPTANCE (the engine accepts programs the definition does not license) — the fault-family instance of the same false-proof hazard the matrix records at § The cell for constraints. The owner must either (a) author a validity argument + citation-duty discharge for class-(a) field-bound reads at fault sites, or (b) rule the field-bound read out (shrinking what the engine may accept).",
+        "Because a computed field reads fields (not args) and carries no guard, this cell has NO validity-grounded discharge available at all — unlike the state-hook cell, which recovers a class-(c) guard path. The gap is structural to computed fields."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-computed-field-business",
+      "label": "IntervalContainment — a computed business-domain (Money) field's result vs its own declared bound; open under the same class-(a) gap, and the built engine cannot even discharge money operands",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment — computed Money/Quantity field result vs its own declared bound",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "same argument-less-rule gate as the primitive computed cell — the only discharge path is class-(a) field-bound reads, with no validity argument" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "the citation-duty ruling and the absent establishment/preservation machinery" }
+        ]
+      },
+      "obligation": {
+        "statement": "interval(⟨computed money expr⟩) ⊆ [⟨declaredMin⟩ .. ⟨declaredMax⟩] for the computed money field's own declared bound",
+        "metavariables": [
+          { "name": "computed money expr", "standsFor": "the `<-` money expression (e.g. PartA + PartB), reading other money fields" },
+          { "name": "declaredMin", "standsFor": "the computed money field's normalized lower bound" },
+          { "name": "declaredMax", "standsFor": "the computed money field's normalized upper bound (e.g. max '1000 USD' -> 1000)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet; normalized base-unit comparison" }
+        ],
+        "wp": { "statement": "IntervalOfNarrowed(computed money expr) ⊆ [DeclaredMin .. DeclaredMax]" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "Same structure as the primitive computed cell — only class (a) (input field bounds) is available, with no validity argument. Additionally recorded: even the built engine cannot discharge the money case today. Live-verified: `field Total as money in 'USD' max '1000 USD' <- PartA + PartB` with PartA, PartB `nonnegative max '500 USD'` yields a computed interval of [−∞ .. +∞] (money field reads / money `+` return an unbounded interval — the IntervalTransfer / ExtractFieldInterval money path is not built), so Total stays Unresolved and rejects with PRE0078 regardless of the operand bounds. Contrast the primitive `Rate * Hours` and `A + B` cases, which DO compute a finite interval. So this cell is BOTH model-open (no validity argument for class a) AND built-unresolved (money operand intervals unbuilt).",
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the fault-family case shape" },
+        { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:562", "note": "CollectComputedFieldBoundObligations mints this obligation for money computed fields too" }
+      ],
+      "notes": [
+        "No formal base witness recorded (open cell): the illustrative data-only program `field PartA as money in 'USD' nonnegative max '500 USD' default '0 USD' / field PartB ... / field Total as money in 'USD' max '1000 USD' <- PartA + PartB` was live-compiled — Total's computed interval is [−∞ .. +∞] despite the bounded operands, so it rejects with PRE0078 (plus incidental PRE0158 no-write-site warnings that keep it from meeting base-minimality). The unbounded-money-operand behavior is the load-bearing observation, recorded in premiseAvailability.",
+        "openFlag: the model gap is identical to the primitive computed cell (class-(a) field-bound read, no validity argument, absent citation-duty machinery). The additional built gap (money operand intervals return unbounded) means the engine currently REJECTS even a sound money computed field — a conservatism (safe direction) here rather than an over-acceptance, but it means the cell has no proven-today discharge to record either way. Both facts routed to the owner."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-field-default-primitive",
+      "label": "IntervalContainment — scalar primitive field default vs its bound: MISATTRIBUTED — minted as Numeric (OutOfRange), not IntervalContainment",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment (claimed) — scalar field default vs declared bound",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "empty",
+        "pruningDerivation": "empty: this coordinate mints NO IntervalContainment obligation. A scalar primitive field default vs its declared bound is minted as a NumericProofRequirement (the OutOfRange family) by CollectNumericDefaultObligations (ProofEngine.Analysis.cs:586), ProofRequirementKind.Numeric — NOT IntervalContainment. The IntervalContainment default path (CollectElementIntervalDefaultObligations, Analysis.cs:503) is gated on `field.DefaultExpression is TypedListLiteral`, so it fires only for collection list-literal defaults. The obligation is real but belongs to the Numeric-family cell file.",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:586", "note": "CollectNumericDefaultObligations — emits NumericProofRequirement per value-bounding modifier (min/max) on a scalar default; strategy Literal, diagnostic OutOfRange (PRE0079)" },
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:503", "note": "CollectElementIntervalDefaultObligations is gated on TypedListLiteral — a scalar default never reaches the IntervalContainment path" }
+        ]
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule", "note": "MINT FROM WHERE OBLIGATIONS ARE ACTUALLY MINTED — a catalog/coordinate-map attribution that does not match the real mint site is a definition error to route, not to author around" }
+        , { "kind": "code", "ref": "src/Precept/Language/ProofRequirement.cs:190", "note": "IntervalContainmentProofRequirement has exactly three construction sites in the tree (Analysis.cs:518, :562; Actions.cs:460); none is a scalar-default path — confirmed by grep" }
+      ],
+      "notes": [
+        "openFlag (coordinate-map misattribution, routed to owner): the coordinate map lists fault-intervalcontainment-field-default-primitive with obligation `⟨declaredMin⟩ <= ⟨default-literal⟩ <= ⟨declaredMax⟩`. That obligation exists but is a ProofRequirementKind.Numeric (OutOfRange) obligation, discharged by strategy Literal, diagnostic PRE0079 — verified live: `field Ratio as integer nonnegative max 100 default 0` mints `Numeric ... must satisfy 'max'` and `... 'nonnegative'` (strategy Literal), zero IntervalContainment obligations for the scalar default. The cell should be REMOVED from the IntervalContainment coordinate map and, if not already present, added to the Numeric-family coordinate map.",
+        "Not authored as defined: doing so would attribute an IntervalContainment discharge to a site that mints a different obligation kind — exactly the catalog-vs-real-mint hazard the corrected inputs forbid."
+      ]
+    },
+    {
+      "id": "fault-intervalcontainment-arg-default-primitive",
+      "label": "IntervalContainment — event arg default vs its bound: MISATTRIBUTED — minted as Numeric (OutOfRange), not IntervalContainment",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntervalContainment (claimed) — event arg default vs declared bound",
+        "evaluationSiteCategory": "event-arg-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "empty",
+        "pruningDerivation": "empty: this coordinate mints NO IntervalContainment obligation. An event arg default vs its declared bound is minted as a NumericProofRequirement (OutOfRange family) — verified live: `event SetRatio(Value as integer max 100 default 150)` mints `Numeric ... 'Default value of Value must satisfy max'`, disposition Unresolved -> PRE0079, and zero IntervalContainment obligations. IntervalContainment has exactly three construction sites in the tree (grep), none for arg defaults.",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:586", "note": "CollectNumericDefaultObligations — the arg-default path also flows Numeric (OutOfRange), not IntervalContainment; called at Analysis.cs:436 and :776" },
+          { "kind": "code", "ref": "src/Precept/Language/ProofRequirement.cs:190", "note": "the three IntervalContainmentProofRequirement construction sites do not include any arg-default path" }
+        ]
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule", "note": "mint from the real site, not the coordinate map" }
+      ],
+      "notes": [
+        "openFlag (coordinate-map misattribution, routed to owner): fault-intervalcontainment-arg-default-primitive with obligation `⟨declaredMin⟩ <= ⟨arg-default-literal⟩ <= ⟨declaredMax⟩` is a ProofRequirementKind.Numeric (OutOfRange) obligation (PRE0079), not IntervalContainment. Live-verified. Remove from the IntervalContainment coordinate map; belongs to the Numeric family.",
+        "Both scalar-default cells (this and field-default-primitive) share the same root: only COLLECTION list-literal defaults reach the IntervalContainment default path (Analysis.cs:503 TypedListLiteral gate); scalar/arg defaults are Numeric OutOfRange."
+      ]
+    }
+  ]
+}

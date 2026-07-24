@@ -1,0 +1,150 @@
+{
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "family": "fault",
+  "kind": "DimensionalProduct",
+  "proofRequirementKindOrdinal": 12,
+  "hasCatalogSite": true,
+  "provenance": {
+    "compileOracle": "precept_compile (MCP) — SYNTAX/COMPILE oracle only; its proof verdict is NOT cited as authority for the definition",
+    "verifiedAtHead": "c295d7b4",
+    "verifiedDate": "2026-07-21",
+    "compilerHoleCheck": "BUG-033 (into-binding write site) and the write-surface enumeration gap are INERT for this kind: both concern the survival of a runtime VALUE fact across a write, and DimensionalProduct consumes no value fact — it consumes the operands' declared dimension, a type-level invariant no write can change. No cell in this file rests on either hole."
+  },
+
+  "mintSites": [
+    {
+      "fileLine": "src/Precept/Language/Operations.cs:605",
+      "howMinted": "Catalog-declared on BinaryOperationMeta.ProofRequirements for OperationKind.QuantityTimesQuantity: new DimensionalProductProofRequirement(ParamSubject(PQuantity), ParamSubject(PQuantity), \"Product dimension must be in the curated business-domain set or cancel to a known dimension\"). This is the sole construction of DimensionalProductProofRequirement in the tree (grep-confirmed).",
+      "instantiatedAt": "src/Precept/Pipeline/ProofEngine.cs:306-307 — the TypedBinaryOp arm of WalkExpression mints one ProofObligation per bin.ProofRequirements entry at every binary-op evaluation occasion, regardless of enclosing context (action RHS, rule/ensure condition, computed-field expression, interpolation).",
+      "note": "DimensionalProduct is catalog-only. It has no proof-engine-synthesized mint site (unlike PresenceProofRequirement / CountContainmentProofRequirement). The only operation carrying it is quantity*quantity; quantity*period / quantity*duration / price*quantity carry other requirement kinds instead."
+    }
+  ],
+
+  "dischargeMechanism": {
+    "name": "dimensional resolution against the curated DimensionCatalog",
+    "code": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:46-99 (TryDimensionalProductProof / TryResolveDimensionVector); dispatched at ProofEngine.cs:1084-1085 → (Proved, ProofStrategy.DimensionalProduct); failure emits PRE0157 IncompatibleDimensionalProduct at ProofEngine.Diagnostics.cs:223.",
+    "curatedSet": "src/Precept/Language/Ucum/DimensionCatalog.cs:9-22 — 11 aliases: length, mass, time, temperature, volume, area, speed, energy, pressure, force, count (count = DimensionVector.None, the dimensionless cancelling result).",
+    "characterization": "This is a discharge MECHANISM, not a premise-class discharge — peer in status to ingress evaluation (matrix, Vocabulary, Discharge mechanisms). None of the four premise classes (a field modifiers / b arg constraints / c handler guard / d pre-state) participates: no runtime value fact is consumed. The fact consumed is each operand's DECLARED dimension qualifier, resolved from static type metadata via DimensionCatalog + UCUM parse, and combined by exact integer-exponent vector arithmetic (DimensionVector.Multiply). The result is route-invariant: the same operands yield the same verdict on every route, because a Quantity's dimension is a type invariant, not a mutable value."
+  },
+
+  "dischargeContractSharedAcrossCells": {
+    "iff": "The DimensionalProduct obligation on ⟨left⟩ * ⟨right⟩ discharges IFF (1) TryResolveDimensionVector succeeds for BOTH operands — each operand's Unit-axis (else Dimension-axis) qualifier resolves to a DimensionVector via DimensionCatalog.All lookup or a valid UCUM parse — AND (2) the product vector leftVector.Multiply(rightVector) is a member of the curated 11-alias DimensionCatalog set (DimensionCatalog.TryGetAlias). Otherwise the obligation is Unresolved and PRE0157 is emitted.",
+    "decisionProcedure": "Total finite function over declared type metadata — no premise enumeration, no search, no fixpoint. Steps: (i) resolve(left) — one FrozenDictionary lookup then, on miss, one UCUM parse; (ii) resolve(right) likewise; (iii) component-wise integer add of two 7-element dimension-exponent vectors; (iv) equality-scan of the product vector against the 11-member curated alias table. Terminates in O(1). Reject side is decided when: either resolve fails (operand has no resolvable unit/dimension qualifier — e.g. an open `quantity`), or the product vector matches no curated alias.",
+    "applicablePremiseClasses": "NONE (a/b/c/d all inapplicable). See dischargeMechanism.characterization and familyOpenFlags[0].",
+    "respellabilityFamilyVerdict": "no — a compounding product (e.g. m × m → area, dimensionally curated) that a rule/ensure CONDITION compares against a named-unit quantity cannot be respelled into a licensed clean form, because the product's result Unit qualifier is 'unresolved' and co-mints an undischargeable QualifierCompatibility (PRE0114) on the comparison. The DimensionalProduct obligation itself is discharged, but the surrounding comparison is not expressible. This is a surface-shrink observation routed to the owner via familyOpenFlags[1], not a paper 'yes'. Where the product CANCELS to a single named unit (kg/m × m → kg) the result unit resolves and no respelling is needed (see cell fault-dimensionalproduct-rule-condition-business witness)."
+  },
+
+  "transportRuleCitation": {
+    "rule": "transport-rule-restatement-2026-07-21.md § 5 (What earns a fact, and on which routes) — route-indexed frame and kill.",
+    "howTheFactReachesTheSite": "The consumed fact is each operand's declared dimension. Its provenance depends on the operand shape: a FIELD operand → a carried type-level fact established at the field's `in '<unit>'` / `of '<dimension>'` declaration; an ARG operand → an ingress-governed argument whose dimension is its declared qualifier; a LITERAL operand → 'Literal denotation' (transport table row: earned at the site, read-closure empty, never killable).",
+    "killability": "NON-KILLABLE on every route. deps(φ) for a dimension fact is the operand's declared TYPE, not its runtime value; no write construct on any route changes a field's or argument's declared dimension (the type checker rejects assigning a mass into a `quantity in 'm'` field). Therefore the frame condition deps(φ) ∩ mayWrite(r,p,q) = ∅ holds vacuously on every route, and BUG-033 / the write-surface gap cannot make this obligation unsound.",
+    "citationDutyDisposition": "The 2026-07-21 citation duty (matrix § The cell) requires a discharge that consumes a declared field-modifier / arg / guard / pre-state fact to NAME the establishing obligation and every preserving obligation, each discharged. Here there is NO establishing proof obligation and NO preserving proof obligation to name: a field/arg dimension is a type-checker invariant, not a proof-surface constraint (ProofRequirement carries no 'dimension establishment' or 'dimension preservation' subtype). The citation set is therefore empty — see familyOpenFlags[0], which routes to the owner whether that empty set is correct or whether dimension qualifiers should be modelled as citable class-(a)/(b) facts with (trivial, type-invariant) establishing/preserving obligations."
+  },
+
+  "coordinateMapDenominator": {
+    "occasions": ["transition-row-action-operand", "rule-condition", "computed-field-expression"],
+    "typeFamilies": ["business-domain"],
+    "note": "Covered exactly, as instructed. See familyOpenFlags[2]: quantity*quantity can also be reached at other evaluation-site occasions (state-ensure-condition, event-ensure-condition, to/from-S-ensure, reject-message-interpolation, because-interpolation), which this 3-occasion denominator omits; routed to the owner as a possible generated-enumeration under-count for this kind."
+  },
+
+  "cells": [
+    {
+      "cellId": "fault-dimensionalproduct-transition-business",
+      "occasion": "transition-row-action-operand",
+      "typeFamily": "business-domain",
+      "kind": "DimensionalProduct",
+      "disposition": "Defined",
+      "obligationSchema": "dimension(⟨left:Quantity⟩) × dimension(⟨right:Quantity⟩) ∈ CuratedDimensions, where the product expression is an operand of a transition-row action RHS (`set F = ⟨left⟩ * ⟨right⟩`).",
+      "routesReachingSite": "fire (this row only) and inspect-fire (transport-rule § 3, transition-row-action-operand). Discharge is route-invariant — the operand dimensions are identical on both routes.",
+      "dischargeContract": "As dischargeContractSharedAcrossCells. Instance: `Measure.L` (quantity in 'cm', dimension length) × `Measure.W` (quantity in 'cm', dimension length) → product vector = area, curated → Proved via ProofStrategy.DimensionalProduct.",
+      "premiseClasses": "none — discharge mechanism (dimensional resolution). Both operands here are ingress-governed arguments; only their declared dimension (type-level) is read, not their value.",
+      "witness": {
+        "description": "cm × cm = area (curated). Product assigned to an open `quantity` field so the assignment introduces no competing obligation; base compiles clean and the DimensionalProduct obligation is discharged.",
+        "program": "precept DimProbe\n\nfield Length as quantity in 'cm' default '0 cm' nonnegative\nfield Width as quantity in 'cm' default '0 cm' nonnegative\nfield Footprint as quantity optional\n\nstate Draft initial\nstate Measured terminal\n\nevent Measure(L as quantity in 'cm', W as quantity in 'cm')\n\nfrom Draft on Measure\n    -> set Length = Measure.L\n    -> set Width = Measure.W\n    -> set Footprint = Measure.L * Measure.W\n    -> transition Measured",
+        "dischargeAddition": "The addition that makes it compile IS the choice of two length-dimensioned operands whose product (area) lands in the curated set. There is no author-written premise line — dimensional discharge consumes declared types, so 'the discharge' is the operand type selection itself.",
+        "compileObservation": "success:true, 0 diagnostics; proofObligation DimensionalProduct disposition=Proved strategy=DimensionalProduct (precept_compile, HEAD c295d7b4). Syntax/compile observation only."
+      },
+      "nearMiss": {
+        "description": "Weaken past sufficiency by replacing one length operand with a mass operand: cm × kg = mass·length, outside the curated set. Compiler must still reject naming the SAME obligation.",
+        "program": "precept DimProbe\n\nfield Length as quantity in 'cm' default '0 cm' nonnegative\nfield Weight as quantity in 'kg' default '0 kg' nonnegative\nfield Footprint as quantity optional\n\nstate Draft initial\nstate Measured terminal\n\nevent Measure(L as quantity in 'cm', G as quantity in 'kg')\n\nfrom Draft on Measure\n    -> set Length = Measure.L\n    -> set Weight = Measure.G\n    -> set Footprint = Measure.L * Measure.G\n    -> transition Measured",
+        "requiredOutcome": "reject:PRE0157 (IncompatibleDimensionalProduct), DimensionalProduct disposition=Unresolved — same obligation.",
+        "compileObservation": "success:false, 1 diagnostic PRE0157 (\"'cm' × 'kg' produces dimension 'cm'·'kg', which is not in the business-domain dimension set\"); DimensionalProduct disposition=Unresolved (precept_compile, HEAD c295d7b4)."
+      },
+      "respellability": "inherits family verdict; not exercised here — an open-quantity assignment target imposes no comparison, so the compounding-unit PRE0114 friction (familyOpenFlags[1]) does not arise in this occasion.",
+      "openFlags": []
+    },
+
+    {
+      "cellId": "fault-dimensionalproduct-rule-condition-business",
+      "occasion": "rule-condition",
+      "typeFamily": "business-domain",
+      "kind": "DimensionalProduct",
+      "disposition": "Defined",
+      "obligationSchema": "dimension(⟨left⟩) × dimension(⟨right⟩) ∈ CuratedDimensions, where the product expression sits inside a rule condition (`rule ⟨left⟩ * ⟨right⟩ <cmp> ⟨comparand⟩`).",
+      "routesReachingSite": "every route EXCEPT restore (transport-rule § 3, rule-condition: the `always` bucket is evaluated on every operation but restore bypasses constraint evaluation). Discharge is route-invariant.",
+      "dischargeContract": "As dischargeContractSharedAcrossCells. Instance: `Density` (quantity in 'kg/m', dimension mass·length⁻¹) × `Length` (quantity in 'm', dimension length) → product vector = mass, curated → Proved. A CANCELLING product is used deliberately: mass·length⁻¹ × length cancels to a single named unit (kg), so the result Unit qualifier resolves and the `<= MaxMass` comparison discharges its own QualifierCompatibility obligation cleanly, keeping the base minimal.",
+      "premiseClasses": "none — discharge mechanism. The rule condition reads two fields; only their declared dimensions (type-level) participate.",
+      "witness": {
+        "description": "kg/m × m = mass (curated); the product cancels to the resolved unit kg, matching MaxMass, so the comparison is clean and the DimensionalProduct obligation discharges.",
+        "program": "precept RateCheck\n\nfield Density as quantity in 'kg/m' default '1 kg/m' nonnegative editable\nfield Length as quantity in 'm' default '1 m' nonnegative editable\nfield MaxMass as quantity in 'kg' default '10 kg' nonnegative editable\n\nrule Density * Length <= MaxMass because \"Total mass {Density}x{Length} cannot exceed {MaxMass}\"",
+        "dischargeAddition": "The choice of two operands whose dimensions cancel to a curated single dimension (mass). No author premise line; dimensional discharge consumes declared types.",
+        "compileObservation": "success:true, 0 diagnostics; DimensionalProduct disposition=Proved strategy=DimensionalProduct; the co-located QualifierCompatibility obligation also Proved (precept_compile, HEAD c295d7b4)."
+      },
+      "nearMiss": {
+        "description": "Replace the length operand with a mass operand: kg/m × kg = mass²·length⁻¹, outside the curated set. Still rejects, same obligation.",
+        "program": "precept RateCheck\n\nfield Density as quantity in 'kg/m' default '1 kg/m' nonnegative editable\nfield Mass as quantity in 'kg' default '1 kg' nonnegative editable\nfield MaxMass as quantity in 'kg' default '10 kg' nonnegative editable\n\nrule Density * Mass <= MaxMass because \"Total {Density}x{Mass} cannot exceed {MaxMass}\"",
+        "requiredOutcome": "reject:PRE0157, DimensionalProduct disposition=Unresolved — same obligation.",
+        "compileObservation": "success:false, 1 diagnostic PRE0157 (\"'kg/m' × 'kg' produces dimension 'kg/m'·'kg', which is not in the business-domain dimension set\"); DimensionalProduct=Unresolved; QualifierCompatibility still Proved so PRE0157 is the sole diagnostic (precept_compile, HEAD c295d7b4)."
+      },
+      "respellability": "no (family verdict). Representative band member: a COMPOUNDING product in a comparison, e.g. `rule Length * Width <= MaxFootprint` with Length,Width in 'm' and MaxFootprint in 'm^2'. Observed at HEAD: DimensionalProduct discharges (Proved) but the comparison co-mints PRE0114 QualifierCompatibility because the product's result Unit is 'unresolved' and matches no named unit — and even `rule Length * Width >= Baseline * Baseline` (product vs product) trips PRE0114 (two unresolved units do not match each other). No licensed respelling keeps the compounding-product comparison AND clears PRE0114 within the current surface. Routed via familyOpenFlags[1].",
+      "openFlags": []
+    },
+
+    {
+      "cellId": "fault-dimensionalproduct-computed-field-business",
+      "occasion": "computed-field-expression",
+      "typeFamily": "business-domain",
+      "kind": "DimensionalProduct",
+      "disposition": "Defined",
+      "obligationSchema": "dimension(⟨left⟩) × dimension(⟨right⟩) ∈ CuratedDimensions, where the product expression is the RHS of a computed-field declaration (`field C as quantity <- ⟨left⟩ * ⟨right⟩`).",
+      "routesReachingSite": "every route INCLUDING restore (transport-rule § 3, computed-field-expression: recomputation appears in every operation's pipeline, evaluator.md:144, and survives the restore correction because § 3A.4 phase 7 recomputes computed fields on Restore). Discharge is route-invariant.",
+      "dischargeContract": "As dischargeContractSharedAcrossCells. Instance: `Length` (m, length) × `Width` (m, length) → area, curated → Proved. The computed field is declared open (`as quantity`), so it accepts the compound area result without a competing assignment/containment obligation, keeping the base minimal.",
+      "premiseClasses": "none — discharge mechanism. The computed-field RHS reads two fields; only their declared dimensions participate.",
+      "witness": {
+        "description": "m × m = area (curated), assigned to an open computed `quantity` field; base compiles clean and the DimensionalProduct obligation discharges.",
+        "program": "precept FloorArea\n\nfield Length as quantity in 'm' default '1 m' nonnegative editable\nfield Width as quantity in 'm' default '1 m' nonnegative editable\nfield Area as quantity <- Length * Width",
+        "dischargeAddition": "The choice of two length-dimensioned inputs whose product (area) is curated. No author premise line; dimensional discharge consumes declared types.",
+        "compileObservation": "success:true, 0 diagnostics; DimensionalProduct disposition=Proved strategy=DimensionalProduct (precept_compile, HEAD c295d7b4)."
+      },
+      "nearMiss": {
+        "description": "Replace one length input with a mass input: m × kg = mass·length, outside the curated set. Still rejects, same obligation.",
+        "program": "precept FloorArea\n\nfield Length as quantity in 'm' default '1 m' nonnegative editable\nfield Weight as quantity in 'kg' default '1 kg' nonnegative editable\nfield Area as quantity <- Length * Weight",
+        "requiredOutcome": "reject:PRE0157, DimensionalProduct disposition=Unresolved — same obligation.",
+        "compileObservation": "success:false, 1 diagnostic PRE0157 (\"'m' × 'kg' produces dimension 'm'·'kg', which is not in the business-domain dimension set\"); DimensionalProduct=Unresolved (precept_compile, HEAD c295d7b4)."
+      },
+      "respellability": "no (family verdict) for the compounding-in-comparison band member — but note a computed field is the natural RESPELLING TARGET for that band: assigning the compounding product to a computed `quantity` field (as here) discharges DimensionalProduct without any comparison, and a downstream rule can then compare the named computed field. Whether that respelling is 'within the surface' for a rule that intrinsically needs to compare a product to a literal area bound is what familyOpenFlags[1] routes.",
+      "openFlags": []
+    }
+  ],
+
+  "familyOpenFlags": [
+    {
+      "id": "dimprod-premise-class-and-citation-duty-fit",
+      "severity": "routed-to-owner",
+      "summary": "DimensionalProduct discharges from static dimensional TYPE metadata, which fits none of the matrix's four premise classes (a/b/c/d — all value-fact classes) and has no establishing/preserving proof obligation for the citation duty to name.",
+      "detail": "The matrix's premise-class taxonomy and the 2026-07-21 citation duty are written for runtime VALUE facts that need establishment-at-construction plus preservation-at-every-write. The fact this obligation consumes — each operand's declared dimension — is a type-checker invariant (any write to a `quantity in 'm'` field is type-checked to preserve dimension), so there is no establishment ProofRequirement and no preservation obligation to cite. The generative sections name no discharge mechanism for 'dimensional resolution against a curated catalog'; the closest anchors (transport-rule § 5 'Catalog-declared callee attribute' non-killable row, and 'Literal denotation') live in the transport-rule design doc, not the matrix, and cover callee attributes/literals rather than operand dimension qualifiers. OWNER RULING OWED: either (i) add 'dimensional resolution against the curated DimensionCatalog' as a named discharge mechanism (peer to ingress evaluation) whose consumed fact is type-level and EXEMPT from the value-fact citation duty — the disposition this file provisionally records — or (ii) rule that dimension qualifiers ARE citable class-(a)/(b) facts and specify their (trivial, type-invariant) establishing and preserving obligations. Until ruled, the empty citation set in transportRuleCitation.citationDutyDisposition is asserted, not derived."
+    },
+    {
+      "id": "dimprod-compounding-product-comparison-pre0114",
+      "severity": "routed-to-owner",
+      "summary": "A compounding quantity×quantity product used as a comparison operand in a rule/ensure condition co-mints an undischargeable QualifierCompatibility (PRE0114); no base-minimal DimensionalProduct witness exists for that shape.",
+      "detail": "Observed at HEAD c295d7b4 via precept_compile: `rule Length * Width <= MaxFootprint` (m × m vs m^2) yields DimensionalProduct=Proved BUT PRE0114 QualifierCompatibility because the product's result Unit qualifier is 'unresolved' and matches no named unit; `rule Length * Width >= Baseline * Baseline` (product vs product) also trips PRE0114 because two 'unresolved' units do not match each other. Only CANCELLING products that reduce to a single named unit (kg/m × m → kg, used in the rule-condition witness) compare cleanly. This bounds what the rule-condition cell's witness can be (hence the cancelling-product witness) and it is why the family respellability verdict is 'no'. It is a surface property, not a DimensionalProduct-cell gap, but it is a surface-shrink candidate the owner should see: either license a resolved compound unit for quantity×quantity results (so comparisons discharge) or accept that products in conditions must be pre-assigned to a named computed field. NOT dependent on any known compiler hole."
+    },
+    {
+      "id": "dimprod-occasion-denominator-completeness",
+      "severity": "routed-to-owner",
+      "summary": "The supplied 3-occasion denominator (transition-row-action-operand, rule-condition, computed-field-expression) may under-list where quantity×quantity actually mints.",
+      "detail": "ProofEngine.cs:306-307 mints the DimensionalProduct obligation at EVERY binary-op evaluation occasion. A quantity×quantity product can therefore also occur in state-ensure-condition, event-ensure-condition, to/from-S-ensure conditions, reject-message-interpolation, and because-interpolation holes (transport-rule § 3 enumerates 23 evaluation-site categories). The given coordinate-map lists three. Per the Storage ruling (matrix), the coordinate enumeration is generated data whose totality the validator checks; if the generator emitted only three occasions for this kind, that is a possible generation under-count to reconcile. This file covers exactly the three instructed and flags the remainder rather than inventing cells outside the denominator."
+    }
+  ]
+}

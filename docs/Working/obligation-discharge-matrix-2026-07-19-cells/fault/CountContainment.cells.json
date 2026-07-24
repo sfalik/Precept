@@ -1,0 +1,662 @@
+{
+  "$schema": "../cell.schema.json",
+  "familyId": "fault-countcontainment",
+  "title": "Fault family — collection element-count containment (mincount/maxcount) across a mutation or a default list",
+  "caseShape": "fault",
+  "kind": "CountContainment",
+  "hasCatalogSite": false,
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "mintSites": [
+    {
+      "fileLine": "src/Precept/Pipeline/ProofEngine.cs:579-654 (CountContainmentObligation)",
+      "howMinted": "engine-synthesized, NO catalog ProofRequirements slot: WalkActions (ProofEngine.cs:505) calls CountContainmentObligation for every action on every write plan. It reads the field's DeclaredMinCount/DeclaredMaxCount and the action's catalog ActionEffectClass (Grows/Shrinks/Empties/ReplacesValue), advances a single per-field count interval seeded once from the governed band [mincount ?? 0, maxcount ?? ∞], and stamps a CountContainmentProofRequirement carrying the post-mutation interval. Prove-or-reject: DiagnosticCode.CountBoundViolation (PRE0136) unless the interval is provably in-band."
+    },
+    {
+      "fileLine": "src/Precept/Pipeline/ProofEngine.Analysis.cs:693-716 (CollectCountDefaultObligation)",
+      "howMinted": "engine-synthesized, NO catalog slot: CollectCountDefaultObligation (called at ProofEngine.Analysis.cs:445) stamps a CountContainmentProofRequirement for a count-bounded field whose `default [...]` is a TypedListLiteral, with the exact literal element count as the point interval [n, n], against the declared mincount/maxcount. This is the establishment (construction) base case that the mutation cells' premise (d) inductive hypothesis rests on."
+    }
+  ],
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "the Fault family row: the catalog-declared safety precondition at the evaluation site; premise classes (b)/(c)/(a), with (d) admitted under the 2026-07-21 citation duty and (a) not exempt from it"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+      "note": "the 2026-07-21 citation duty (a fault proof consuming a declared fact must name the establishing + every preserving obligation, each discharged) and the open design hole — nothing detects an obligation that was never minted"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+      "note": "site identity is an evaluation occasion, not a syntactic position — one written mutation reached by N routes mints N count obligations; fault minting is catalog-stamped at evaluation sites but count containment has no catalog ProofRequirements slot (engine-synthesized)"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+      "note": "premise classes (a)/(b)/(c)/(d); the sound-but-unprovable band and respellability; the exact discharge contract with a named decision procedure / search bound"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+      "note": "Arg-bound interval arithmetic (extended to field-declared count modifiers), Inductive hypothesis plus sign monotonicity (extended to the per-kind count delta), Literal constant-fold for defaults"
+    },
+    {
+      "kind": "transport-rule",
+      "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 4 The transport rule, § 5 What earns a fact, § 7 What kills",
+      "note": "route-indexed frame-and-kill; a guard's count-narrowing fact is earned at phase 2 and killed by any construct on the route that writes the collection before the mutation runs (the 2026-07-21 soundness correction: exit actions run at phase 3, before the row's action chain)"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/ProofRequirement.cs:227-235 (CountContainmentProofRequirement)",
+      "note": "the obligation carries the post-mutation count interval [CountLower .. CountUpper]; discharge is prove-or-reject iff lower >= mincount AND upper <= maxcount; no runtime deferral (§0.7)"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.cs:689-748 (SeedCountInterval)",
+      "note": "the seed [mincount ?? 0, maxcount ?? ∞] narrowed by a same-context `F.count op literal` guard conjunct (class c) and by routed reject-row siblings (discharge mechanism); narrowing only tightens, never widens the governed band"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.cs:761-820 (BuildSiblingCountExclusions)",
+      "note": "routed reject-row sibling narrowing — predecessor exclusion — computed ONLY for TransitionRowContext (siblingCountCaps is null for StateHookContext and EventHandlerContext, ProofEngine.cs:434-436)"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Modifiers.cs:195-217 (Mincount / Maxcount ValueModifierMeta)",
+      "note": "the mincount/maxcount modifiers — the class (a) field-modifier facts that define the band; the same ProofSatisfaction.Numeric catalog shape the .count > 0 emptiness obligation uses"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § Constraint Catalog",
+      "note": "mincount N / maxcount N constraints and `default [...]` list literals on set/queue/stack/bag/log/list"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/DiagnosticCode.cs:168 (CountBoundViolation = 136)",
+      "note": "PRE0136 — the diagnostic the CountContainment meta maps to (ProofRequirement.cs:355-358)"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [],
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "the Respellable bullet — the verdict is stated once per contract family and inherited; a corpus measurement is the hard gate"
+      }
+    ],
+    "notes": [
+      "Every sound-but-unprovable band member respells into a licensed form. The band is spellings the seed-narrowing (SeedCountInterval) does not read: a guard on a proxy variable rather than on `F.count` (e.g. `when NotFull` where NotFull tracks count < max); an algebraically-rearranged count comparison (`when F.count + 1 <= maxcount`, which SeedCountInterval does not parse — it reads only `F.count op literal`). The licensed respelling of each is a direct `when F.count < maxcount` (or `> mincount`) guard, or an adjusted mincount/maxcount declaration, or a routed `when F.count >= maxcount -> reject` sibling.",
+      "SeedCountInterval reads both `<` and `<=` (and `>`, `>=`, `==`), so `when F.count <= maxcount - 1` and `when F.count < maxcount` are BOTH licensed — neither is a band member; the boundary that separates a band member from a licensed spelling is whether the guard's comparison is literally `F.count op integer-literal`."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault-countcontainment-transition-collection",
+      "label": "Count containment at a transition-row mutating action — post-mutation count must stay within [mincount, maxcount]",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "count-containment on a mutating collection action (Grows/Shrinks/Empties per ActionEffectClass)",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" }
+        ]
+      },
+      "obligation": {
+        "statement": "mincount <= post-mutation-count(F) <= maxcount",
+        "metavariables": [
+          { "name": "F", "standsFor": "the count-bounded collection field the action mutates" },
+          { "name": "mincount", "standsFor": "F's declared mincount (0 if none)" },
+          { "name": "maxcount", "standsFor": "F's declared maxcount (∞ if none)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet — the count domain is integer, so guard/sibling narrowing is exact" }
+        ],
+        "wp": {
+          "statement": "AdvanceCount(seed, delta) ⊆ [mincount, maxcount], where seed = narrow([mincount ?? 0, maxcount ?? ∞], guard, reject-siblings) and delta is the action's catalog per-kind count effect (grow: upper +1, lower +1 or +0 for a dedup kind; shrink: lower −1 floored 0, upper −1 or +0 for a conditional no-op; clear: reset to [0,0])",
+          "note": "prove-or-reject: clean iff AdvanceCount(seed,delta).lower >= mincount AND .upper <= maxcount (ProofRequirement.cs:227-235). A `set` to a non-literal drops the tracked interval and mints nothing (re-seeds on the next grow)."
+        }
+      },
+      "applicablePremiseClasses": ["a", "d", "c"],
+      "premiseAvailability": "Every discharge consumes (a) AND (d): (a) the field's declared mincount/maxcount define the band AND — via governance holding count in [mincount, maxcount] at chain entry — the endpoints of the seed; (d) the inductive hypothesis that the count was in-band before this handler ran IS the seed. (c) applies whenever the transition row carries a `F.count op literal` conjunct in its `when` guard (narrows the seed via SeedCountInterval). A routed reject-row sibling (`when F.count op N -> reject` above this row) narrows the seed as a discharge MECHANISM (predecessor exclusion, BuildSiblingCountExclusions) — available at this occasion only. Class (b) never applies: the count delta is a fixed per-action constant; no event argument represents a collection's cardinality, and the grown value's own arg constraints bound WHAT is added, not HOW MANY.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a", "d"],
+          "derivation": "structural headroom: the seed [mincount ?? 0, maxcount ?? ∞] advanced by the action's per-kind delta already lands in-band without any guard — a grow when F has no maxcount (upper stays ∞) or a shrink when F has no mincount (lower floored 0 = effective mincount).",
+          "strategy": "CountContainment",
+          "validityArguments": ["Arg-bound interval arithmetic", "Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "Integer interval arithmetic: seed = [mincount ?? 0, maxcount ?? ∞]; post = AdvanceCount(seed, delta); accept iff post.lower >= mincount AND post.upper <= maxcount. Finite, no search. (live-observed: mincount-1 field grown by append → band [1..∞], Proved/CountContainment.)",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Inductive hypothesis plus sign monotonicity — here the monotone step is the catalog per-kind count delta (a grow raises count, a shrink lowers it), not the numeric subtraction of Family 1 Base B; the pre-state fact is the count-in-band inductive hypothesis" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:662-671 (AdvanceCount)" }
+          ]
+        },
+        {
+          "premiseClasses": ["a", "d", "c"],
+          "derivation": "a `F.count op literal` conjunct in the row's `when` guard narrows the seed (SeedCountInterval: `< N` caps upper at N−1, `> N` raises lower to N+1, `== N` pins both) so that the delta-advanced interval lands in-band. Example: `when F.count < maxcount` gives a grow the headroom it structurally lacks.",
+          "strategy": "CountContainment",
+          "validityArguments": ["Arg-bound interval arithmetic", "Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "Extract `F.count op integer-literal` conjuncts from the row guard (per-branch union across an OR guard, so an OR never over-narrows — SeedCountInterval:697-724); tighten the seed; run the same interval arithmetic. A guard on a proxy variable or an algebraically-rearranged comparison is NOT extracted (a band member, respellable). (live-observed: `when Items.count < 3` on a maxcount-3 grow → Proved; weakening to `when Items.count <= 3` → PRE0136, same obligation.)",
+          "capabilityTier": "1a",
+          "transport": {
+            "earnedAt": "phase 2, immediately after the row guard evaluates (transport-rule § 5, Fired-guard fact)",
+            "consumedAt": "the mutating action (phase 5 of the operation execution order — the row's mutation chain)",
+            "killCondition": "the fact is killed if any construct on the route between the guard evaluation and the mutation writes F. For a transition row this includes a source-state EXIT action (phase 3, which runs BEFORE the row's action chain — the 2026-07-21 soundness correction) that grows/shrinks/clears F. SeedCountInterval narrows from the guard WITHOUT a frame-and-kill check against such interposing writers — see openFlags.",
+            "citations": [
+              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 4 The transport rule", "note": "route-indexed frame-and-kill: deps(φ) ∩ mayWrite(r, p, q) = ∅" },
+              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 7 What kills", "note": "collection grow/shrink/clear and the exit-action chain are writers of the collection field" }
+            ]
+          },
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:695-728 (SeedCountInterval guard narrowing)" },
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Arg-bound interval arithmetic, guard-spelled variant: the per-term bound conjuncts feed the same interval arithmetic; inherits the 2026-07-21 no-intervening-write soundness correction" }
+          ]
+        },
+        {
+          "premiseClasses": ["a", "d"],
+          "mechanism": "predecessor-exclusion (routed reject-row sibling)",
+          "derivation": "a reject-row sibling `when F.count op N -> reject` declared ABOVE this row on the same (state, event) intercepts those cases first, so this fall-through row fires only when the sibling guard is FALSE; the integer negation caps the seed (e.g. `when F.count >= N -> reject` ⇒ this row fires with F.count <= N−1). The narrowed seed advanced by the delta lands in-band.",
+          "strategy": "CountContainment",
+          "validityArguments": ["Arg-bound interval arithmetic", "Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "BuildSiblingCountExclusions (ProofEngine.cs:761-820): single-leaf `F.count op integer-literal` reject guards above the current row, matched on event + FromState compatibility + first-match position, negated into an integer count band, intersected. Then the same interval arithmetic. (live-observed: `when Items.count >= 3 -> reject` above an unguarded append to a maxcount-3 list → Proved/CountContainment.)",
+          "note": "This is a discharge MECHANISM, not a premise class (matrix § Vocabulary — Discharge mechanisms). It is available at transition-row-action-operand ONLY: siblingCountCaps is null for state hooks and stateless handlers (ProofEngine.cs:434-436).",
+          "transport": {
+            "earnedAt": "phase 2, at each earlier sibling row's guard evaluation (transport-rule § 5, Predecessor exclusion)",
+            "consumedAt": "the mutating action",
+            "killCondition": "same interposing-writer hazard as the guard case; additionally, transport-rule § 5 flags predecessor exclusion as unavailable on inspect-fire routes (a shrink of the fault surface routed to the owner, N8).",
+            "citations": [
+              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 5 What earns a fact", "note": "Predecessor exclusion — earned at the earlier guard; the surviving inspect-fire restriction is routed (N8)" }
+            ]
+          },
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:761-820 (BuildSiblingCountExclusions)" },
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1904", "note": "transition rows are first-match — the fall-through row fires only when every earlier sibling guard was false" }
+          ]
+        },
+        {
+          "premiseClasses": ["b"],
+          "pruned": true,
+          "pruningDerivation": "empty: class (b) × count-containment. The action's count delta is a fixed per-kind catalog constant (grow +1/+0, shrink −1/−0, clear→0) independent of every event argument; no argument represents F's cardinality, and an argument bounding the grown VALUE (`append F Arg` with Arg constrained) bounds what is added, never how many. No arg-constraint premise can appear in the discharge, so class (b) is pruned, not merely unavailable-here.",
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:560-573", "note": "the per-kind delta is derived from ActionEffectClass and TypeMeta.DeduplicatesElements — no arg is read" }
+          ]
+        }
+      ],
+      "citationDuty": {
+        "consumedFacts": ["(a) F's mincount/maxcount modifiers", "(d) the pre-state count-in-band inductive hypothesis"],
+        "establishingObligation": "the field-default (or construction) count-establishment obligation — cell fault-countcontainment-field-default-collection — proves the count is in-band in the initial configuration",
+        "preservingObligations": "every OTHER mutating action of F, in every write plan (this cell at every occasion), each carrying its own CountContainment obligation that keeps the count in-band",
+        "status": "NOT dischargeable as a cited proof today — the citation-duty machinery (naming establishing + preserving obligations in the certificate) is unbuilt, and the ProofRequirement DU carries no establishment/preservation subtype (matrix § Obligation family). Today the seed consumes the count-in-band assumption BARE. Under the open design hole (matrix § The cell), nothing checks that every writer of F actually mints a preserving obligation — see openFlags.",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell", "note": "the 2026-07-21 citation duty and the open design hole — nothing detects an obligation that was never minted" }
+        ]
+      },
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a `when F.count op N` guard giving the mutation direction headroom (`< maxcount` for a grow, `> mincount` for a shrink)", "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:695-728" } ] },
+        { "premiseClasses": ["a"], "schema": "widen the declared maxcount (or lower the mincount) so the un-narrowed seed advanced by the delta lands in-band", "citations": [ { "kind": "spec", "ref": "docs/language/collection-types.md § Constraint Catalog" } ] },
+        { "premiseClasses": [], "mechanism": "predecessor-exclusion", "schema": "add a routed `when F.count op N -> reject` sibling above the row so the fall-through row fires only with count headroom", "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:761-820" } ] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CountTransitionBase\n\nfield Items as list of integer maxcount 3 default [1, 2]\n\nstate Cart initial\n\nevent Add(Value as integer)\n\nfrom Cart on Add\n    -> append Items Add.Value\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "diagnostic": "PRE0136 (CountBoundViolation) — cannot prove Items stays within maxcount 3 after this add",
+            "missingPremiseClasses": ["c"],
+            "noOtherDiagnostics": true
+          },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "syntax + observed compiler behavior; the definition (not the compiler's verdict) is the authority — they agree here" }
+        },
+        "discharges": [
+          {
+            "id": "guard-count-headroom",
+            "kind": "guard",
+            "addition": "when Items.count < 3",
+            "application": { "locus": "row-guard", "eventName": "Add" },
+            "premiseClasses": ["a", "d", "c"],
+            "derivation": "guard narrows seed to [0,2]; grow → [1,3]; upper 3 <= maxcount 3 → in-band",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "structural-mincount-only",
+            "kind": "arg-modifier",
+            "addition": "declare the field `mincount 1` and no maxcount (grow can never breach an absent upper)",
+            "premiseClasses": ["a", "d"],
+            "derivation": "seed [1,∞]; grow → [2,∞]; lower 2 >= mincount 1, no upper → in-band without any guard",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "CountTransitionStructural compiled clean, band [1..∞]" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "reject-sibling-cap",
+            "kind": "other",
+            "addition": "from Cart on Add when Items.count >= 3 -> reject \"Cart is full\" (above the append row)",
+            "premiseClasses": ["a", "d"],
+            "mechanism": "predecessor-exclusion",
+            "derivation": "sibling caps this row's seed upper at 2; grow → [1,3]; upper 3 <= maxcount 3 → in-band",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "CountTransitionSibling compiled clean" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-count-headroom",
+            "addition": "when Items.count <= 3",
+            "whyStillRejects": "`<= 3` caps the seed upper at 3 (not 2); grow → [1,4]; upper 4 > maxcount 3 — the guard is weakened past sufficiency, must still reject the same obligation",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "PRE0136, obligation Unresolved" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:213-218 (TransitionRowContext → WalkActions)", "note": "the transition-row-action-operand occasion; siblingCountCaps computed here (ProofEngine.cs:434-436)" }
+      ],
+      "notes": [
+        "The site-identity ruling (matrix § The minting rule) makes this obligation per-occasion: one append reached by two transitions into the same handler mints two obligations, each proved from its own route's facts. The shipped compiler mints one per action per handler (route-collapsed); route-splitting is the transport-rule restatement's committed change, parked.",
+        "None of the three witnesses use `dequeue ... into` or any of the uncatalogued writers, so none rests on BUG-033 or the write-surface enumeration gap — they are verified, not flagged. The DEPENDENCY on that enumeration is real for premise (d) and is recorded in citationDuty + openFlags."
+      ]
+    },
+    {
+      "id": "fault-countcontainment-state-hook-collection",
+      "label": "Count containment at a state entry/exit hook mutating action",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "count-containment on a mutating collection action in a state hook",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "mincount <= post-mutation-count(F) <= maxcount",
+        "metavariables": [
+          { "name": "F", "standsFor": "the count-bounded collection field the hook action mutates" },
+          { "name": "mincount", "standsFor": "F's declared mincount (0 if none)" },
+          { "name": "maxcount", "standsFor": "F's declared maxcount (∞ if none)" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "AdvanceCount(seed, delta) ⊆ [mincount, maxcount]; identical mechanics to the transition cell (same CountContainmentObligation minter, ProofEngine.cs:505), but with siblingCountCaps = null (no reject-row siblings on a state hook)." }
+      },
+      "applicablePremiseClasses": ["a", "d", "c"],
+      "premiseAvailability": "As the transition cell for (a)+(d). Class (c) applies via the hook's own `when` guard — a state entry/exit hook DOES carry a guard (StateHookContext.Hook.Guard is read by GuardOfContext, and `to S when F.count < N -> ...` compiles and discharges — live-verified). The reject-row-sibling MECHANISM is structurally absent here (siblingCountCaps is null for StateHookContext, ProofEngine.cs:434-436). Class (b) pruned as in the transition cell.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a", "d"],
+          "derivation": "structural headroom (grow with no maxcount, or shrink with no mincount) — the seed advanced by the delta lands in-band with no guard.",
+          "strategy": "CountContainment",
+          "validityArguments": ["Arg-bound interval arithmetic", "Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "Integer interval arithmetic on the un-narrowed seed (as the transition cell). (live-observed: mincount-1 field grown in a `to Closed -> append` entry hook → Proved.)",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:662-671 (AdvanceCount)" } ]
+        },
+        {
+          "premiseClasses": ["a", "d", "c"],
+          "derivation": "a `F.count op literal` conjunct in the hook's `when` guard narrows the seed so the delta-advanced interval lands in-band.",
+          "strategy": "CountContainment",
+          "validityArguments": ["Arg-bound interval arithmetic", "Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "SeedCountInterval guard narrowing on the hook guard, then interval arithmetic. (live-observed: `to Closed when Log.count < 3 -> append Log 99` → Proved; weakening to `<= 3` → PRE0136, same obligation.)",
+          "capabilityTier": "1a",
+          "transport": {
+            "earnedAt": "phase 2 (the hook's guard evaluation)",
+            "consumedAt": "the hook's mutating action (phase 3 for an exit hook, phase 6 for an entry hook)",
+            "killCondition": "killed if a construct between the guard and the action writes F. For an ENTRY hook (phase 6) the phase-4 `omit` reset and any earlier entry action on the same state are candidate interposers; when a state carries several entry actions their order is unruled (spec § 3A.4 Still unsettled), so a second entry action mutating F cannot be ordered against this one — handled by may-write over-approximation in the transport rule but NOT by SeedCountInterval today (see openFlags).",
+            "citations": [ { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 6 the normative phase order", "note": "exit actions phase 3, entry actions phase 6; multiplicity/order of several state actions on one state is unruled" } ]
+          },
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:695-728 (SeedCountInterval)" } ]
+        },
+        {
+          "premiseClasses": ["b"],
+          "pruned": true,
+          "pruningDerivation": "empty: class (b) × count-containment — the count delta is a fixed per-kind constant, no arg represents cardinality (same derivation as the transition cell).",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:560-573" } ]
+        }
+      ],
+      "citationDuty": {
+        "consumedFacts": ["(a) F's mincount/maxcount modifiers", "(d) the pre-state count-in-band inductive hypothesis"],
+        "establishingObligation": "cell fault-countcontainment-field-default-collection (construction establishment)",
+        "preservingObligations": "every other mutating action of F across all write plans, including every state hook and transition row",
+        "status": "as the transition cell — the citation-duty machinery is unbuilt; the seed consumes the count-in-band assumption bare; the open design hole applies.",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell" } ]
+      },
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a `when F.count op N` guard on the hook", "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:695-728" } ] },
+        { "premiseClasses": ["a"], "schema": "widen maxcount / lower mincount so the un-narrowed seed advanced by the delta is in-band", "citations": [ { "kind": "spec", "ref": "docs/language/collection-types.md § Constraint Catalog" } ] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CountStateHookBase\n\nfield Log as list of integer maxcount 3 default [1, 2]\n\nstate Open initial\nstate Closed terminal\n\nevent Close\n\nfrom Open on Close\n    -> transition Closed\n\nto Closed -> append Log 99\n",
+          "expected": {
+            "outcome": "reject",
+            "diagnostic": "PRE0136 (CountBoundViolation) — cannot prove Log stays within maxcount 3 after this add",
+            "missingPremiseClasses": ["c"],
+            "noOtherDiagnostics": true
+          },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "Closed marked terminal to keep the base minimal (no PRE0119 dead-end warning)" }
+        },
+        "discharges": [
+          {
+            "id": "hook-guard-headroom",
+            "kind": "guard",
+            "addition": "to Closed when Log.count < 3 -> append Log 99",
+            "application": { "locus": "state-hook-guard", "stateName": "Closed" },
+            "premiseClasses": ["a", "d", "c"],
+            "derivation": "hook guard narrows seed to [0,2]; grow → [1,3]; upper 3 <= maxcount 3 → in-band",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "state entry hooks DO carry a `when` guard — CountStateHookGuard compiled clean" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "hook-structural-mincount-only",
+            "kind": "arg-modifier",
+            "addition": "declare the field `mincount 1` and no maxcount",
+            "premiseClasses": ["a", "d"],
+            "derivation": "seed [1,∞]; grow → [2,∞] → in-band without any guard",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "CountStateHookStructural compiled clean, band [1..∞]" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "hook-guard-headroom",
+            "addition": "to Closed when Log.count <= 3 -> append Log 99",
+            "whyStillRejects": "`<= 3` caps upper at 3; grow → [1,4]; upper 4 > maxcount 3 — weakened past sufficiency, must still reject the same obligation",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "PRE0136, obligation Unresolved" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:228-232 (StateHookContext → WalkActions)", "note": "the state-hook-action-operand occasion; siblingCountCaps null" }
+      ],
+      "notes": [
+        "Entry hook syntax `to S -> action` / `to S when G -> action` and exit hook `from S -> action` are both live (samples/parcel-locker-pickup.precept:28, samples/restaurant-waitlist.precept:64). The witness uses an entry hook; an exit hook (`from S -> append ...`) mints the identical obligation at phase 3.",
+        "A residency ensure with a mincount/maxcount interaction (an ensure over F.count) is a DIFFERENT obligation family (constraint preservation, not fault) and is out of this cell's scope."
+      ]
+    },
+    {
+      "id": "fault-countcontainment-stateless-hook-collection",
+      "label": "Count containment at a stateless event-hook mutating action",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "count-containment on a mutating collection action in a stateless handler",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "mincount <= post-mutation-count(F) <= maxcount",
+        "metavariables": [
+          { "name": "F", "standsFor": "the count-bounded collection field the stateless handler mutates" },
+          { "name": "mincount", "standsFor": "F's declared mincount (0 if none)" },
+          { "name": "maxcount", "standsFor": "F's declared maxcount (∞ if none)" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "AdvanceCount(seed, delta) ⊆ [mincount, maxcount]; same minter (ProofEngine.cs:505 via EventHandlerContext, ProofEngine.cs:221-225), siblingCountCaps = null." }
+      },
+      "applicablePremiseClasses": ["a", "d", "c"],
+      "premiseAvailability": "As the transition cell for (a)+(d). A bare `on E -> ...` stateless handler is legal ONLY in a stateless precept (no states) — in a stateful precept it is PRE0092 'Event handler is not valid in a stateful precept' (live-verified). Class (c): the compiler ACCEPTS and CONSUMES an `on E when F.count op N` guard in a stateless precept (live-verified: `on Record when Log.count < 3` → Proved) — but this contradicts precept-language-spec.md:1007 ('stateless event handlers carry no when guard'). Whether class (c) is genuinely available at this occasion is a spec-vs-compiler tension routed to the owner (see openFlags). The reject-sibling mechanism is absent (siblingCountCaps null). Class (b) pruned.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a", "d"],
+          "derivation": "structural headroom (grow with no maxcount, or shrink with no mincount).",
+          "strategy": "CountContainment",
+          "validityArguments": ["Arg-bound interval arithmetic", "Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "Integer interval arithmetic on the un-narrowed seed. (live-observed: mincount-1 field grown by a stateless `on Record -> append` → Proved.)",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:662-671 (AdvanceCount)" } ]
+        },
+        {
+          "premiseClasses": ["a", "d", "c"],
+          "derivation": "a `F.count op literal` conjunct in the stateless handler's `when` guard narrows the seed. CONTINGENT on the spec-vs-compiler tension below — the compiler accepts this guard, spec:1007 says stateless handlers carry none.",
+          "strategy": "CountContainment",
+          "validityArguments": ["Arg-bound interval arithmetic", "Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "SeedCountInterval guard narrowing, then interval arithmetic. (live-observed: `on Record when Log.count < 3` → Proved; weakening to `<= 3` → PRE0136, same obligation.)",
+          "capabilityTier": "1a",
+          "transport": {
+            "earnedAt": "phase 2 (handler guard evaluation)",
+            "consumedAt": "the handler's mutating action (phase 5)",
+            "killCondition": "killed by any construct writing F between the guard and the action; a stateless handler is a flat action chain, so the only interposers are earlier actions in the same chain (handled by the sequential countIntervals tracking within the chain).",
+            "citations": [ { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 2 Routes are finitely enumerable", "note": "stateless handlers are first-class route sources" } ]
+          },
+          "openFlagRef": "stateless-guard-spec-conflict",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:201 (EventHandlerContext → h.Handler.Guard)" } ]
+        },
+        {
+          "premiseClasses": ["b"],
+          "pruned": true,
+          "pruningDerivation": "empty: class (b) × count-containment — the count delta is a fixed per-kind constant, no arg represents cardinality.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:560-573" } ]
+        }
+      ],
+      "citationDuty": {
+        "consumedFacts": ["(a) F's mincount/maxcount modifiers", "(d) the pre-state count-in-band inductive hypothesis"],
+        "establishingObligation": "cell fault-countcontainment-field-default-collection",
+        "preservingObligations": "every other mutating action of F across all handlers",
+        "status": "as the other mutation cells — machinery unbuilt, seed consumed bare, open design hole applies.",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell" } ]
+      },
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a `when F.count op N` guard (if the stateless-guard question resolves in favor of availability)", "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:695-728" } ] },
+        { "premiseClasses": ["a"], "schema": "widen maxcount / lower mincount so the un-narrowed seed advanced by the delta is in-band", "citations": [ { "kind": "spec", "ref": "docs/language/collection-types.md § Constraint Catalog" } ] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CountStatelessHookBase\n\nfield Log as list of integer maxcount 3 default [1, 2]\n\nevent Record\n\non Record\n    -> append Log 99\n",
+          "expected": {
+            "outcome": "reject",
+            "diagnostic": "PRE0136 (CountBoundViolation) — cannot prove Log stays within maxcount 3 after this add",
+            "missingPremiseClasses": ["c"],
+            "noOtherDiagnostics": true
+          },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "0 states (a genuinely stateless precept); a bare `on E` handler in a STATEFUL precept is PRE0092 — the stateless occasion requires a stateless precept" }
+        },
+        "discharges": [
+          {
+            "id": "stateless-guard-headroom",
+            "kind": "guard",
+            "addition": "on Record when Log.count < 3 -> append Log 99",
+            "application": { "locus": "event-handler-guard", "eventName": "Record" },
+            "premiseClasses": ["a", "d", "c"],
+            "derivation": "handler guard narrows seed to [0,2]; grow → [1,3] → in-band",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today-but-spec-conflicted",
+            "builtStatusNote": "Compiles clean and discharges (live-verified). But precept-language-spec.md:1007 says stateless event handlers carry no `when` guard, so the compiler's acceptance of this construct is a spec-vs-compiler conflict — see openFlags; the discharge's very availability is unsettled.",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "stateless-structural-mincount-only",
+            "kind": "arg-modifier",
+            "addition": "declare the field `mincount 1` and no maxcount",
+            "premiseClasses": ["a", "d"],
+            "derivation": "seed [1,∞]; grow → [2,∞] → in-band without any guard (unaffected by the stateless-guard question)",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "CountStatelessHookStructural compiled clean, band [1..∞]" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "stateless-guard-headroom",
+            "addition": "on Record when Log.count <= 3 -> append Log 99",
+            "whyStillRejects": "`<= 3` caps upper at 3; grow → [1,4]; upper 4 > maxcount 3 — weakened past sufficiency, must still reject the same obligation",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "PRE0136, obligation Unresolved" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:220-226 (EventHandlerContext → WalkActions)" },
+        { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1007", "note": "stateless event handlers carry no `when` guard — in tension with the compiler's acceptance of the class-(c) discharge here" }
+      ],
+      "notes": [
+        "The structural (a)+(d) discharge is untouched by the stateless-guard question — it needs no guard. So this cell is always dischargeable for a grow-with-no-maxcount or shrink-with-no-mincount; only the guard-narrowed discharge is contingent on the spec resolution."
+      ]
+    },
+    {
+      "id": "fault-countcontainment-field-default-collection",
+      "label": "Count containment of a default list literal — establishment at construction",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "count-containment on a `default [...]` collection literal (CollectCountDefaultObligation)",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "mincount <= count(default-list-literal) <= maxcount",
+        "metavariables": [
+          { "name": "F", "standsFor": "the count-bounded collection field carrying a `default [...]`" },
+          { "name": "n", "standsFor": "the exact element count of the default list literal (a compile-time constant)" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "the point interval [n, n] ⊆ [mincount, maxcount]; i.e. mincount <= n AND n <= maxcount. n is the literal's element count (exact, no interval widening)." }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "ONLY class (a): the field's own declared mincount/maxcount, checked against the constant-folded literal count. There is NO pre-state (this IS the initial configuration), so class (d) does not apply; no guard on a default, so class (c) does not apply; no arguments, so class (b) does not apply. This cell is the ESTABLISHMENT base case that the three mutation cells' premise (d) inductive hypothesis cites.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "constant-fold the default list literal's element count n; the field's declared mincount/maxcount is checked directly against the point interval [n, n]. Discharges iff n is in-band.",
+          "strategy": "CountContainment",
+          "validityArguments": ["Literal constant-fold for defaults"],
+          "decisionProcedure": "n = list.Elements.Length (ProofEngine.Analysis.cs:701, exact); accept iff n >= (mincount ?? 0) AND (maxcount is null OR n <= maxcount). Finite, no search, no widening. (live-observed: `default [1,2,3]` with maxcount 2 → PRE0136; `default [1,2]` → Proved/CountContainment.)",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Literal constant-fold for defaults — construction builds the hollow version with defaults applied; the default surface takes a literal; a list literal's element count is exact, so the fold compares an exact count against the declared band" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:693-716 (CollectCountDefaultObligation)" }
+          ]
+        },
+        {
+          "premiseClasses": ["b", "c", "d"],
+          "pruned": true,
+          "pruningDerivation": "empty: a construction default has no pre-state (no d), no guard (no c), and no event arguments (no b). The only fact available is the field's own declared band (a). This is why the establishment base case is a pure constant-fold — it cannot borrow an inductive hypothesis, which is exactly why it must hold unconditionally for the mutation cells' (d) to be sound.",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Establishment over defaults / the pre-configuration rule — establishment WP is taken over the default configuration" } ]
+        }
+      ],
+      "citationDuty": {
+        "consumedFacts": ["(a) F's mincount/maxcount modifiers"],
+        "establishingObligation": "none — this cell IS the establishing obligation for F's count invariant",
+        "preservingObligations": "n/a at construction",
+        "status": "self-contained; the only consumed fact is the field's own declared band, established by the declaration itself. This cell supplies the establishing obligation that the mutation cells must cite under the 2026-07-21 citation duty.",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell" } ]
+      },
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "make the default list have between mincount and maxcount elements, or adjust the declared mincount/maxcount to admit the default's count", "citations": [ { "kind": "spec", "ref": "docs/language/collection-types.md § Constraint Catalog" } ] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CountDefaultBase\n\nfield Items as list of integer maxcount 2 default [1, 2, 3]\n\nstate Cart initial\n\nevent Add(Value as integer)\n\nfrom Cart on Add when Items.count < 2\n    -> append Items Add.Value\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "diagnostic": "PRE0136 (CountBoundViolation) on the default — the 3-element default exceeds maxcount 2",
+            "missingPremiseClasses": ["a"],
+            "noOtherDiagnostics": true
+          },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "the guarded append (`when Items.count < 2`) keeps the MUTATION obligation Proved so the only reject is the default obligation (base minimality); a bare default-only field would add PRE0119/PRE0081/PRE0158 structural warnings" }
+        },
+        "discharges": [
+          {
+            "id": "default-in-band",
+            "kind": "arg-modifier",
+            "addition": "default [1, 2] (2 elements, the maxcount-2 boundary)",
+            "premiseClasses": ["a"],
+            "derivation": "n=2; point interval [2,2]; 2 <= maxcount 2 → in-band",
+            "strategy": "CountContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "CountDefaultDischarge compiled clean; default obligation Proved/CountContainment" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "default-in-band",
+            "addition": "default [1, 2, 3] (3 elements — one past the maxcount-2 boundary)",
+            "whyStillRejects": "n=3; point interval [3,3]; 3 > maxcount 2 — the count is weakened past sufficiency by one element, must still reject the same obligation (an exact off-by-one at the boundary the discharge just cleared)",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "c295d7b4", "note": "PRE0136, default obligation Unresolved" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:445 (CollectCountDefaultObligation call site)" },
+        { "kind": "code", "ref": "src/Precept/Language/ProofRequirement.cs:227-235", "note": "CollectCountDefaultObligation reuses the SAME CountContainmentProofRequirement + TryCountContainmentProof prover as the mutation cells — the point interval [n,n] is the degenerate case of the mutation interval" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § Constraint Catalog", "note": "`default [...]` list literals on set/queue/stack/bag/log/list (not `queue of T by P` or `lookup`)" }
+      ],
+      "notes": [
+        "`list of T by P` (ordered list with keys) and `lookup of K to V` carry NO `default [...]` (collection-types.md:427) — those subkinds cannot reach this cell; the type family 'collection' here means the six count-bounded-with-list-default kinds.",
+        "notempty on a collection folds to a mincount-1 lower bound (the same generator path as the string length sibling); a `notempty default []` would reject here for count 0 < mincount 1."
+      ]
+    }
+  ],
+  "openFlags": [
+    {
+      "id": "stateless-guard-spec-conflict",
+      "cell": "fault-countcontainment-stateless-hook-collection",
+      "summary": "Class (c) availability at the stateless-hook occasion is unsettled: the compiler accepts and consumes `on E when F.count op N` in a stateless precept (live-verified discharge), but precept-language-spec.md:1007 states stateless event handlers carry no `when` guard.",
+      "whyNotDerivable": "The generative sections give class (c) whenever a guard exists; whether a stateless handler CAN carry a guard is a language-surface fact the spec answers one way and the compiler another. The matrix cannot pick a side — it is a spec-vs-compiler drift (AI-slop pattern: check git history) or a genuine surface question.",
+      "routeTo": "owner — resolve whether stateless handlers carry a `when` guard; if not, class (c) is pruned at this occasion and the only discharge is structural (a)+(d), a real expressiveness constraint for grows against a maxcount in a stateless precept."
+    },
+    {
+      "id": "seed-inductive-hypothesis-uncited",
+      "cell": "all three mutation cells",
+      "summary": "The seed [mincount ?? 0, maxcount ?? ∞] assumes the count entered the handler in-band (the premise-(d) inductive hypothesis), but consumes it BARE — SeedCountInterval does not name or check the establishing obligation (the field-default cell) or the preserving obligations (every other mutation of F), as the 2026-07-21 citation duty requires.",
+      "whyNotDerivable": "The citation-duty machinery is unbuilt and the ProofRequirement DU has no establishment/preservation subtype (matrix § Obligation family). CountContainment self-mints per mutation, so 'preservation' is a family of per-mutation obligations — but nothing checks that EVERY writer of F actually mints one (matrix § The cell open design hole: nothing detects an obligation never minted).",
+      "routeTo": "the design pass owning the citation-duty / minting-completeness machinery — the same open hole the matrix records; recorded here as the CountContainment-specific instance."
+    },
+    {
+      "id": "guard-narrow-no-frame-kill",
+      "cell": "transition + state-hook cells",
+      "summary": "The class-(c) guard-narrowing discharge (SeedCountInterval) tightens the seed from a `F.count op N` guard WITHOUT a route-indexed frame-and-kill check: a construct between the guard and the mutation that writes F (a source-state exit action at phase 3, running before a transition row's action chain; the phase-4 omit reset; an unordered sibling entry action) can stale the narrowed seed. The transport-rule restatement (route-indexed frame-and-kill, the 2026-07-21 soundness correction) addresses this but is parked/unmechanized.",
+      "whyNotDerivable": "This is a soundness dependency the transport rule owns, not a fact the cell can settle. It is the count-domain analogue of the guard-in-path hole (BUG-033 family) — the guard fact is consumed at a later phase than it was earned, with an interposing writer possible.",
+      "routeTo": "the transport-rule restatement's owner routing (docs/Working/transport-rule-restatement-2026-07-21.md § Open questions). The four witnesses in this file avoid the hazard (no interposing writer), so they remain verified; the CONTRACT names the dependency."
+    },
+    {
+      "id": "count-containment-strategy-not-in-band-vocabulary",
+      "cell": "all cells",
+      "summary": "Every discharge here uses a single ProofStrategy 'CountContainment' (interval arithmetic) — there is no separate GuardInPath / IntervalContainment strategy split as the numeric/length siblings have. Guard narrowing, sibling narrowing, and structural headroom all fold into the one interval-arithmetic strategy. This is an observation, not a defect: recorded so the certificate-step-vocabulary pinning (matrix § Vocabulary, deferred) knows the CountContainment step kind is monolithic.",
+      "whyNotDerivable": "The certificate-step membership doc was not read this pass (named as the largest unread dependency in the transport-rule doc); pinning the CountContainment transport step into the closed CertificateStepKind vocabulary is deferred.",
+      "routeTo": "the deferred certificate-step-vocabulary pass; no owner ruling needed now."
+    }
+  ]
+}

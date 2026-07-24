@@ -1,0 +1,1087 @@
+{
+  "$schema": "../cell.schema.json",
+  "familyId": "fault-presence",
+  "title": "Fault family — Presence: an optional field referenced in a value position must be proven set (PRE0116 / UnprovedPresenceRequirement)",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "Fault family row: the obligation is the catalog-declared safety precondition at the evaluation site; premise classes (b)/(c)/(a) per catalog ProofSatisfactions, with (d) admitted under the 2026-07-21 citation duty"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+      "note": "Fault minting + site identity (2026-07-21): each evaluation OCCASION mints its own presence obligation, one per route"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+      "note": "2026-07-21 citation-duty ruling extends declared-fact premises to the fault family; and the written-value (E2) provenance ruling"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+      "note": "Ratification gate: no cell ratifies whose derivation cites an argument-less rule; the seven named validity arguments"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.cs:374",
+      "note": "AddPresenceObligation — presence is ENGINE-SYNTHESIZED, not catalog-declared: constructed directly in WalkExpression (:293 TypedFieldRef, :301 TypedArgRef under includeOptionalArgRefs). No operator/function/action ProofRequirements slot mints it; a catalog-only enumeration silently drops this kind"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/ProofRequirement.cs:68",
+      "note": "PresenceProofRequirement(SelfSubject with null Accessor, Description) — the subject is the field itself"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:777",
+      "note": "The only built presence discharge: a GuardInPath guard conjunct whose field matches the subject and whose IsPresenceCheck is true (the `is set` guard). ReassignedBefore kills a stale presence guard (sequential proof flow)"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/DiagnosticCode.cs:255",
+      "note": "UnprovedPresenceRequirement = 116 (PRE0116) — the rejection diagnostic every base in this file carries"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Where a site is evaluated — the route relation",
+      "note": "The route classes reaching each evaluation-site category this file uses (transition-row-action-operand, state-hook-action-operand, stateless-hook-action-operand, rule-condition, state-ensure-condition, event-ensure-condition, computed-field-expression, quantifier-predicate)"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "Respellable: the band member is a sound alternate spelling of the `is set` guard; for guard-bearing sites it respells into `when F is set`"
+      }
+    ],
+    "notes": [
+      "The presence discharge is binary (a field is set or it is not), so the sound-but-unprovable band is narrow: it is the sound alternate SPELLINGS of the presence guard that the built matcher does not recognize — e.g. the double-negated `when not (F is not set)`, and the inline short-circuit forms `F is not set or <reads F>` and `if F is set then <reads F> else <fallback>`, both live-verified to still reject (see the state-ensure/computed-field cells).",
+      "For a GUARD-bearing evaluation site (transition row, state hook, stateless hook, rule/quantifier-rule condition) every such band member has a licensed respelling: move the presence into the site's own `when F is set` activation guard. Verdict yes there.",
+      "For a NO-GUARD evaluation site (ensure condition, computed-field expression) the same sound inline forms have NO licensed respelling — an ensure/computed field cannot carry `when` (live-verified PRE0009 parse error), so there is no surface to move the presence into. Those cells are recorded as OPEN (the discharge itself is undefined), so the respellability question there is subsumed by the open disposition rather than a band verdict. If those cells are later ruled discharge-defined, this family verdict must be re-measured against the corpus, since a no-guard sound form with no respelling would flip the verdict to no (a surface decision routed to the owner).",
+      "Model-derived only. Per the ratification protocol the family verdict ratifies only when it agrees with the classified sample corpus, which has not been run for this family."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault-presence-transition-primitive",
+      "label": "Presence — optional primitive field read in a transition-row action operand",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family — catalog(engine)-synthesized safety precondition; premise (c) via the row's `is set` guard"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.cs:290",
+            "note": "TypedFieldRef to a DeclaredPresenceMeta.Optional field in value position mints the PresenceProofRequirement"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Score is set",
+        "metavariables": [
+          {
+            "name": "Score",
+            "standsFor": "the optional primitive field referenced in a value position at the transition-row action RHS"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet — presence is a nullary predicate; the guard conjunct `Score is set` matches the obligation `Score is set` identically, no numeric normalization applies"
+          }
+        ],
+        "wp": {
+          "statement": "Score is set"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "The only applicable premise class is (c), the handler's guard. The obligation mints solely for a DeclaredPresenceMeta.Optional field (ProofEngine.cs:290-293); a `when Score is set` guard on the row establishes presence for the action that follows, since the row's action runs only if the guard evaluated true (spec:1897) and evaluation is pure and deterministic (spec:170, :96). Premise (a) — a field modifier — is structurally inapplicable: there is no value modifier that keeps a field optional while proving it present, and a field declared with guaranteed presence never mints this obligation at all (the mint is gated on Optional). Premise (b) is inapplicable: the subject is a field, not an event arg. Premise (d) — a pre-state constraint establishing `Score is set` (e.g. a residency ensure `in S ensure Score is set`) — is admitted for the fault family under the 2026-07-21 citation duty, but the matrix's § Rule validity states NO validity argument for a rule/constraint-premised (CompositionalConstraint) discharge of a fault obligation; the same gap fault-1 records for numeric premise (d). Recorded as a missing rule, not resolved here. Written-value provenance (E2) would also apply in principle (a prior `set Score = <present>` in the same plan), but it is design-parked, unbuilt for presence (live-verified: `set Score = <arg> ; read Score` still emits PRE0116), and has no entry in the seven-member validity-argument enum.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard conjunct `Score is set` (IsPresenceCheck) matching the subject field -> presence guard-in-path",
+          "strategy": "GuardInPath",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Search the in-path guard conjuncts (a finite set) for one whose field equals the subject and whose IsPresenceCheck is true, and which is not in ReassignedBefore. No such conjunct rejects.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:777",
+              "note": "the presence GuardInPath arm: gc.Field == subject field && gc.IsPresenceCheck"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1897",
+              "note": "guards select — the action runs only if the guard evaluated true"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard `when <field> is set` on the row that reaches this read",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet — stated per applicable premise class"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PresenceTransition\n\nfield Score as integer optional\nfield Recorded as integer default 0\n\nstate Active initial\n\nevent Create() initial\nevent SetScore(Value as integer)\nevent Record()\n\non Create\n    -> set Recorded = 0\n\nfrom Active on SetScore\n    -> set Score = SetScore.Value\n    -> no transition\n\nfrom Active on Record\n    -> set Recorded = Score\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        },
+        "discharges": [
+          {
+            "id": "guard-is-set",
+            "kind": "guard",
+            "addition": "when Score is set",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Record"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard conjunct `Score is set` matches the subject field -> presence guard-in-path",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-is-set",
+            "addition": "when Score is not set",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Record"
+            },
+            "whyStillRejects": "The guard on the WRONG condition: the row fires only when Score is ABSENT, then reads Score — so the read is provably unsafe. The compiler must still reject the same presence obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "Band member `if Score is set then Score else 0` / `when not (Score is not set)` respells to `when Score is set` (family verdict yes)."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault family case shape governs this cell"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/ProofEngine.cs:374",
+          "note": "engine-synthesized mint (no catalog site)"
+        }
+      ],
+      "notes": [
+        "Live-verified at HEAD c295d7b4 via precept_compile (MCP; the MCP serves its last-spawn build, so the exact built commit is unverified — treated as a SYNTAX/compile oracle only, never as authority for what the definition says). Base: 1 diagnostic, PRE0116 on Score, only. Discharge `when Score is set`: 0 diagnostics, Presence disposition Proved, strategy GuardInPath. Near-miss `when Score is not set`: 1 diagnostic, PRE0116 (same obligation).",
+        "The discharge cites the validity argument 'Guard normal-form match', whose written form in the matrix is numeric (WP shape `<RHS> <cmp> <bound>`). Its guard-selection core (the guard evaluated true; the action sees the same pre-state; purity + determinism) is what actually licenses the presence discharge, and the match of `Score is set` against `Score is set` is trivial. The matrix carries NO validity argument specialized to the presence predicate; this adequacy gap is flagged for the owner (openFlag)."
+      ]
+    },
+    {
+      "id": "fault-presence-state-hook-temporal",
+      "label": "Presence — optional temporal field read in a state hook action operand, discharged by the hook's own `when` guard",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family; premise (c) via the state hook's own `when` guard"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Where a site is evaluated — the route relation",
+            "note": "state-hook-action-operand is reached by fire/inspect-fire routes with a transition outcome touching the anchor state; exit actions run at phase 3, entry actions at phase 6"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "ActivatedAt is set",
+        "metavariables": [
+          {
+            "name": "ActivatedAt",
+            "standsFor": "the optional temporal field referenced in a value position at a state entry/exit hook action RHS"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet — nullary presence predicate, identical match"
+          }
+        ],
+        "wp": {
+          "statement": "ActivatedAt is set"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Premise (c) is available via the state hook's OWN `when` guard: a state action `from S when ActivatedAt is set -> set ... = ActivatedAt` runs only when the guard is true, and the guard fact transports to the action (the hook is a straight-line sequence, spec:164, pure/deterministic). The transport-rule subtlety BUG-033 warns of does not bite here because the guard is on the same hook as the read, with nothing between them that writes ActivatedAt. Premise (a)/(b)/(d) and written-value (E2) are inapplicable / unbacked exactly as recorded on fault-presence-transition-primitive.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "hook guard conjunct `ActivatedAt is set` (IsPresenceCheck) matching the subject field -> presence guard-in-path",
+          "strategy": "GuardInPath",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Search the hook's in-path guard conjuncts for one whose field equals the subject and IsPresenceCheck is true (not in ReassignedBefore). None rejects.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:777",
+              "note": "presence GuardInPath arm"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard `when <field> is set` on the state hook that reads it",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PresenceStateHook\n\nfield ActivatedAt as instant optional\nfield LastActive as instant optional\nfield Ticks as integer default 0\n\nstate Warm initial\nstate Cold terminal\n\nevent Create() initial\nevent Activate(At as instant)\nevent Cool()\n\non Create -> set Ticks = 0\nfrom Warm on Activate -> set ActivatedAt = Activate.At -> no transition\nfrom Warm on Cool -> transition Cold\n\nfrom Warm -> set LastActive = ActivatedAt\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        },
+        "discharges": [
+          {
+            "id": "hook-guard-is-set",
+            "kind": "guard",
+            "addition": "from Warm when ActivatedAt is set -> set LastActive = ActivatedAt",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "hook guard conjunct `ActivatedAt is set` matches the subject -> presence guard-in-path",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "The addition replaces the unguarded exit hook `from Warm -> set LastActive = ActivatedAt` with the guarded form; the `application` DU has no state-hook locus, so the whole replacement line is given in `addition`."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "hook-guard-is-set",
+            "addition": "from Warm when ActivatedAt is not set -> set LastActive = ActivatedAt",
+            "whyStillRejects": "The hook fires only when ActivatedAt is absent, then reads it — provably unsafe; must still reject the same presence obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault family case shape"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/ProofEngine.cs:374",
+          "note": "engine-synthesized mint"
+        }
+      ],
+      "notes": [
+        "Live-verified at HEAD c295d7b4 via precept_compile. Base (with Cold marked terminal to keep it minimal): 1 diagnostic, PRE0116 on ActivatedAt ('used in state hook for Warm'), only. Discharge (guarded exit hook): 0 diagnostics, Presence Proved, GuardInPath. Near-miss marked model-derived (not individually run).",
+        "The exit hook `from Warm -> ...` runs at phase 3 (before the row's mutation chain per the normative operation order); putting the guard on the hook itself is what keeps the guard fact in-path to the read. Same numeric-specialization flag on 'Guard normal-form match' as the transition cell."
+      ]
+    },
+    {
+      "id": "fault-presence-stateless-hook-business",
+      "label": "Presence — optional business-domain field read in a stateless handler action operand, discharged by the handler's `when` guard",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family; premise (c) via the stateless handler's `when` guard"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Semantic Rules",
+            "note": "the stateless handler class is a first-class route source in the enumeration"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Budget is set",
+        "metavariables": [
+          {
+            "name": "Budget",
+            "standsFor": "the optional business-domain field (here `money in 'USD'`) referenced in a value position at a stateless handler action RHS"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "nullary presence predicate, identical match"
+          }
+        ],
+        "wp": {
+          "statement": "Budget is set"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Premise (c) via the stateless handler's `when` guard. NOTE a spec-vs-built tension recorded as an openFlag: the transport doc cites spec:1007 ('stateless event handlers carry no `when` guard'), yet the built compiler ACCEPTS and discharges `on Record when Budget is set -> set Spent = Budget` (live-verified Proved, GuardInPath). This cell records the built behaviour and routes the spec conflict to the owner rather than assuming either side. Premise (a)/(b)/(d) and written-value (E2) are inapplicable / unbacked as on the transition cell.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "handler guard conjunct `Budget is set` (IsPresenceCheck) matches the subject field -> presence guard-in-path",
+          "strategy": "GuardInPath",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Search the handler's in-path guard conjuncts for a matching IsPresenceCheck conjunct on the subject field (not in ReassignedBefore). None rejects.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:777",
+              "note": "presence GuardInPath arm"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard `when <field> is set` on the handler that reads it",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PresenceStatelessHook\n\nfield Budget as money in 'USD' optional\nfield Spent as money in 'USD' default '0.00 USD'\n\nevent Allocate(Amount as money in 'USD')\nevent Record()\n\non Allocate -> set Budget = Allocate.Amount\non Record -> set Spent = Budget\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        },
+        "discharges": [
+          {
+            "id": "handler-guard-is-set",
+            "kind": "guard",
+            "addition": "when Budget is set",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Record"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "handler guard conjunct `Budget is set` matches the subject -> presence guard-in-path",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "handler-guard-is-set",
+            "addition": "when Budget is not set",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Record"
+            },
+            "whyStillRejects": "The handler fires only when Budget is absent, then reads it — provably unsafe; must still reject the same presence obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault family case shape"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/ProofEngine.cs:374",
+          "note": "engine-synthesized mint"
+        }
+      ],
+      "notes": [
+        "Live-verified at HEAD c295d7b4 via precept_compile in a fully stateless (0-state) precept. Base: 1 diagnostic PRE0116 on Budget ('used in event handler Record'), only. Discharge `when Budget is set`: 0 diagnostics, Presence Proved, GuardInPath. Also live-verified: written-value provenance does NOT discharge — `on Allocate -> set Budget = Allocate.Amount -> set Spent = Budget` (reading Budget right after setting it from a present arg) still emits PRE0116, so E2 is design-parked/unbuilt for presence.",
+        "Numeric-specialization flag on 'Guard normal-form match' applies as on the other guard cells. The spec:1007-vs-built tension is the cell's distinctive openFlag."
+      ]
+    },
+    {
+      "id": "fault-presence-rule-condition-collection",
+      "label": "Presence — optional collection field read inside a rule condition, discharged by the rule's `when` activation guard",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family; premise (c) via the rule's `when` activation guard"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Where a site is evaluated — the route relation",
+            "note": "rule-condition is reached by every route except restore"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Tags is set",
+        "metavariables": [
+          {
+            "name": "Tags",
+            "standsFor": "the optional collection field (here `set of string`) referenced in a value position (e.g. `Tags.count`) inside a rule condition"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "nullary presence predicate, identical match"
+          }
+        ],
+        "wp": {
+          "statement": "Tags is set"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Premise (c) via the rule's own `when` activation guard: `rule Tags.count >= MinTags when Tags is set` activates the rule only when Tags is present, and the guard fact reaches the condition's read. Collections ARE presence-eligible: `field Tags as set of string optional` is accepted and reading `Tags.count` mints PRE0116 (live-verified). The presence obligation here is on the COLLECTION field itself (its whole-value presence), distinct from the collection's emptiness/count obligations and from the element-bound proof surface. Premise (a)/(b)/(d) and written-value (E2) inapplicable / unbacked as on the transition cell.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "rule activation-guard conjunct `Tags is set` (IsPresenceCheck) matches the subject field -> presence guard-in-path",
+          "strategy": "GuardInPath",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Search the rule's activation-guard conjuncts for a matching IsPresenceCheck conjunct on the subject collection field. None rejects.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:777",
+              "note": "presence GuardInPath arm"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a `when <field> is set` activation guard to the rule",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept RuleCondColl\n\nfield Tags as set of string optional\nfield MinTags as integer default 1\n\nstate Active initial\nevent Create() initial\nevent Fill(T as set of string)\n\non Create -> set MinTags = 1\nfrom Active on Fill -> set Tags = Fill.T -> no transition\n\nrule Tags.count >= MinTags because \"a tagged record must carry at least the minimum tags\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        },
+        "discharges": [
+          {
+            "id": "rule-guard-is-set",
+            "kind": "guard",
+            "addition": "rule Tags.count >= MinTags when Tags is set because \"a tagged record must carry at least the minimum tags\"",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "rule activation-guard `Tags is set` matches the subject -> presence guard-in-path",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "The addition replaces the whole `rule` line with its `when Tags is set` guarded form; the `application` DU has no rule-guard locus, so the full replacement line is in `addition`."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "rule-guard-is-set",
+            "addition": "rule Tags.count >= MinTags when Tags is not set because \"a tagged record must carry at least the minimum tags\"",
+            "whyStillRejects": "The rule activates only when Tags is absent, then reads Tags.count — provably unsafe; must still reject the same presence obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault family case shape"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/ProofEngine.cs:374",
+          "note": "engine-synthesized mint"
+        }
+      ],
+      "notes": [
+        "Live-verified at HEAD c295d7b4 via precept_compile. Base (rule with no `when`): 1 diagnostic PRE0116 on Tags ('used while evaluating rule at index 0'), only. Discharge (`when Tags is set`): 0 diagnostics, Presence Proved, GuardInPath. Near-miss model-derived.",
+        "Numeric-specialization flag on 'Guard normal-form match' applies."
+      ]
+    },
+    {
+      "id": "fault-presence-quantifier-collection",
+      "label": "Presence — optional collection field quantified over in a quantifier predicate, discharged by the enclosing rule's `when` guard",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "quantifier-predicate",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family; premise (c) via the enclosing rule's `when` activation guard"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Where a site is evaluated — the route relation",
+            "note": "quantifier-predicate inherits its enclosing position's route set; element multiplicity is handled by universal quantification, not the route"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Scores is set",
+        "metavariables": [
+          {
+            "name": "Scores",
+            "standsFor": "the optional collection field appearing in the collection position of a quantifier (`each s in Scores (...)`)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "nullary presence predicate, identical match"
+          }
+        ],
+        "wp": {
+          "statement": "Scores is set"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Premise (c) via the enclosing rule's `when` activation guard. SCOPE: this cell's obligation is the PRESENCE of the optional collection field `Scores` referenced in the quantifier's collection position — NOT the element-predicate proof surface (whether a quantified constraint's body is proof surface at all is the matrix's open ⧖ Q10, and collection-types.md:10 marks quantifier predicates 'not yet built'). Live-verified: `rule each s in Scores (s >= Floor)` parses and mints exactly a Presence obligation on Scores; `when Scores is set` discharges it (Proved, GuardInPath). So the collection-presence half is defined and built even though the element-predicate half is open. Premise (a)/(b)/(d) and written-value (E2) inapplicable / unbacked as on the transition cell.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "enclosing-rule activation-guard conjunct `Scores is set` (IsPresenceCheck) matches the subject collection -> presence guard-in-path",
+          "strategy": "GuardInPath",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Search the enclosing rule's activation-guard conjuncts for a matching IsPresenceCheck conjunct on the quantified collection field. None rejects.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:777",
+              "note": "presence GuardInPath arm"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a `when <collection> is set` activation guard to the enclosing rule",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept QuantColl\n\nfield Scores as set of integer optional\nfield Floor as integer default 0\n\nstate Active initial\nevent Create() initial\nevent Fill(S as set of integer)\n\non Create -> set Floor = 0\nfrom Active on Fill -> set Scores = Fill.S -> no transition\n\nrule each s in Scores (s >= Floor) because \"every score must clear the floor\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        },
+        "discharges": [
+          {
+            "id": "quant-rule-guard-is-set",
+            "kind": "guard",
+            "addition": "rule each s in Scores (s >= Floor) when Scores is set because \"every score must clear the floor\"",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "enclosing-rule activation-guard `Scores is set` matches the subject collection -> presence guard-in-path",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Full replacement rule line given in `addition` (no rule-guard locus in the `application` DU)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "quant-rule-guard-is-set",
+            "addition": "rule each s in Scores (s >= Floor) when Scores is not set because \"every score must clear the floor\"",
+            "whyStillRejects": "The rule activates only when Scores is absent, then quantifies over it — provably unsafe; must still reject the same presence obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault family case shape"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/ProofEngine.cs:374",
+          "note": "engine-synthesized mint"
+        }
+      ],
+      "notes": [
+        "Live-verified at HEAD c295d7b4 via precept_compile. Base: 1 diagnostic PRE0116 on Scores, only. Discharge (`when Scores is set`): 0 diagnostics, Presence Proved, GuardInPath. Near-miss model-derived.",
+        "The obligation is deliberately scoped to collection presence, so it is NOT blocked by the quantifier-predicate build gap (collection-types.md:10) or ⧖ Q10 — those govern the element body, which is a separate obligation kind not in this cell."
+      ]
+    },
+    {
+      "id": "fault-presence-state-ensure-primitive",
+      "label": "Presence — optional primitive field read inside an in-S-ensure condition (discharge undefined: ensures carry no guard construct)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "state-ensure-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the `in S ensure` case shape names 'premise classes as for rule' AND leaves the residency-fact premise question explicitly open; no premise class carries a validity argument that discharges a field-presence FAULT obligation at a no-guard evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+            "note": "the seven named validity arguments contain none specialized to presence, and none for a constraint-premised (d) discharge of a fault obligation; the ratification gate forbids ratifying on an argument-less rule"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Where a site is evaluated — the route relation",
+            "note": "state-ensure-condition (`in <current>`) is re-evaluated on every fire/update/construction route while resident, so a single entering-row guard cannot cover the in-residence routes; the transport of an entering guard to the residency ensure is design-parked"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Score is set",
+        "metavariables": [
+          {
+            "name": "Score",
+            "standsFor": "the optional primitive field referenced in a value position inside an `in S ensure` condition"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "nullary presence predicate"
+          }
+        ],
+        "wp": {
+          "statement": "Score is set"
+        }
+      },
+            "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+          "note": "the 2026-07-21 citation duty admits (d) for the fault family but supplies no validity argument for it"
+        }
+      ],
+      "notes": [
+        "The obligation MINTS and rejects (live-verified at HEAD c295d7b4): `in Open ensure Score >= Threshold because \"...\"` over an optional `Score` emits PRE0116 ('used while evaluating ensure for Open'). Base program: `precept EnsurePrimitive` with `field Score as integer optional`, `field Threshold as integer default 10`, `state Open initial`, `on Create -> set Threshold = 10`, `from Open on SetScore -> set Score = SetScore.V -> no transition`, `in Open ensure Score >= Threshold because \"...\"`. 1 diagnostic, PRE0116, only.",
+        "NO discharge is derivable, and this is why the cell is OPEN rather than defined: (i) an ensure cannot carry a `when` guard — `in Open ensure Score >= Threshold when Score is set` is a live-verified PRE0009 PARSE error ('Expected because here, but found when'); (ii) the inline short-circuit forms `Score is not set or Score >= Threshold` and `if Score is set then Score >= Threshold else true` are live-verified to STILL emit PRE0116 (the built engine does not treat a disjunctive/conditional presence test as discharging the value read); (iii) an entering-row guard `from Draft on Activate when Score is set -> transition Open` does NOT discharge the in-Open ensure (live-verified: still PRE0116), because the residency ensure re-evaluates on every in-residence route, not only at entry.",
+        "So the only ways to make it compile are to make Score required (which UNMINTS the obligation rather than discharging it) or to establish `Score is set` as a pre-state fact (premise d) / by written-value provenance (E2) — and neither has a named validity argument in the matrix's § Rule validity. The diagnostic's own suggestion ('guard with when Score is set') names a construct the ensure cannot syntactically carry. This is routed to the owner as a missing rule (openFlag), not resolved here.",
+        "The diagnostic suggestion text is itself a finding: PRE0116 suggests `when F is set` even at evaluation sites (ensure/computed) where no `when` is grammatically available."
+      ]
+    },
+    {
+      "id": "fault-presence-event-ensure-temporal",
+      "label": "Presence — optional temporal field read inside an on-E-ensure condition (discharge undefined: event ensures carry no guard, subject is a pre-state field)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "event-ensure-condition",
+        "typeFamily": "temporal"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the `on E ensure` case shape discharges via INGRESS evaluation over the event's ARGS (premise b, 'the args are the subject'); it says nothing about a presence obligation on a pre-state FIELD read inside the event ensure, which is what this cell contains"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+            "note": "no validity argument for a constraint-premised (d) discharge of a fault obligation, and none specialized to presence"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Where a site is evaluated — the route relation",
+            "note": "event-ensure-condition is evaluated at ingress (phase 1), before any mutation; there is no row/hook guard on an `on E ensure`, and the field it reads is pre-state"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Deadline is set",
+        "metavariables": [
+          {
+            "name": "Deadline",
+            "standsFor": "the optional temporal (pre-state) field referenced in a value position inside an `on E ensure` condition"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "nullary presence predicate"
+          }
+        ],
+        "wp": {
+          "statement": "Deadline is set"
+        }
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+          "note": "the 2026-07-21 citation duty admits (d) for the fault family but supplies no validity argument for it"
+        }
+      ],
+      "notes": [
+        "The obligation MINTS and rejects (live-verified at HEAD c295d7b4): `on Close ensure Close.At >= Deadline because \"...\"` over an optional field `Deadline` emits PRE0116 ('used while evaluating ensure for Close'). Base program: `precept EventEnsureTemporal` with `field Deadline as instant optional`, `field Note as string default \"\"`, `state Open initial`, events `Create()/SetDeadline(D as instant)/Close(At as instant)`, `from Open on SetDeadline -> set Deadline = SetDeadline.D -> no transition`, `from Open on Close -> set Note = \"closed\" -> no transition`, `on Close ensure Close.At >= Deadline because \"...\"`. 1 diagnostic, PRE0116, only.",
+        "NO discharge is derivable: (i) an event ensure cannot carry `when` — `on Close ensure ... when Deadline is set` is a live-verified PRE0009 parse error; (ii) the inline `Deadline is not set or Close.At >= Deadline` short-circuit is live-verified to still emit PRE0116; (iii) unlike the `in S ensure` cell there is not even an entering-row to carry a guard — the event ensure is an ingress check with no row/hook of its own, and its matrix case shape supplies a discharge only for obligations on the event's ARGS, not on a pre-state field. The subject here is a pre-state field, so the ingress-over-args discharge does not reach it.",
+        "The candidate premise is (d) — a residency ensure / rule establishing `Deadline is set` before Close can fire — but fault-(d) has no named validity argument (the same gap fault-1 records). Making Deadline required unmints rather than discharges. Routed to the owner as a missing rule (openFlag)."
+      ]
+    },
+    {
+      "id": "fault-presence-computed-field-business",
+      "label": "Presence — optional business-domain field read inside a computed-field expression (discharge undefined: computed fields carry no guard construct)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Presence — optional field must be set before a value-position read",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+            "note": "no validity argument specialized to presence, and none for a (d)/written-value discharge of a fault obligation; the ratification gate forbids ratifying on an argument-less rule"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § Where a site is evaluated — the route relation",
+            "note": "computed-field-expression is re-evaluated in EVERY operation's pipeline (evaluator.md:144), including restore; there is no guard construct on a computed field, so no premise-(c) discharge exists"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Budget is set",
+        "metavariables": [
+          {
+            "name": "Budget",
+            "standsFor": "the optional business-domain input field (here `money in 'USD'`) referenced in a value position inside a `<-` computed-field expression"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "nullary presence predicate"
+          }
+        ],
+        "wp": {
+          "statement": "Budget is set"
+        }
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+          "note": "the 2026-07-21 citation duty admits (d) for the fault family but supplies no validity argument for it; the written-value (E2) provenance ruling likewise carries no validity-argument enum entry"
+        }
+      ],
+      "notes": [
+        "The obligation MINTS and rejects (live-verified at HEAD c295d7b4): `field Total as money in 'USD' <- Budget + Fee` with `Budget` optional emits PRE0116 ('used in the computed expression for field Total'). Base program: `precept ComputedBusiness` with `field Budget as money in 'USD' optional`, `field Fee as money in 'USD' default '0.00 USD'`, `field Total as money in 'USD' <- Budget + Fee`, `state Active initial`, `from Active on Allocate -> set Budget = Allocate.Amount -> no transition`. 1 diagnostic PRE0116, only (the currency QualifierCompatibility obligation proves).",
+        "NO discharge is derivable: a computed field cannot carry a `when` guard, and the inline conditional `<- if Budget is set then Budget + Fee else Fee` is live-verified to STILL emit PRE0116 (the built engine does not narrow presence through the then-branch of a computed conditional). The computed field recomputes on every operation (including restore), so proving `Budget is set` at recompute would require Budget present in every reachable configuration — i.e. Budget required (which unmints) or a pre-state establishment fact (premise d) / written-value provenance (E2), neither of which has a named validity argument. Routed to the owner as a missing rule (openFlag).",
+        "This cell and the two ensure cells share one root gap: at every evaluation site that carries no `when` guard construct (ensure condition, computed-field expression), the only built presence discharge (guard-in-path) is unavailable and no other premise class has a validity argument. That is the single missing rule the owner is asked to author."
+      ]
+    }
+  ]
+}

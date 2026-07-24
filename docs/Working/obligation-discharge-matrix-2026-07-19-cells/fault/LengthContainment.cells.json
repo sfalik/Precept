@@ -1,0 +1,325 @@
+{
+  "kind": "LengthContainment",
+  "family": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "proofRequirementKind": "ProofRequirementKind.LengthContainment (src/Precept/Language/ProofRequirementKind.cs:31)",
+  "requirementSubtype": "LengthContainmentProofRequirement (src/Precept/Language/ProofRequirement.cs:206-212)",
+  "diagnosticCode": "LengthBoundViolation (surface code PRE0135), catalog-mediated via ProofRequirementMeta.LengthContainment (src/Precept/Language/ProofRequirement.cs:349-352)",
+  "hasCatalogSite": false,
+  "hasCatalogSiteNote": "Engine-synthesized: no operator/function/action carries a LengthContainment slot in its declared ProofRequirements. The obligation is minted directly by the proof engine reading the target field's (or its collection element type's) declared minlength/maxlength. A catalog-only walk (bin/call/ma/action.ProofRequirements) drops the entire kind — it is reached only through the ActionMeta.DynamicObligationGenerator hook and the default-collector.",
+  "decisionProcedure": {
+    "name": "TryLengthContainmentProof",
+    "fileLine": "src/Precept/Pipeline/ProofEngine.Lengths.cs:25-46 (dispatched from ProofEngine.cs:1095)",
+    "how": "Computes a static character-length interval [min, max?] for the assigned string RHS via StringLengthIntervalOf (ProofEngine.Lengths.cs:55-128) — literal -> exact point (len,len); field/arg reference -> its declared [minlength, maxlength] with notempty folding min to >=1; concatenation -> operand-interval sum; conditional -> branch union; length-stable string function -> argument transfer; interpolated string -> literal-segment + per-hole sum. Discharge is prove-or-reject: proved iff the whole interval is provably within [declaredMinLength, declaredMaxLength] (min >= declaredMin AND max.HasValue AND max <= declaredMax); a provable violation (false) OR a merely-unprovable case such as an unbounded upper bound (null) both leave the obligation Unresolved and emit LengthBoundViolation (spec 0.7 prove-or-reject, no runtime deferral).",
+    "searchBound": "Structural recursion over the finite RHS expression tree — no guard search, no fixpoint. The bound is met trivially (a walk, not a search)."
+  },
+  "mintSites": [
+    {
+      "role": "scalar set into a length-bounded string field",
+      "fileLine": "src/Precept/Language/Actions.cs:307-323 (inside GenerateIntervalContainmentObligations) -> Actions.cs:423-443 (BuildLengthContainmentObligation)",
+      "hook": "ActionMeta.DynamicObligationGenerator on ActionKind.Set (Actions.cs:76), invoked from ProofEngine.cs:454-467",
+      "guard": "targetField.ResolvedType == String AND (DeclaredMinLength or DeclaredMaxLength) AND InputExpression.ResultType == String"
+    },
+    {
+      "role": "element-introducing action into a string-bounded collection",
+      "fileLine": "src/Precept/Language/Actions.cs:343-378 (GenerateElementLengthContainmentObligation) -> Actions.cs:423-443",
+      "hook": "TypedInputAction branch, invoked from ProofEngine.cs:479-481",
+      "guard": "actionMeta.Effect == Grows AND WriteSemantics == EstablishesValue AND InputExpression.ResultType == String AND ElementType.ValueBounds carries a length band; notempty folds min to >=1"
+    },
+    {
+      "role": "scalar string field default literal",
+      "fileLine": "src/Precept/Pipeline/ProofEngine.Analysis.cs:648-682 (CollectLengthDefaultObligation), reached from Analysis.cs:441-443",
+      "guard": "targetType == String AND DefaultExpression is TypedLiteral{String} AND (declaredMinLength or declaredMaxLength); notempty folds min to >=1"
+    },
+    {
+      "role": "each string element of a collection default-list literal",
+      "fileLine": "src/Precept/Pipeline/ProofEngine.Analysis.cs:462-493 (CollectElementLengthDefaultObligations), reached from Analysis.cs:447",
+      "guard": "ElementType.ValueBounds non-empty AND DefaultExpression is TypedListLiteral; one obligation per String element; notempty folds min to >=1"
+    }
+  ],
+  "premiseClassApplicability": {
+    "note": "The length decision procedure consumes only the RHS's declared length structure. Mapping to the four premise classes plus the literal-fold discharge mechanism:",
+    "literal-fold": "APPLICABLE (discharge mechanism, not a premise class). A string literal RHS folds to its exact character length. This is the 'Literal constant-fold for defaults' validity argument extended to any literal operand.",
+    "(a) field modifiers": "APPLICABLE. A field-reference RHS is discharged from the referenced field's declared minlength/maxlength (notempty -> min 1). StringLengthIntervalOf reads field.DeclaredMinLength/DeclaredMaxLength (ProofEngine.Lengths.cs:64-69). Subject to the citation duty (see per-cell derivations).",
+    "(b) arg constraints": "APPLICABLE where an event arg is in scope (transition rows, stateless handlers, construction rows). A dotted arg-reference RHS is discharged from the arg's declared minlength/maxlength via ingress governance (ProofEngine.Lengths.cs:73-85). NOT in scope for state entry/exit hooks, which fire on any transition into/out of the anchor state and therefore reference no single event's args.",
+    "(c) handler guard": "NOT APPLICABLE (build) and NOT LICENSED (definition). StringLengthIntervalOf consults no guard facts, and the catalog carrier ProofSatisfaction.LengthContainment (ProofRequirement.cs:406) carries no projection/bound-source (unlike ProofSatisfaction.Numeric, which carries SatisfactionProjection + NumericBoundSource). The generative sections, keyed to the catalog satisfaction shape (fault case shape, matrix 'per catalog ProofSatisfactions'), license no guard-narrowing for length. A program whose length safety rests on a runtime guard (e.g. when NewCode.length <= 10) is in the sound-but-unprovable band. Whether guard-narrowed length SHOULD enrol is a surface-expansion question routed in openFlags.",
+    "(d) pre-state constraint / inductive hypothesis": "NOT CONSUMED by the length procedure. There is no length-comparison constraint surface folded into StringLengthIntervalOf. Written-value provenance (E2, transport rule clause E2) is likewise NOT exploited for length: a field-reference RHS reads the field's DECLARED modifiers, not the flow-sensitive value written earlier in the plan (set A = <short literal>; set B = A with A unbounded stays Unresolved). Band member; see respellability."
+  },
+  "compilerHolesChecked": {
+    "BUG-033-into-binding": "The `into` binding target is not a mint site for LengthContainment. Verified at HEAD 2026-07-21 (precept_compile): `dequeue Q into Head` where `field Head as string maxlength 3` and Q holds a length-7 element emits NO length obligation (proofObligations carries only the Numeric emptiness check) and reports PRE0158 'Head has no write site'. None of the six enumerated cells route through `into`, so no cell rests on this hole; it is recorded as a family minting-completeness gap in openFlags.",
+    "write-surface-enumeration-gap": "Only the enumerated set/element-write/default mint sites are catalogued for length. The `dequeue/pop ... into F` scalar target (a length-bearing write) is uncovered (same instance as above). Adding `when Q.count > 0` would clear PRE0064 and let that program compile clean while Head silently receives an over-long value — a false-clean resting on the gap. Flagged, not counted."
+  },
+  "respellability": {
+    "verdictScope": "contract family: length-containment (static length-interval computation)",
+    "verdict": "yes (provisional) for the declared-modifier-recoverable band; a residual sub-band routed to owner",
+    "band": [
+      "Guard-narrowed length (when arg.length <= N ...): respellable by declaring `maxlength N` on the source arg/field. YES.",
+      "Written-value provenance (set A = <literal>; set B = A, A unbounded): respellable by declaring maxlength on A, or setting B directly from the literal. YES.",
+      "A value from a non-length-stable function or an otherwise unbounded source the author knows is bounded but cannot attach a modifier to: NO respelling attaches a declared bound. Potential respellable:no sub-band."
+    ],
+    "openRoute": "The non-length-stable-source sub-band cannot be settled here: respellable:no is a surface-shrink decision, and the matrix requires the family verdict to agree with the classified sample corpus (an INPUT, never citable as coverage). Routed in openFlags.",
+    "inheritedByAllCells": true
+  },
+  "cells": [
+    {
+      "cellId": "fault-lengthcontainment-transition-primitive",
+      "occasion": "transition-row-action-operand",
+      "typeFamily": "primitive",
+      "disposition": "Defined",
+      "mintSite": "src/Precept/Language/Actions.cs:307-323 (scalar set, DynamicObligationGenerator hook)",
+      "obligationSchema": "declaredMinLength <= length(assigned-string-expr) <= declaredMaxLength, at a scalar `set` into a length-bounded string field, evaluated on a transition row's action chain",
+      "routes": [
+        "fire (this row only) — transition-row-action-operand, transport-rule route relation, section 3",
+        "inspect-fire mirror (same row)"
+      ],
+      "transportCitation": "The RHS is evaluated at the write in the mutation phase (phase 5 of the section 3A.4 execution order). An arg-length fact is earned at phase 1 (ingress governance) and is never killed (nothing in a plan writes an argument), so it reaches the write on every route carrying the event including the inspect-fire mirror (transport rule, section 5, 'Ingress-governed argument fact'). A field-reference fact is a carried modifier fact earned at route position zero, killed only by an ungoverned write to that field between position zero and the site (transport rule route-indexed frame-and-kill, section 4). A literal read-closure is empty and is never killed.",
+      "dischargeContract": {
+        "iff": "The obligation discharges IFF StringLengthIntervalOf(RHS) yields [min, max] with max.HasValue and min >= declaredMinLength and max <= declaredMaxLength.",
+        "byPremiseClass": {
+          "literal-fold": "RHS is a string literal -> exact point interval -> compared against the band.",
+          "(b) arg constraint": "RHS is `E.Arg` with the arg declaring minlength/maxlength (notempty -> min 1); the arg interval is the declared band. Established by ingress governance at the event door.",
+          "(a) field modifier": "RHS is a field reference whose declared minlength/maxlength band lies within the target band. Subject to the citation duty below."
+        },
+        "citationDuty": "A discharge consuming a field-modifier length fact (class a) must name: the ESTABLISHING obligation (the source field's own default LengthContainment obligation at construction, mint site 3, or its initial-event-assignment LengthContainment obligation) AND every PRESERVING obligation (each write-site LengthContainment obligation on the source field, mint sites 1/2), each itself discharged. For class (b) the establishing mechanism is ingress governance and the preserving set is empty (arguments are immutable). NOTE (build divergence, not a soundness hole): the shipped StringLengthIntervalOf reads the source field's declared modifiers BARE — it does not materialize the establishment/preservation citation. The fact is nonetheless structurally earned for every length-bounded string field, because Precept mints a length obligation at that field's default and at every one of its write sites; the gap is citation materialization, not an unearned premise. See openFlags."
+      },
+      "suggestionSchema": "Bound the assigned expression so its length interval fits [declaredMinLength .. declaredMaxLength]: declare `maxlength <declaredMaxLength>` (and `minlength`/`notempty` as needed) on the source arg (class b) or source field (class a), or assign a literal within the band. Names all applicable classes (a, b, literal).",
+      "witness": {
+        "base": {
+          "program": "precept LenTransitionPrimitive\n\nfield Code as string optional maxlength 10\n\nstate Draft initial\nstate Filed terminal\n\nevent Create initial\nevent File(RawCode as string)\n\non Create\n    -> set Code = \"seed\"\n\nfrom Draft on File\n    -> set Code = File.RawCode\n    -> transition Filed",
+          "expected": "reject:LengthBoundViolation naming Code's length obligation",
+          "verified": "precept_compile HEAD 2026-07-21: diagnosticCount 1, PRE0135 on `set Code = File.RawCode`; obligation LengthContainment Unresolved (the construction seed is Proved). Base minimal — the only diagnostic is the target obligation."
+        },
+        "dischargeAddition": {
+          "program": "change `event File(RawCode as string)` to `event File(RawCode as string maxlength 10)`",
+          "expected": "accept",
+          "verified": "precept_compile HEAD 2026-07-21: diagnosticCount 0 (modulo an unrelated no-outgoing-transition warning in a bare fragment); LengthContainment Proved, strategy LengthContainment. Class (b): arg interval [0,10] within [0,10]."
+        },
+        "nearMiss": {
+          "program": "change the arg to `RawCode as string maxlength 20` (looser than the field's maxlength 10)",
+          "expected": "reject:LengthBoundViolation naming the SAME Code length obligation",
+          "verified": "precept_compile HEAD 2026-07-21: PRE0135, obligation Unresolved. Arg interval [0,20], upper 20 > 10, TryLengthContainmentProof returns null -> emit."
+        }
+      },
+      "respellability": "inherits family (yes, provisional)",
+      "openFlags": []
+    },
+    {
+      "cellId": "fault-lengthcontainment-transition-collection",
+      "occasion": "transition-row-action-operand",
+      "typeFamily": "collection",
+      "disposition": "Defined",
+      "mintSite": "src/Precept/Language/Actions.cs:343-378 (GenerateElementLengthContainmentObligation), invoked ProofEngine.cs:479-481",
+      "obligationSchema": "declaredMinLength <= length(element-string-expr) <= declaredMaxLength, at an element-introducing action (add/enqueue/push/append/insert/put and by-keyed variants — the catalog Grows + EstablishesValue set) into a string collection whose element type declares a length band, on a transition row",
+      "routes": [
+        "fire (this row only)",
+        "inspect-fire mirror"
+      ],
+      "transportCitation": "Identical to the scalar case: the element operand is evaluated at the growing action in the mutation phase; arg facts transport from ingress unkilled, field-reference facts are carried modifier facts killable by an intervening ungoverned write (transport rule sections 4-5). The bound source differs (the receiver field's ElementType.ValueBounds, not the field's own modifiers) but the transport of the element expression's facts is the same.",
+      "dischargeContract": {
+        "iff": "Discharges IFF StringLengthIntervalOf(element-expr) is provably within the collection element band [ElementType minlength (notempty->1) .. ElementType maxlength], via the shared TryLengthContainmentProof.",
+        "byPremiseClass": {
+          "literal-fold": "element operand is a string literal -> exact point.",
+          "(b) arg constraint": "element operand is `E.Arg` with declared length band.",
+          "(a) field modifier": "element operand is a field reference with a declared length band within the element band; citation duty as in the scalar cell."
+        },
+        "citationDuty": "Same as the scalar transition cell for class (a). The receiver's ElementType length band is a declared modifier on the collection field's element type and is itself established/preserved by the field's default-element obligations (mint site 4) and each element-write obligation (this mint site); the discharge consuming a class-(a) element source must cite them."
+      },
+      "suggestionSchema": "Bound the introduced element so its length interval fits the collection element band: `maxlength` on the source arg/field or a literal within the band.",
+      "witness": {
+        "base": {
+          "program": "precept LenTransitionCollection\n\nfield Tags as queue of string maxlength 5\n\nstate Draft initial\nstate Filed terminal\n\nevent Create initial\nevent AddTag(Label as string)\n\non Create\n    -> enqueue Tags \"ok\"\n\nfrom Draft on AddTag\n    -> enqueue Tags AddTag.Label\n    -> transition Filed",
+          "expected": "reject:LengthBoundViolation naming Tags' element length obligation",
+          "verified": "precept_compile HEAD 2026-07-21: diagnosticCount 1, PRE0135 on `enqueue Tags AddTag.Label`; obligation LengthContainment Unresolved (the construction `enqueue Tags \"ok\"` element is Proved). Base minimal."
+        },
+        "dischargeAddition": {
+          "program": "change `event AddTag(Label as string)` to `event AddTag(Label as string maxlength 5)`",
+          "expected": "accept",
+          "verified": "By the shared TryLengthContainmentProof: arg interval [0,5] within element band [0,5] -> Proved (same procedure verified Proved for the scalar `maxlength 10` discharge at HEAD 2026-07-21)."
+        },
+        "nearMiss": {
+          "program": "change the arg to `Label as string maxlength 8` (looser than the element maxlength 5)",
+          "expected": "reject:LengthBoundViolation naming the SAME Tags element obligation",
+          "verified": "precept_compile HEAD 2026-07-21: PRE0135, obligation Unresolved. Element interval [0,8], upper 8 > 5 -> emit."
+        }
+      },
+      "respellability": "inherits family (yes, provisional)",
+      "openFlags": []
+    },
+    {
+      "cellId": "fault-lengthcontainment-state-hook-primitive",
+      "occasion": "state-hook-action-operand",
+      "typeFamily": "primitive",
+      "disposition": "Defined",
+      "mintSite": "src/Precept/Language/Actions.cs:307-323 (same scalar-set DynamicObligationGenerator; the action sits in a `to S ->`/`from S ->` state hook)",
+      "obligationSchema": "declaredMinLength <= length(assigned-string-expr) <= declaredMaxLength, at a scalar `set` in a state entry/exit hook",
+      "routes": [
+        "fire and inspect-fire with a transition outcome touching the anchor state — exit actions at phase 3, entry actions at phase 6 (transport rule route relation, 'state-hook-action-operand'; section 3A.4 phases)",
+        "OPEN sub-route: construction firing of an entry hook when the anchor is the initial state — whether entry actions fire at construction is unruled (section 3A.4 'Still unsettled'); routed"
+      ],
+      "transportCitation": "The hook action's RHS is evaluated at phase 3 (exit) or phase 6 (entry). State hooks fire on any transition into/out of the anchor state, so NO single event's args are in scope; class (b) is not applicable here. A field-reference RHS is a carried modifier fact from route position zero, killed by any ungoverned write to that field earlier on the route — for an entry hook (phase 6) this includes the row's own mutation chain (phase 5) and exit actions (phase 3). Because the enumerated multiplicity/ordering of several state actions on one state is unsettled (section 3A.4), a same-state sibling action is a may-write (kill-direction over-approximation, safe) and is never must-run (so it establishes nothing).",
+      "dischargeContract": {
+        "iff": "Discharges IFF StringLengthIntervalOf(RHS) is provably within the target field band. Applicable premise classes: literal-fold and (a) field modifier only; (b) is out of scope (no event arg at a state hook), (c)/(d) unlicensed as for the family.",
+        "byPremiseClass": {
+          "literal-fold": "RHS literal -> exact point.",
+          "(a) field modifier": "RHS is a field reference whose declared band is within the target band; the source field's length fact must be earned (a carried modifier fact) and must not be killed by an earlier write on the hook's phase; citation duty applies."
+        },
+        "citationDuty": "As the scalar transition cell: consuming a class-(a) field length fact names the source field's establishment (construction default or initial-event assignment length obligation) and every preserving write-site length obligation, each discharged, AND — because a hook can sit after the row mutation (entry, phase 6) — the derivation must witness that no write on the route to the hook killed the source fact (transport rule frame-and-kill)."
+      },
+      "suggestionSchema": "Bound the source field with `maxlength`/`minlength`/`notempty`, or assign a literal within the target band. (An event-arg suggestion is not offered — a state hook cannot reference a specific event's args.)",
+      "witness": {
+        "base": {
+          "program": "precept LenStateHook\n\nfield Code as string optional maxlength 10\nfield Source as string\n\nstate Draft initial\nstate Filed terminal\n\nevent Create(SourceIn as string) initial\nevent File\n\non Create\n    -> set Source = Create.SourceIn\n\nto Filed -> set Code = Source\n\nfrom Draft on File\n    -> transition Filed",
+          "expected": "reject:LengthBoundViolation naming Code's length obligation",
+          "verified": "precept_compile HEAD 2026-07-21: diagnosticCount 1, PRE0135 on `set Code = Source` in the `to Filed` entry hook; obligation LengthContainment Unresolved. Source is required (no presence noise) but unbounded, so its interval [0,inf) fails containment. Base minimal."
+        },
+        "dischargeAddition": {
+          "program": "declare Source with a bound and feed it from a bounded arg: `field Source as string maxlength 10` and `event Create(SourceIn as string maxlength 10) initial`",
+          "expected": "accept",
+          "verified": "precept_compile HEAD 2026-07-21: success true, diagnosticCount 0; both Source (from SourceIn, class b at construction) and Code (from Source, class a at the entry hook) Proved with strategy LengthContainment. This program materializes the citation chain: Code's discharge cites Source's maxlength; Source's maxlength is established at the construction write from a maxlength-10 arg and has that single write site as its (discharged) preserving obligation."
+        },
+        "nearMiss": {
+          "program": "loosen the source: `field Source as string maxlength 20` (still fed from a maxlength-20 arg), target Code maxlength 10",
+          "expected": "reject:LengthBoundViolation naming the SAME Code obligation",
+          "verified": "By the shared procedure (verified analogously at HEAD 2026-07-21 for the maxlength-20-vs-10 arg case): Source interval [0,20], upper 20 > 10 -> Unresolved -> emit."
+        }
+      },
+      "respellability": "inherits family (yes, provisional)",
+      "openFlags": [
+        "Entry-hook firing at construction is unruled (section 3A.4 'Still unsettled: whether entry actions fire at construction and on a self-transition'). When the anchor is the initial state, whether this cell's obligation also mints on the construction route is undetermined; routed to owner, not assumed here."
+      ]
+    },
+    {
+      "cellId": "fault-lengthcontainment-stateless-hook-primitive",
+      "occasion": "stateless-hook-action-operand",
+      "typeFamily": "primitive",
+      "disposition": "Defined",
+      "mintSite": "src/Precept/Language/Actions.cs:307-323 (same scalar-set DynamicObligationGenerator; the action sits in a stateless `on E -> set` handler)",
+      "obligationSchema": "declaredMinLength <= length(assigned-string-expr) <= declaredMaxLength, at a scalar `set` in a stateless handler",
+      "routes": [
+        "the stateless handler class (event E)",
+        "its inspection mirror",
+        "construction and its mirror (transport rule route relation, 'stateless-hook-action-operand')"
+      ],
+      "transportCitation": "A stateless precept has no transition rows; its route is the stateless handler class, first-class in the enumeration (transport rule section 2). The handler's arg is earned at ingress (phase 1) and never killed, so a class-(b) arg fact reaches the `set` on both the handler route and its inspection mirror. A field-reference RHS is a carried modifier fact killable by an ungoverned write earlier in the handler.",
+      "dischargeContract": {
+        "iff": "Discharges IFF StringLengthIntervalOf(RHS) is provably within the target band. Applicable: literal-fold, (b) arg constraint (a stateless handler DOES have its event's args in scope, unlike a state hook), (a) field modifier. (c)/(d) unlicensed as for the family.",
+        "byPremiseClass": {
+          "literal-fold": "RHS literal -> exact point.",
+          "(b) arg constraint": "RHS `E.Arg` with declared band; ingress-governed.",
+          "(a) field modifier": "RHS field reference within the target band; citation duty applies."
+        },
+        "citationDuty": "As the scalar transition cell. For an editable target field (stateless precepts are typically all-editable), the field is also re-established at its editable-field ingress door (E1), but the length discharge here reads only the RHS's declared structure, independent of that door."
+      },
+      "suggestionSchema": "Bound the assigned arg (`maxlength`) or source field, or assign a literal within the band; names classes a, b, literal.",
+      "witness": {
+        "base": {
+          "program": "precept LenStateless\n\nfield Code as string optional maxlength 10 editable\n\nevent Rename(NewCode as string)\n\non Rename\n    -> set Code = Rename.NewCode",
+          "expected": "reject:LengthBoundViolation naming Code's length obligation",
+          "verified": "precept_compile HEAD 2026-07-21: diagnosticCount 1, PRE0135 on `set Code = Rename.NewCode`; obligation LengthContainment Unresolved. Stateless precept (0 states). Base minimal."
+        },
+        "dischargeAddition": {
+          "program": "change `event Rename(NewCode as string)` to `event Rename(NewCode as string maxlength 10)`",
+          "expected": "accept",
+          "verified": "precept_compile HEAD 2026-07-21: success true, diagnosticCount 0; LengthContainment Proved, strategy LengthContainment. Class (b): arg interval [0,10] within [0,10]."
+        },
+        "nearMiss": {
+          "program": "change the arg to `NewCode as string maxlength 20`",
+          "expected": "reject:LengthBoundViolation naming the SAME Code obligation",
+          "verified": "precept_compile HEAD 2026-07-21: PRE0135, obligation Unresolved. Arg interval [0,20], upper 20 > 10 -> emit."
+        }
+      },
+      "respellability": "inherits family (yes, provisional)",
+      "openFlags": []
+    },
+    {
+      "cellId": "fault-lengthcontainment-field-default-primitive",
+      "occasion": "field-default-value-expression",
+      "typeFamily": "primitive",
+      "disposition": "Defined",
+      "mintSite": "src/Precept/Pipeline/ProofEngine.Analysis.cs:648-682 (CollectLengthDefaultObligation)",
+      "obligationSchema": "declaredMinLength <= length(default-string-literal) <= declaredMaxLength, at a scalar string field's `default` literal",
+      "routes": [
+        "construction and its inspection mirror",
+        "every fire route whose outcome is a transition into a state that omits the field (the omit reset re-materializes the default) — transport rule route relation, 'field-default-value-expression', citing spec:1074"
+      ],
+      "transportCitation": "The default literal is materialized at construction (phase 4/construction) with an empty read-closure, so it is never killed — 'Literal denotation ... never; read-closure empty' (transport rule section 5). This is the 'Literal constant-fold for defaults' validity argument (matrix): construction builds the hollow version with defaults applied, so the runtime value is the literal itself, and the compile-time character count is exact.",
+      "dischargeContract": {
+        "iff": "Discharges IFF the literal's exact length is within [declaredMinLength (notempty->1) .. declaredMaxLength]. No premise class — pure literal constant fold; the default surface admits only literals (the analyzer reads TypedLiteral{String}).",
+        "byPremiseClass": {
+          "literal-fold": "the sole discharge: default literal length compared against the declared band."
+        },
+        "citationDuty": "None — a literal earns its own fact; there is no declared premise to cite."
+      },
+      "suggestionSchema": "Provide a default string literal whose character length is within [declaredMinLength .. declaredMaxLength] (or relax the field's minlength/maxlength).",
+      "witness": {
+        "base": {
+          "program": "precept LenDefaultPrimitive\n\nfield Code as string maxlength 10 default \"TOOLONGVALUE\" editable",
+          "expected": "reject:LengthBoundViolation naming Code's default length obligation",
+          "verified": "precept_compile HEAD 2026-07-21: diagnosticCount 1, PRE0135 'String value has 12 character(s) but field Code requires length in [0..10]'; obligation LengthContainment Unresolved. `editable` supplies a write site so no PRE0158 noise. Base minimal."
+        },
+        "dischargeAddition": {
+          "program": "shorten the default: `default \"OK\"`",
+          "expected": "accept",
+          "verified": "precept_compile HEAD 2026-07-21: success true, diagnosticCount 0; LengthContainment Proved, strategy LengthContainment. Literal length 2 within [0,10]."
+        },
+        "nearMiss": {
+          "program": "keep an over-long default `default \"TOOLONGVAL\"` (length 11) against maxlength 10",
+          "expected": "reject:LengthBoundViolation naming the SAME default obligation",
+          "verified": "By the exact-length fold (the length-12 literal was verified rejecting at HEAD 2026-07-21): any literal whose exact length exceeds maxlength returns false -> emit."
+        }
+      },
+      "respellability": "inherits family (yes) — a literal default is always respellable to an in-band literal",
+      "openFlags": [
+        "The omit-reset re-materialization route (a transition into a state that omits the field) rests on the unsettled question of whether the `omit` reset is itself a write/obligation site (transport rule Open questions N3, matrix Q8). The construction route of this cell is fully derivable (literal fold); the omit-reset route is flagged pending that ruling."
+      ]
+    },
+    {
+      "cellId": "fault-lengthcontainment-field-default-collection",
+      "occasion": "field-default-value-expression",
+      "typeFamily": "collection",
+      "disposition": "Defined",
+      "mintSite": "src/Precept/Pipeline/ProofEngine.Analysis.cs:462-493 (CollectElementLengthDefaultObligations) — one obligation per String element of the default-list literal",
+      "obligationSchema": "declaredMinLength <= length(each-default-list-element) <= declaredMaxLength, per string element of a collection `default [...]` literal, against the collection's ElementType length band",
+      "routes": [
+        "construction and its inspection mirror",
+        "every fire route transitioning into a state that omits the field (omit reset) — same as the scalar default cell"
+      ],
+      "transportCitation": "Each default list element is a literal materialized at construction with an empty read-closure — never killed (transport rule 'Literal denotation'). Same 'Literal constant-fold for defaults' argument, applied per element.",
+      "dischargeContract": {
+        "iff": "Discharges IFF EVERY string element literal's exact length is within the ElementType band [minlength (notempty->1) .. maxlength]. One obligation per element; the field compiles clean iff all element obligations discharge.",
+        "byPremiseClass": {
+          "literal-fold": "the sole discharge, applied per element literal."
+        },
+        "citationDuty": "None — each element literal earns its own fact."
+      },
+      "suggestionSchema": "Ensure every default list element's length is within the collection element band, or relax the element minlength/maxlength.",
+      "witness": {
+        "base": {
+          "program": "precept LenDefaultCollection\n\nfield Tags as list of string maxlength 5 default [\"ok\", \"TOOLONG\"] editable",
+          "expected": "reject:LengthBoundViolation naming the per-element length obligation for the over-long element",
+          "verified": "precept_compile HEAD 2026-07-21: diagnosticCount 1, PRE0135 'String value has 7 character(s) but field Tags requires length in [0..5]' on \"TOOLONG\"; the \"ok\" element obligation is Proved, the \"TOOLONG\" element obligation Unresolved. Base minimal. (Note: `list of string` accepts the `[...]` default literal; `set of string` reports PRE0018 'Expected a set value here, but got list' at HEAD — a surface-syntax observation, not a length-proof fact.)"
+        },
+        "dischargeAddition": {
+          "program": "shorten every element within bound: `default [\"ok\", \"tag\"]`",
+          "expected": "accept",
+          "verified": "By the per-element exact-length fold (the \"ok\" element was verified Proved at HEAD 2026-07-21): all element literals within [0,5] -> every element obligation Proved."
+        },
+        "nearMiss": {
+          "program": "keep one over-long element `default [\"ok\", \"TOOLONG\"]`",
+          "expected": "reject:LengthBoundViolation naming the SAME per-element obligation",
+          "verified": "precept_compile HEAD 2026-07-21 (the base program above): the length-7 element rejects while the length-2 element proves — a single over-band element is sufficient to keep the field unresolved."
+        }
+      },
+      "respellability": "inherits family (yes) — element literals are always respellable to in-band literals",
+      "openFlags": [
+        "Same omit-reset flag as the scalar default cell: the re-materialization route on a transition into an omitting state rests on the unsettled `omit`-reset-as-write question (transport rule N3 / matrix Q8)."
+      ]
+    }
+  ],
+  "openFlags": [
+    "MINTING-COMPLETENESS (family, route to owner): the `dequeue/pop ... into F` scalar binding target is a length-bearing write site that mints NO LengthContainment obligation. Verified at HEAD 2026-07-21: `dequeue Q into Head` with `field Head as string maxlength 3` and a length-7 queue head reports PRE0158 'Head has no write site' and mints only the Numeric emptiness obligation. Adding `when Q.count > 0` would compile the file clean while Head silently receives an over-long value. This is the write-surface enumeration gap (BUG-033 area) intersecting the LengthContainment family. None of the six enumerated cells rest on it, but the coordinate-map mint-site set for this kind is INCOMPLETE — it omits the `into`-target scalar length write. Route: catalog-declare the `into` binding target as a length write site (build-enforcement), consistent with the transport rule's 'into binding target ... killed' row.",
+    "PREMISE-CLASS SURFACE (family, route to owner): the matrix fault case shape lists premise classes (b)/(c)/(a) as generally applicable, but the LengthContainment catalog carrier ProofSatisfaction.LengthContainment (ProofRequirement.cs:406) supports no guard-narrowing or flow-sensitive projection, so classes (c) handler-guard and the written-value provenance (E2) are neither built nor licensed for length. Programs whose length safety rests on a guard (when arg.length <= N) or on an earlier `set` of an unbounded field are in the sound-but-unprovable band. Whether guard-narrowed / written-value length should enrol is a surface-expansion decision; not settled here.",
+    "RESPELLABILITY RESIDUAL (family, route to owner): the respellable:yes family verdict holds for the declared-modifier-recoverable band, but a value from a non-length-stable source the author knows is bounded yet cannot attach a `maxlength` to is a candidate respellable:no sub-band (a surface-shrink decision). The matrix requires the family verdict to agree with the classified sample corpus, which is an INPUT and not citable as coverage, so the verdict is provisional pending that measurement.",
+    "CITATION MATERIALIZATION (family, build divergence not a soundness hole): the shipped StringLengthIntervalOf reads a referenced field's/arg's declared length modifiers BARE (ProofEngine.Lengths.cs:64-85) without emitting the establishment + preservation citation the 2026-07-21 citation-duty ruling requires. The fact is structurally earned (every length-bounded field mints default + write-site length obligations), so this is citation materialization owed by the certificate format, not an unearned premise. Recorded so the certificate-format work covers the class-(a) length discharge."
+  ]
+}

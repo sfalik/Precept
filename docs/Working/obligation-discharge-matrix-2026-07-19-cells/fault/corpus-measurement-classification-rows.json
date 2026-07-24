@@ -1,0 +1,290 @@
+[
+ [
+  "Numeric",
+  "FieldDefaultContext",
+  "Literal",
+  264,
+  "field-default-value-expression",
+  "licensed",
+  "Constant-fold over the default environment; matches the authored cell's premise-less standing discharge."
+ ],
+ [
+  "Numeric",
+  "TransitionRowContext",
+  "GuardInPath",
+  21,
+  "transition-row-action-operand",
+  "licensed",
+  "Class (c) guard normal-form match; checked against the exit-action transport hole (BUG scope) and the into-binding hole (BUG-033) \u2014 see Compiler-hole check section; no live exposure found in this corpus."
+ ],
+ [
+  "Numeric",
+  "TransitionRowContext",
+  "Literal",
+  12,
+  "transition-row-action-operand",
+  "licensed",
+  "Constant-fold of a literal divisor; sound by construction regardless of authored coordinate."
+ ],
+ [
+  "Numeric",
+  "TransitionRowContext",
+  "CompositionalConstraint",
+  6,
+  "transition-row-action-operand",
+  "respell-needed",
+  "Known false-proof hazard (matrix Sec. 'The cell', verified instance 2026-07-20; boundary report finding). Not licensed as written under the fault case-shape's own (b)/(c)/(a) discharge column. Respelling: replace the whole-file compositional argument with an explicit modifier (nonzero/positive) on the divisor's immediate source at each write site, or an explicit guard `when <divisor> != 0` in the consuming row (Family 4, matrix Witness Family sketches)."
+ ],
+ [
+  "Numeric",
+  "ConstraintContext/Rule",
+  "Literal",
+  1,
+  "rule-condition",
+  "licensed",
+  "Constant-fold; general mechanism, though the coordinate itself is marked open in the authored cell file (authoring gap, not a soundness question)."
+ ],
+ [
+  "Numeric",
+  "FieldExpressionContext",
+  "Literal",
+  3,
+  "computed-field-expression",
+  "licensed",
+  "Constant-fold; coordinate open in authored file (authoring gap)."
+ ],
+ [
+  "Numeric",
+  "ConstraintContext/Ensure:EventPrecondition",
+  "Literal",
+  2,
+  "event-ensure-condition",
+  "licensed",
+  "Constant-fold; coordinate is defined (via CompositionalConstraint contract) but the specific Literal strategy sub-case is not separately enumerated -- treated as licensed under the general constant-fold principle."
+ ],
+ [
+  "Numeric",
+  "ConstraintContext/Ensure:StateResident",
+  "DeclarationAttribute",
+  1,
+  "state-ensure-condition",
+  "no-licensed-respelling",
+  "Coordinate is open in the authored cell file; the DeclarationAttribute strategy is not enumerated anywhere for Numeric. Definitional gap, not a proven unsoundness."
+ ],
+ [
+  "Numeric",
+  "TransitionRowContext",
+  "DeclarationAttribute",
+  1,
+  "transition-row-action-operand",
+  "no-licensed-respelling",
+  "Coordinate is defined but only (b) CompositionalConstraint and (c) GuardInPath are enumerated as licensed derivations; DeclarationAttribute is not one of them. Authoring gap."
+ ],
+ [
+  "Numeric",
+  "TransitionRowContext",
+  "CollectionGrowth",
+  1,
+  "transition-row-action-operand",
+  "no-licensed-respelling",
+  "Same coordinate gap as above -- CollectionGrowth strategy not enumerated in the authored contract for this coordinate."
+ ],
+ [
+  "Numeric",
+  "ArgDefaultContext",
+  "Literal",
+  1,
+  "event-arg-modifier-value-expression",
+  "licensed",
+  "Matches the authored arg-default cell's premise-less standing discharge."
+ ],
+ [
+  "LengthContainment",
+  "EventHandlerContext",
+  "LengthContainment",
+  161,
+  "stateless-hook-action-operand",
+  "licensed",
+  "Defined coordinate; (a)/(b)/literal-fold discharge contract. Citation-duty materialization is a noted build divergence, explicitly not a soundness hole per the authored cell."
+ ],
+ [
+  "LengthContainment",
+  "TransitionRowContext",
+  "LengthContainment",
+  135,
+  "transition-row-action-operand",
+  "licensed",
+  "Same contract as above."
+ ],
+ [
+  "LengthContainment",
+  "StateHookContext",
+  "LengthContainment",
+  2,
+  "state-hook-action-operand",
+  "licensed",
+  "Same contract as above."
+ ],
+ [
+  "QualifierCompatibility",
+  "ConstraintContext/Ensure:EventPrecondition",
+  "QualifierCompatibility",
+  70,
+  "event-ensure-condition",
+  "no-licensed-respelling",
+  "No authored cell exists at event-ensure-condition for QualifierCompatibility -- the file authors transition/state-hook/stateless-hook/rule-condition/state-ensure/computed-field but not event-ensure. Coverage gap in the authored contract, not a proven unsoundness; the parallel state-ensure cell's citation-duty argument (declared qualifier is immutable, so the preserving set is provably empty) would very likely extend unchanged, but that extension is not written down."
+ ],
+ [
+  "QualifierCompatibility",
+  "TransitionRowContext",
+  "QualifierCompatibility",
+  67,
+  "transition-row-action-operand",
+  "licensed",
+  "Defined; citation-duty argument: preserving set is empty because a declared qualifier is immutable."
+ ],
+ [
+  "QualifierCompatibility",
+  "ConstraintContext/Rule",
+  "QualifierCompatibility",
+  46,
+  "rule-condition",
+  "licensed",
+  "Defined; same citation-duty argument."
+ ],
+ [
+  "QualifierCompatibility",
+  "ConstraintContext/Ensure:StateResident",
+  "QualifierCompatibility",
+  27,
+  "state-ensure-condition",
+  "licensed",
+  "Defined; same citation-duty argument."
+ ],
+ [
+  "QualifierCompatibility",
+  "FieldExpressionContext",
+  "QualifierCompatibility",
+  25,
+  "computed-field-expression",
+  "licensed",
+  "Defined; same citation-duty argument."
+ ],
+ [
+  "Presence",
+  "ConstraintContext/Rule",
+  "GuardInPath",
+  71,
+  "rule-condition",
+  "licensed",
+  "Authored file has one representative cell at rule-condition (typeFamily=collection); presence discharge is type-agnostic ('is set'/'is not set' is independent of the field's value type) so the representative extends to the other type families exercised here."
+ ],
+ [
+  "Presence",
+  "TransitionRowContext",
+  "GuardInPath",
+  19,
+  "transition-row-action-operand",
+  "licensed",
+  "Defined; checked against the exit-action transport hole -- no exposure found (see Compiler-hole check)."
+ ],
+ [
+  "Presence",
+  "StateHookContext",
+  "GuardInPath",
+  1,
+  "state-hook-action-operand",
+  "licensed",
+  "Defined (temporal representative cell); presence discharge is type-agnostic."
+ ],
+ [
+  "IntervalContainment",
+  "TransitionRowContext",
+  "IntervalContainment",
+  65,
+  "transition-row-action-operand",
+  "licensed",
+  "Defined for primitive/business-domain/collection."
+ ],
+ [
+  "IntervalContainment",
+  "EventHandlerContext",
+  "IntervalContainment",
+  6,
+  "stateless-hook-action-operand",
+  "licensed",
+  "Defined."
+ ],
+ [
+  "IntervalContainment",
+  "EventHandlerContext",
+  "None",
+  2,
+  "stateless-hook-action-operand",
+  "respell-needed",
+  "Both instances are in samples/Test2.precept (the one sample deliberately kept failing), Add1's multi-term guard `when Amount1 + Amount2 <= 1000` -- provable under the model (Witness Family 1, Base A) but the multi-term guard-match derivation is not built at HEAD. Respelling: per-term bound conjuncts, e.g. `when Amount1 <= 500 and Amount2 <= 500`, which IS a built derivation per Witness Family 1 Base A's own licensed-non-band-member note."
+ ],
+ [
+  "IntervalContainment",
+  "FieldExpressionContext",
+  "IntervalContainment",
+  1,
+  "computed-field-expression",
+  "no-licensed-respelling",
+  "Coordinate is open in the authored cell file (no discharge contract written for computed-field-expression at either primitive or business-domain type family). Definitional gap, not a proven unsoundness."
+ ],
+ [
+  "QualifierChain",
+  "TransitionRowContext",
+  "QualifierCompatibility",
+  15,
+  "transition-row-action-operand",
+  "licensed",
+  "Defined."
+ ],
+ [
+  "QualifierChain",
+  "FieldExpressionContext",
+  "QualifierCompatibility",
+  1,
+  "computed-field-expression",
+  "licensed",
+  "Defined."
+ ],
+ [
+  "DimensionalProduct",
+  "TransitionRowContext",
+  "DimensionalProduct",
+  8,
+  "transition-row-action-operand",
+  "licensed",
+  "Defined."
+ ],
+ [
+  "Modifier",
+  "FieldExpressionContext",
+  "DeclarationAttribute",
+  6,
+  "computed-field-expression",
+  "licensed",
+  "Defined."
+ ],
+ [
+  "IndexBounds",
+  "TransitionRowContext",
+  "GuardInPath",
+  3,
+  "transition-row-action-operand",
+  "no-licensed-respelling",
+  "All five IndexBounds coordinates in the authored cell file are open -- the two-sided (interval-on-index + cardinality-on-collection) discharge has no written decision procedure anywhere (matrix missing-rule item on two-sided index-bounds discharge). Compiles clean at HEAD; the definition simply has not caught up."
+ ],
+ [
+  "AssignmentQualifier",
+  "TransitionRowContext",
+  "QualifierCompatibility",
+  1,
+  "transition-row-action-operand",
+  "licensed",
+  "Defined."
+ ]
+]

@@ -1,0 +1,594 @@
+{
+  "$schema": "../cell.schema.json",
+  "familyId": "fault-dimension",
+  "title": "Fault family — ProofRequirementKind.Dimension: a period operand must have the required time dimension (Date for date arithmetic, Time for time arithmetic)",
+  "caseShape": "fault",
+  "kind": "Dimension",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "provenance": {
+    "compileOracle": "precept_compile (MCP) — SYNTAX/COMPILE oracle only; never cited as authority for what the definition licenses",
+    "date": "2026-07-21",
+    "head": "a70fd182",
+    "compilerHoleCheck": "Every witness in this file was checked against the known compiler holes named in the corrected-inputs (BUG-033 into-binding, the write-surface enumeration gap). NONE of these Dimension witnesses depend on a guard fact surviving across a write site: the dimension of a period is a static type attribute of the operand, established by the field/arg declaration or a narrowing guard read at the same site, with no cross-write transport. So no cell in this file rests on BUG-033 or the write-surface gap. The one build gap this family DOES hit is orthogonal to those holes and is recorded per cell and in openFlags: an event ARG declared `of 'date'` is not consulted by the discharge (ResolvePeriodDimension handles TypedFieldRef only), so premise (b) is inert for Dimension today."
+  },
+  "mintSites": [
+    {
+      "fileLine": "src/Precept/Language/Operations.cs:267,272 (DatePlusPeriod → require PeriodDimension.Date)",
+      "howMinted": "catalog-declared on BinaryOperationMeta.ProofRequirements as a DimensionProofRequirement over a ParamSubject(PPeriod); instantiated at src/Precept/Pipeline/ProofEngine.cs:306-307 (bin.ProofRequirements) whenever WalkExpression visits the TypedBinaryOp for `date + period`"
+    },
+    {
+      "fileLine": "src/Precept/Language/Operations.cs:276,281 (DateMinusPeriod → require PeriodDimension.Date)",
+      "howMinted": "as above, for `date - period`"
+    },
+    {
+      "fileLine": "src/Precept/Language/Operations.cs:294,299 (TimePlusPeriod → require PeriodDimension.Time)",
+      "howMinted": "as above, for `time + period`; RequiredDimension is Time"
+    },
+    {
+      "fileLine": "src/Precept/Language/Operations.cs:303,308 (TimeMinusPeriod → require PeriodDimension.Time)",
+      "howMinted": "as above, for `time - period`; RequiredDimension is Time"
+    }
+  ],
+  "dischargeMechanism": {
+    "strategy": "DeclarationAttribute",
+    "codeSite": "src/Precept/Pipeline/ProofEngine.Strategies.cs:85-100 (TryDeclarationAttributeProof, the Dimension arm)",
+    "procedure": "dimension = ResolvePeriodDimension(subject) ?? NarrowedPeriodDimensionFromGuard(subject); discharge iff dimension is Any or dimension == RequiredDimension. ResolvePeriodDimension (Strategies.cs:295-309) reads the subject field's DeclaredQualifiers (TemporalDimension.Value or TemporalUnit.DerivedDimension) — TypedFieldRef only. NarrowedPeriodDimensionFromGuard (ProofEngine.QualifierNarrowing.cs:182-194) reads a `when X.dimension == 'date'|'time'` narrowing on the TemporalDimension axis for an open period.",
+    "diagnostic": "PRE0113 UnprovedDimensionRequirement (src/Precept/Language/DiagnosticCode.cs:249; ProofRequirementMeta.Dimension.DiagnosticCode; formatted at ProofEngine.Diagnostics.cs:50-54). Live message: \"'<field>' must declare `of 'date'` before it can be used here\". Both the base and every near-miss reject naming THIS obligation (Dimension / PRE0113)."
+  },
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "Fault family — the catalog-declared safety precondition at the evaluation site (ProofRequirement DU); premise classes (b)/(c)/(a) per catalog ProofSatisfactions; class (d) admitted under the 2026-07-21 citation duty"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+      "note": "Fault minting is catalog-stamped at evaluation sites; each evaluation occasion mints its own fault obligation (site-identity ruling, 2026-07-21)"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell — 2026-07-21 citation duty ruling",
+      "note": "A proof consuming a declared constraint or field modifier must name the establishing obligation and every preserving obligation, each discharged. Field modifiers are not exempt. (See openFlags: dimension is a type-structural attribute, so what preserving obligation to name is undefined for this family.)"
+    },
+    {
+      "kind": "transport-rule",
+      "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 3 — Where a site is evaluated",
+      "note": "Route relation for evaluation-site categories. For Dimension no cross-write transport occurs — the dimension fact is a same-site type attribute of the operand — so the frame-and-kill rule is trivially satisfied (deps ∩ mayWrite = ∅ over an empty interval)."
+    },
+    {
+      "kind": "catalog",
+      "ref": "src/Precept/Language/ProofRequirement.cs:98-102 (DimensionProofRequirement), :73-91 (PeriodDimension)",
+      "note": "the obligation shape and the Date/Time/Datetime/Any dimension enum"
+    },
+    {
+      "kind": "code",
+      "ref": "docs/compiler/proof-engine.md:515 (Catalog-Driven Obligation Instantiation)",
+      "note": "the type checker stamps ProofRequirements onto typed nodes; the proof engine reads them"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived, corroborated by live compiles",
+    "corpusMeasurement": "pending",
+    "notes": [
+      "The Dimension obligation is decidable exactly from the operand's declared temporal dimension (a static type attribute), so there is no value-arithmetic sound-but-unprovable band of the kind the Numeric family carries. A sound program (the operand genuinely IS date/time-dimensioned) is always respellable into a licensed form: declare the field's dimension (`period of 'date'`/`of 'time'`) — premise (a) — or narrow an open period with a guard (`when X.dimension == 'date'`) — premise (c). Both respellings were live-verified accepting at HEAD.",
+      "Distinct from the band: the premise-(b) build gap (an event arg declared `of 'date'` is not consulted) is a BUILT-vs-MODEL gap, not a sound-but-unprovable band member — the model licenses arg-declared dimension, the shipped strategy does not read it. Recorded per cell and in openFlags; it does not change the respellability verdict (the author can respell by moving the operand to a declared field, or the gap is closed by build work)."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault-dimension-transition-temporal",
+      "label": "Dimension at a transition-row action RHS — `set F = <date> + <period>` / `<time> ± <period>`",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DatePlusPeriod / DateMinusPeriod / TimePlusPeriod / TimeMinusPeriod",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "temporal"
+      },
+      "disposition": { "status": "defined" },
+      "obligation": {
+        "statement": "⟨period-operand⟩.dimension == ⟨required⟩, where ⟨required⟩ = Date for date± / Time for time±",
+        "metavariables": [
+          { "name": "period-operand", "standsFor": "the PPeriod ParamSubject of the binary op — the RHS period expression at the transition-row `set`" },
+          { "name": "required", "standsFor": "the catalog-declared RequiredDimension (Date for DatePlus/MinusPeriod; Time for TimePlus/MinusPeriod)" }
+        ],
+        "wp": { "statement": "⟨period-operand⟩ has declared or narrowed temporal dimension equal to ⟨required⟩ (or Any)" }
+      },
+      "applicablePremiseClasses": ["a", "c"],
+      "premiseAvailability": "Premise (a) — field modifier: available when the period operand is a FIELD declared `... as period of 'date'` (or `of 'time'`). ResolvePeriodDimension reads the field's declared TemporalDimension/TemporalUnit qualifier. LIVE-VERIFIED accept. Premise (c) — handler guard: available for an OPEN period when the transition ROW carries `when ⟨period⟩.dimension == 'date'`; NarrowedPeriodDimensionFromGuard reads it. LIVE-VERIFIED accept. Premise (b) — arg modifier: NOT available today (BUILD GAP): an event arg declared `of 'date'` is ignored — ResolvePeriodDimension handles TypedFieldRef only, not TypedArgRef. LIVE-VERIFIED reject (see openFlags). Premise (d) — pre-state constraint: no validity argument exists in the matrix § Rule validity for a (d)-based discharge of a fault obligation, and no establishment/preservation machinery exists; recorded as a missing rule, not resolved here (same disposition the Numeric fault cells record).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the period operand is a field whose declared temporal-dimension qualifier equals ⟨required⟩ → DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "ResolvePeriodDimension(subject) over the field's DeclaredQualifiers (a finite set); discharge iff the resolved dimension is Any or == RequiredDimension. Any other resolved dimension, or an unresolved (open) period with no narrowing guard, rejects with PRE0113.",
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:88-99", "note": "the Dimension arm of TryDeclarationAttributeProof" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:295-309", "note": "ResolvePeriodDimension reads the field's declared TemporalDimension / TemporalUnit.DerivedDimension" }
+          ]
+        },
+        {
+          "premiseClasses": ["c"],
+          "derivation": "an open period narrowed by the row guard `when ⟨period⟩.dimension == 'date'` → guard narrowing, discharged under DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "NarrowedPeriodDimensionFromGuard on the TemporalDimension axis over the row's guard conjuncts (a finite set); discharge iff the narrowed dimension == RequiredDimension. A narrowing to a different dimension, to 'datetime' (Datetime ≠ any single Date/Time requirement), or no narrowing, rejects.",
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:182-194", "note": "NarrowedPeriodDimensionFromGuard" },
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1897", "note": "guards select — the row's actions run only if its guard evaluated true, so the narrowing holds of the operand the action reads" }
+          ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the period field's dimension: `<field> as period of 'date'` (or `of 'time'` for time arithmetic)" },
+        { "premiseClasses": ["c"], "schema": "add a row guard narrowing the open period: `when <period>.dimension == 'date'`" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept DimBaseClean\n\nfield Anchor as date default '2026-01-01'\nfield Term as period default '3 days'\nfield Result as date optional\n\nstate Active initial\n\nin Active modify Term editable\n\nevent Create(A as date) initial\nevent Shift()\n\non Create\n    -> set Anchor = Create.A\n\nfrom Active on Shift\n    -> set Result = Anchor + Term\n    -> no transition\n",
+          "expected": { "outcome": "reject", "diagnostic": "PRE0113", "missingPremiseClasses": ["a", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "success:false, single diagnostic PRE0113 'Term must declare of date', Dimension obligation Unresolved, no other diagnostics" }
+        },
+        "discharges": [
+          {
+            "id": "field-of-date",
+            "kind": "field-modifier",
+            "addition": "declare `field Term as period of 'date' default '3 days'` (in place of the open `period`)",
+            "premiseClasses": ["a"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimDischargeA: success:true, Dimension Proved strategy DeclarationAttribute" },
+            "expected": { "outcome": "accept" }
+          },
+          {
+            "id": "guard-narrow-date",
+            "kind": "guard",
+            "addition": "add row guard `when Term.dimension == 'date'` on the Shift row (open period Term)",
+            "application": { "locus": "row-guard", "eventName": "Shift" },
+            "premiseClasses": ["c"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimDischargeC: success:true, Dimension Proved strategy DeclarationAttribute" },
+            "expected": { "outcome": "accept" }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-of-date",
+            "addition": "declare `field Term as period of 'time' default '3 hours'` — a valid dimension, but Time ≠ the required Date",
+            "whyStillRejects": "ResolvePeriodDimension returns Time; Time ≠ Date, so PRE0113 still fires naming the same Dimension obligation",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimNearMissA: success:false, PRE0113, Dimension Unresolved" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          },
+          {
+            "pairsWith": "guard-narrow-date",
+            "addition": "weaken the guard to `when Term.dimension == 'time'` — narrows to the wrong dimension",
+            "application": { "locus": "row-guard", "eventName": "Shift" },
+            "whyStillRejects": "NarrowedPeriodDimensionFromGuard returns Time; Time ≠ Date, so PRE0113 still fires naming the same Dimension obligation",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimNearMissC: success:false, PRE0113, Dimension Unresolved" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "openFlags": [
+        "Premise (b) build gap: an event ARG declared `of 'date'` does not discharge (arg operand `Shift.Term as period of 'date'` still rejects PRE0113 — verified DimArgB). Under the model an arg's declared dimension is a static type fact that should discharge; ResolvePeriodDimension ignores TypedArgRef. Build gap, not a definition gap. When the operand at this occasion is an arg, only a field-hosted respelling discharges today.",
+        "Citation duty (2026-07-21) vs. a type-structural modifier: the citation duty requires a proof consuming a field modifier to name the establishing obligation and every preserving obligation. A temporal-dimension qualifier is a type attribute, immutable across writes (a write of a wrong-dimension period is a type error / AssignmentQualifier PRE0141, not a preservation obligation), so there is NO minted establishing/preserving obligation to name. What the citation duty resolves to for a type-structural fact is undefined by the matrix's generative sections. Routed to owner."
+      ]
+    },
+    {
+      "id": "fault-dimension-state-hook-temporal",
+      "label": "Dimension at a state entry/exit hook action RHS — `from S -> set F = <date> + <period>`",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DatePlusPeriod / DateMinusPeriod / TimePlusPeriod / TimeMinusPeriod",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "temporal"
+      },
+      "disposition": { "status": "defined" },
+      "obligation": {
+        "statement": "⟨period-operand⟩.dimension == ⟨required⟩, at a state entry/exit hook action RHS",
+        "wp": { "statement": "⟨period-operand⟩ has declared dimension equal to ⟨required⟩" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "Premise (a) — field modifier: available; a period field declared `of 'date'` discharges the hook-action operand. LIVE-VERIFIED (DimExitHook). Premise (c) — handler guard: NOT available — a pure state entry/exit hook (`from S -> ...`, an unconditional action chain) carries no `when` guard of its own (a guarded `from S on E when ...` is a transition row, cell fault-dimension-transition, not a hook). Premise (b): N/A — hook operands read fields/defaults, not event args. Premise (d): missing-rule, as in the transition cell.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the period operand is a field whose declared temporal-dimension qualifier equals ⟨required⟩ → DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "ResolvePeriodDimension over the field's DeclaredQualifiers; discharge iff Any or == RequiredDimension. Occasion-independent: the strategy reads the field declaration, not the site.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:88-99,295-309" } ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the period field's dimension: `<field> as period of 'date'`" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept DimHookBase\n\nfield Anchor as date default '2026-01-01'\nfield Term as period default '3 days'\nfield Log as date optional\n\nstate Active initial\nstate Done terminal\n\nfrom Active -> set Log = Anchor + Term\n\nevent Create() initial\nevent Finish()\n\non Create\n    -> set Anchor = '2026-01-01'\n\nfrom Active on Finish\n    -> transition Done\n",
+          "expected": { "outcome": "reject", "diagnostic": "PRE0113", "missingPremiseClasses": ["a"] },
+          "provenance": { "mark": "model-derived", "note": "the open-period variant of the verified DimExitHook discharge; rejects PRE0113 by the same ResolvePeriodDimension→null path verified at every other occasion. Base carries the benign PRE0158 no-write-site warning on Term (warning severity, does not name a competing obligation)." }
+        },
+        "discharges": [
+          {
+            "id": "field-of-date",
+            "kind": "field-modifier",
+            "addition": "declare `field Term as period of 'date' default '3 days'`",
+            "premiseClasses": ["a"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimExitHook (`from Active -> set Log = Anchor + Term`, Term of 'date'): success:true, Dimension Proved strategy DeclarationAttribute" },
+            "expected": { "outcome": "accept" }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-of-date",
+            "addition": "declare `field Term as period of 'time'` — Time ≠ the required Date",
+            "whyStillRejects": "resolved dimension Time ≠ Date → PRE0113, same Dimension obligation",
+            "provenance": { "mark": "model-derived", "note": "symmetric to the live-verified transition near-miss DimNearMissA; ResolvePeriodDimension is occasion-independent" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "openFlags": [
+        "Premise (c) unavailability rests on the unstated multiplicity/ordering of state actions (transport-rule § 6, `Still unsettled`). A pure hook has no guard regardless, so (c) is unavailable here under every reading; recorded for completeness, not routed."
+      ]
+    },
+    {
+      "id": "fault-dimension-stateless-hook-temporal",
+      "label": "Dimension at a stateless handler action RHS — `on E -> set F = <date> + <period>`",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DatePlusPeriod / DateMinusPeriod / TimePlusPeriod / TimeMinusPeriod",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "temporal"
+      },
+      "disposition": { "status": "defined" },
+      "obligation": {
+        "statement": "⟨period-operand⟩.dimension == ⟨required⟩, in a stateless `on E -> set` handler RHS",
+        "wp": { "statement": "⟨period-operand⟩ has declared dimension equal to ⟨required⟩" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "Premise (a) — field modifier: available when the period operand is a field `of 'date'`. Premise (b) — arg modifier: NOT available today (BUILD GAP): the natural stateless shape reads an event arg (`E.Term`), and an arg declared `of 'date'` is ignored — LIVE-VERIFIED reject (DimArgB). Premise (c) — handler guard: NOT available: stateless event handlers carry no `when` guard (spec:1007). Premise (d): missing-rule.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the period operand is a field whose declared temporal-dimension qualifier equals ⟨required⟩ → DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "ResolvePeriodDimension over the field's DeclaredQualifiers; discharge iff Any or == RequiredDimension.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:88-99,295-309" }, { "kind": "spec", "ref": "docs/language/precept-language-spec.md:1007", "note": "stateless event handlers carry no when guard — so premise (c) is structurally unavailable here" } ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "read the period from a field declared `as period of 'date'` rather than from an open event arg" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept DimStatelessHook\n\nfield Anchor as date default '2026-01-01'\nfield Result as date optional\n\nevent Shift(Term as period)\n\non Shift\n    -> set Result = Anchor + Shift.Term\n",
+          "expected": { "outcome": "reject", "diagnostic": "PRE0113", "missingPremiseClasses": ["a"] },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "success:false, PRE0113 'Term must declare of date (used in event handler Shift)', Dimension Unresolved. Benign PRE0158 warning on Anchor." }
+        },
+        "discharges": [
+          {
+            "id": "field-of-date",
+            "kind": "field-modifier",
+            "addition": "read a field period instead: `field Term as period of 'date' default '3 days'` and `-> set Result = Anchor + Term`",
+            "premiseClasses": ["a"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "field-hosted `of 'date'` operand proves via DeclarationAttribute at every occasion tested (DimDischargeA/DimExitHook/DimComputedA/DimRuleA); the stateless-hook operand resolves identically" },
+            "expected": { "outcome": "accept" }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-of-date",
+            "addition": "declare the field `as period of 'time'` — Time ≠ required Date",
+            "whyStillRejects": "resolved dimension Time ≠ Date → PRE0113, same Dimension obligation",
+            "provenance": { "mark": "model-derived", "note": "symmetric to live-verified DimNearMissA" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "openFlags": [
+        "Premise (b) build gap (arg-declared `of 'date'` ignored) bites hardest here: the natural stateless operand IS an event arg, and there is no guard fallback (spec:1007), so a stateless division/arithmetic over an arg period is UNPROVABLE today unless the value is first moved to a declared field. Under the model the arg's declared dimension should discharge (premise b). Build gap, routed."
+      ]
+    },
+    {
+      "id": "fault-dimension-rule-condition-temporal",
+      "label": "Dimension inside a `rule` condition — `rule Result == Anchor + Term ...`",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DatePlusPeriod / DateMinusPeriod / TimePlusPeriod / TimeMinusPeriod",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "temporal"
+      },
+      "disposition": { "status": "defined" },
+      "obligation": {
+        "statement": "⟨period-operand⟩.dimension == ⟨required⟩, inside a rule condition",
+        "wp": { "statement": "⟨period-operand⟩ has declared or activation-guard-narrowed dimension equal to ⟨required⟩" }
+      },
+      "applicablePremiseClasses": ["a", "c"],
+      "premiseAvailability": "Premise (a) — field modifier: available; a rule condition over a field `of 'date'` proves. LIVE-VERIFIED (DimRuleA: Proved DeclarationAttribute). Premise (c) — the rule's `when` activation guard narrows an open period: LIVE-VERIFIED (DimRuleC: `rule ... when Term.dimension == 'date'`, open Term → Proved DeclarationAttribute). NOTE: the matrix defines premise (c) as 'the handler's guard'; a rule has no handler, and the narrowing comes from the rule's OWN activation guard reading its OWN condition's operand. Whether this is premise (c), a variant of (a) (the constraint's activation is part of its own declaration), or a distinct provenance is not cleanly settled by the matrix — flagged. Premise (b): N/A (rule conditions read fields). Premise (d): missing-rule.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the period operand is a field declared `of 'date'` → DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "ResolvePeriodDimension over the field's DeclaredQualifiers; discharge iff Any or == RequiredDimension.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:88-99,295-309" } ]
+        },
+        {
+          "premiseClasses": ["c"],
+          "derivation": "an open period narrowed by the rule's `when ⟨period⟩.dimension == 'date'` activation guard → guard narrowing, under DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "NarrowedPeriodDimensionFromGuard over the rule's activation-guard conjuncts; discharge iff narrowed dimension == RequiredDimension.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:182-194" } ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the period field's dimension: `<field> as period of 'date'`" },
+        { "premiseClasses": ["c"], "schema": "add a rule activation guard: `... when <period>.dimension == 'date'`" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept DimRule\n\nfield Anchor as date default '2026-01-01'\nfield Term as period default '3 days'\nfield Result as date default '2026-01-04'\n\nstate Active initial\n\nrule Result == Anchor + Term because \"result is anchor plus term\"\n\nevent Create() initial\n\non Create\n    -> set Result = '2026-01-04'\n",
+          "expected": { "outcome": "reject", "diagnostic": "PRE0113", "missingPremiseClasses": ["a", "c"] },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "success:false, PRE0113 'Term must declare of date (used while evaluating rule at index 0)', Dimension Unresolved. (Benign PRE0158/PRE0119 structural warnings.)" }
+        },
+        "discharges": [
+          {
+            "id": "field-of-date",
+            "kind": "field-modifier",
+            "addition": "declare `field Term as period of 'date' default '3 days'`",
+            "premiseClasses": ["a"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimRuleA: success:true, Dimension Proved strategy DeclarationAttribute" },
+            "expected": { "outcome": "accept" }
+          },
+          {
+            "id": "activation-guard-narrow-date",
+            "kind": "guard",
+            "addition": "add rule activation guard: `rule Result == Anchor + Term when Term.dimension == 'date' because ...` (open Term)",
+            "application": { "locus": "rule-activation-guard" },
+            "premiseClasses": ["c"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimRuleC: success:true, Dimension Proved strategy DeclarationAttribute" },
+            "expected": { "outcome": "accept" }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-of-date",
+            "addition": "declare `field Term as period of 'time'` — Time ≠ required Date",
+            "whyStillRejects": "resolved dimension Time ≠ Date → PRE0113, same Dimension obligation",
+            "provenance": { "mark": "model-derived", "note": "symmetric to live-verified DimNearMissA" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          },
+          {
+            "pairsWith": "activation-guard-narrow-date",
+            "addition": "weaken the activation guard to `when Term.dimension == 'time'`",
+            "whyStillRejects": "narrowed dimension Time ≠ Date → PRE0113, same Dimension obligation",
+            "provenance": { "mark": "model-derived", "note": "symmetric to live-verified DimNearMissC (row-guard variant)" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "openFlags": [
+        "Premise-class attribution for a rule's own activation-guard narrowing: the matrix defines (c) as 'the handler's guard'. A rule condition's operand narrowed by the rule's own `when` clause is not a handler guard. The discharge is live (DimRuleC) but its premise class under the matrix vocabulary is undetermined. Routed."
+      ]
+    },
+    {
+      "id": "fault-dimension-state-ensure-temporal",
+      "label": "Dimension inside an `in S ensure` condition — `in Active ensure Result == Anchor + Term ...`",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DatePlusPeriod / DateMinusPeriod / TimePlusPeriod / TimeMinusPeriod",
+        "evaluationSiteCategory": "state-ensure-condition",
+        "typeFamily": "temporal"
+      },
+      "disposition": { "status": "defined" },
+      "obligation": {
+        "statement": "⟨period-operand⟩.dimension == ⟨required⟩, inside an in-S-ensure condition",
+        "wp": { "statement": "⟨period-operand⟩ has declared dimension equal to ⟨required⟩" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "Premise (a) — field modifier: available; an ensure condition over a field `of 'date'` proves (occasion-independent DeclarationAttribute). Premise (c) — activation guard: NOT available: `in S ensure <cond> when ...` is a SYNTAX ERROR (verified DimStateEnsureC: PRE0009 'Expected because, but found when') — a state ensure carries no activation guard, so there is no guard to narrow an open period. Premise (b): N/A (ensure conditions here read fields). Premise (d): missing-rule.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the period operand is a field declared `of 'date'` → DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "ResolvePeriodDimension over the field's DeclaredQualifiers; discharge iff Any or == RequiredDimension.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:88-99,295-309" } ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the period field's dimension: `<field> as period of 'date'`" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept DimStateEnsure\n\nfield Anchor as date default '2026-01-01'\nfield Term as period default '3 days'\nfield Result as date default '2026-01-04'\n\nstate Active initial\n\nin Active ensure Result == Anchor + Term because \"result is anchor plus term\"\n\nevent Create() initial\n\non Create\n    -> set Result = '2026-01-04'\n",
+          "expected": { "outcome": "reject", "diagnostic": "PRE0113", "missingPremiseClasses": ["a"] },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "success:false, PRE0113 'Term must declare of date (used while evaluating ensure for Active)', Dimension Unresolved. (Benign PRE0158/PRE0119 structural warnings; the PRE0146 construction-path error in the raw test is removed here by the `on Create -> set Result` handler.)" }
+        },
+        "discharges": [
+          {
+            "id": "field-of-date",
+            "kind": "field-modifier",
+            "addition": "declare `field Term as period of 'date' default '3 days'`",
+            "premiseClasses": ["a"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "the field-hosted `of 'date'` operand proves via DeclarationAttribute in the ensure occasion (DimEventEnsureField, an ensure over `Anchor + Term` with Term of 'date', reports Dimension Proved DeclarationAttribute); ResolvePeriodDimension is occasion-independent" },
+            "expected": { "outcome": "accept" }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-of-date",
+            "addition": "declare `field Term as period of 'time'` — Time ≠ required Date",
+            "whyStillRejects": "resolved dimension Time ≠ Date → PRE0113, same Dimension obligation",
+            "provenance": { "mark": "model-derived", "note": "symmetric to live-verified DimNearMissA" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "notes": [
+          "Because the ensure carries no activation guard (premise (c) is syntactically impossible), the ONLY licensed respelling of a sound-but-open period in an ensure is the field declaration `of 'date'` (premise (a)). Still respellable: yes — there is a licensed form — but the respelling set is narrower than the rule-condition sibling's (no guard alternative)."
+        ]
+      }
+    },
+    {
+      "id": "fault-dimension-event-ensure-temporal",
+      "label": "Dimension inside an `on E ensure` condition — `on Shift ensure Shift.Base + Shift.Term > Shift.Base ...`",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DatePlusPeriod / DateMinusPeriod / TimePlusPeriod / TimeMinusPeriod",
+        "evaluationSiteCategory": "event-ensure-condition",
+        "typeFamily": "temporal"
+      },
+      "disposition": { "status": "defined" },
+      "obligation": {
+        "statement": "⟨period-operand⟩.dimension == ⟨required⟩, inside an on-E-ensure condition",
+        "wp": { "statement": "⟨period-operand⟩ has declared dimension equal to ⟨required⟩" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "An event ensure is stated over E's arguments (matrix Constraint kinds — EventPrecondition, 'against E's arguments before any mutation'). Premise (b) — arg modifier: this is the NATURAL premise for an event ensure, but it is NOT available today (BUILD GAP): an arg declared `of 'date'` is ignored — LIVE-VERIFIED reject (DimEventEnsureArg: `on Shift ensure Shift.Base + Shift.Term ...` with `Term as period of 'date'` → PRE0113). Premise (a) — field modifier: available if the ensure references a FIELD period `of 'date'` — LIVE-VERIFIED accept (DimEventEnsureField). Premise (c): N/A — event ensures carry no activation guard. Premise (d): missing-rule.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the period operand is a FIELD declared `of 'date'` referenced by the event ensure → DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "ResolvePeriodDimension over the field's DeclaredQualifiers; discharge iff Any or == RequiredDimension.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:88-99,295-309" } ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "reference a field period declared `as period of 'date'` in the ensure, rather than an open event arg" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept DimEventEnsureArg\n\nfield Result as date optional\n\nstate Active initial\n\nevent Create() initial\nevent Shift(Base as date, Term as period of 'date')\n\non Create\n    -> set Result = '2026-01-01'\n\non Shift ensure Shift.Base + Shift.Term > Shift.Base because \"must advance\"\n\nfrom Active on Shift\n    -> set Result = Shift.Base + Shift.Term\n    -> no transition\n",
+          "expected": { "outcome": "reject", "diagnostic": "PRE0113", "missingPremiseClasses": ["a", "b"] },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimEventEnsureArg rejects with PRE0113 'used while evaluating ensure for Shift' AND 'used on event Shift from state Active' — TWO Dimension obligations Unresolved (the ensure occasion and the transition-row occasion, per the site-identity ruling), both over the arg `Shift.Term` whose `of 'date'` is ignored. (This raw test also carried a PRE0009 from `on Create -> no transition`; corrected here to `on Create -> set Result = '2026-01-01'`.)" }
+        },
+        "discharges": [
+          {
+            "id": "field-of-date",
+            "kind": "field-modifier",
+            "addition": "reference a field: `field Anchor as date`, `field Term as period of 'date' default '3 days'`, and `on Shift ensure Anchor + Term > Anchor ...`",
+            "premiseClasses": ["a"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimEventEnsureField: the ensure over `Anchor + Term` (Term field of 'date') reports Dimension Proved strategy DeclarationAttribute" },
+            "expected": { "outcome": "accept" }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-of-date",
+            "addition": "declare `field Term as period of 'time'` — Time ≠ required Date",
+            "whyStillRejects": "resolved dimension Time ≠ Date → PRE0113, same Dimension obligation",
+            "provenance": { "mark": "model-derived", "note": "symmetric to live-verified DimNearMissA" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "notes": [
+          "For an event ensure whose period operand is an event arg, the model's natural premise is (b) — the arg's declared dimension — which the shipped strategy does not read (build gap). Respellable: yes, but only by moving the period to a declared FIELD `of 'date'` (premise a); the arg-declared respelling is sound-and-model-licensed but UNPROVABLE today. This is a built-vs-model gap surfaced as a respelling restriction, not a sound-but-unprovable band member."
+        ]
+      },
+      "openFlags": [
+        "Premise (b) build gap: an event arg's `of 'date'` is ignored (ResolvePeriodDimension is TypedFieldRef-only). For the event-ensure occasion, whose subject IS the event's args, this means the occasion has NO available premise today when the operand is an arg — the discharge requires respelling to a field. Under the model the arg-declared dimension should discharge via (b). Build gap, routed."
+      ]
+    },
+    {
+      "id": "fault-dimension-computed-field-temporal",
+      "label": "Dimension inside a computed-field expression — `field Result as date <- Anchor + Term`",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DatePlusPeriod / DateMinusPeriod / TimePlusPeriod / TimeMinusPeriod",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "temporal"
+      },
+      "disposition": { "status": "defined" },
+      "obligation": {
+        "statement": "⟨period-operand⟩.dimension == ⟨required⟩, inside a `<-` computed-field expression",
+        "wp": { "statement": "⟨period-operand⟩ has declared dimension equal to ⟨required⟩" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "Premise (a) — field modifier: available; a computed field whose input period is declared `of 'date'` proves. LIVE-VERIFIED (DimComputedA: Proved DeclarationAttribute). Premise (c): N/A — a computed-field expression has no guard in scope. Premise (b): N/A — computed-field inputs are fields, not event args. Premise (d): missing-rule.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the computed field's input period is a field declared `of 'date'` → DeclarationAttribute",
+          "strategy": "DeclarationAttribute",
+          "decisionProcedure": "ResolvePeriodDimension over the input field's DeclaredQualifiers; discharge iff Any or == RequiredDimension.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:88-99,295-309" } ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the input period field's dimension: `<input> as period of 'date'`" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept DimComputed\n\nfield Anchor as date default '2026-01-01'\nfield Term as period default '3 days'\nfield Result as date <- Anchor + Term\n\nstate Active initial\n\nevent Create() initial\n\non Create\n    -> set Anchor = '2026-01-01'\n",
+          "expected": { "outcome": "reject", "diagnostic": "PRE0113", "missingPremiseClasses": ["a"] },
+          "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "success:false, PRE0113 'Term must declare of date (used in the computed expression for field Result)', Dimension Unresolved. (The raw test carried PRE0146/PRE0081 construction-path warnings; corrected here with an `on Create -> set Anchor` handler.)" }
+        },
+        "discharges": [
+          {
+            "id": "field-of-date",
+            "kind": "field-modifier",
+            "addition": "declare `field Term as period of 'date' default '3 days'`",
+            "premiseClasses": ["a"],
+            "strategy": "DeclarationAttribute",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-21", "head": "a70fd182", "observed": "DimComputedA (`field Result as date <- Anchor + Term`, Term of 'date'): Dimension Proved strategy DeclarationAttribute (the PRE0043 noise in the raw test came from a redundant `editable` I added and is not part of this witness)" },
+            "expected": { "outcome": "accept" }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-of-date",
+            "addition": "declare `field Term as period of 'time'` — Time ≠ required Date",
+            "whyStillRejects": "resolved dimension Time ≠ Date → PRE0113, same Dimension obligation",
+            "provenance": { "mark": "model-derived", "note": "symmetric to live-verified DimNearMissA" },
+            "expected": { "outcome": "reject", "diagnostic": "PRE0113", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" }
+    }
+  ]
+}

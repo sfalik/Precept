@@ -1,0 +1,248 @@
+{
+  "kind": "Modifier",
+  "family": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "proofRequirementKind": "Modifier (ProofRequirementKind = 4)",
+  "generatedAtHead": "verified via precept_compile on 2026-07-21 at HEAD of spike/Precept-V2-Radical",
+
+  "obligation": {
+    "what": "At a choice ORDINAL comparison (`<`, `>`, `<=`, `>=` whose operands are `choice` values), every operand's declared choice type must carry the `ordered` modifier. Ordinal comparison of an unordered choice set has no defined order, so the operation is unsafe unless every operand is declared ordered.",
+    "duType": "ModifierRequirement(Subject: ParamSubject(PChoice), Required: ModifierKind.Ordered, Description: \"Both choice operands must be declared ordered\")",
+    "diagnostic": "PRE0112 (UnprovedModifierRequirement, DiagnosticCode = 112)",
+    "diagnosticMediation": "ProofRequirementMeta.Modifier.DiagnosticCode = UnprovedModifierRequirement (src/Precept/Language/ProofRequirement.cs:314-317); emitted at src/Precept/Pipeline/ProofEngine.Diagnostics.cs:44"
+  },
+
+  "hasCatalogSite": true,
+  "mintSites": [
+    {
+      "fileLine": "src/Precept/Language/Operations.cs:871,879,887,895",
+      "howMinted": "Catalog-declared on BinaryOperationMeta.ProofRequirements for the four choice ordinal operators: ChoiceLessThanChoice (:871), ChoiceGreaterThanChoice (:879), ChoiceLessThanOrEqualChoice (:887), ChoiceGreaterThanOrEqualChoice (:895). Each declares one ModifierRequirement(ParamSubject(PChoice), ModifierKind.Ordered). The equality operators ChoiceEqualsChoice/ChoiceNotEqualsChoice (:860,:863) declare NO ProofRequirements — equality needs no order, so `==`/`!=` on choice never mints a Modifier obligation.",
+      "instantiatedAt": "src/Precept/Pipeline/ProofEngine.cs:305-310 (TypedBinaryOp arm: `foreach (var req in bin.ProofRequirements) obligations.Add(new ProofObligation(req, bin, ctx, ProofDisposition.Unresolved, null, null))`). This is the ONLY mint path for Modifier — the kind is catalog-declared on binary operators only and is never synthesized elsewhere in ProofEngine.cs / ProofEngine.Analysis.cs. A grep for `new ModifierRequirement` across src/Precept confirms the four Operations.cs sites are the complete set."
+    }
+  ],
+  "mintCompleteness": "For ProofRequirementKind.Modifier the catalog IS the complete mint surface: the only obligation carrier is BinaryOperationMeta.ProofRequirements at the four ordinal-operator sites, and the only ModifierKind ever required is Ordered. Unlike Numeric/Presence/Count/Length/Index kinds (which are synthesized by the engine with no catalog site), Modifier has no synthesized mint path. This was confirmed against source, not assumed from the catalog.",
+
+  "dischargeShape": {
+    "premiseClasses": ["(a) field modifiers — the ONLY applicable class"],
+    "whyOnlyClassA": "The `ordered` modifier is a declaration-time STRUCTURAL property of the operand's choice TYPE, not a fact about its runtime VALUE. Premise classes (b) arg constraints, (c) handler guard, and (d) pre-state constraint/inductive hypothesis all supply VALUE facts (`x != 0`, `x >= 0`, `Total_pre <= 1000`). None can make a field's declared type ordered — orderedness is fixed by the `ordered` keyword in the type declaration and no guard, argument value, or pre-state value can supply it. So classes (b)/(c)/(d) are structurally inapplicable to this obligation, and the applicable-class set is the singleton {(a)}. (Note: when an operand is an event arg of an ordered choice type, the modifier still rides on the arg's DECLARED type — structurally class-(a)-shaped even though the operand is an argument; the discharge reads the declaration, not an ingress value fact.)",
+    "iff": "The obligation discharges IFF every operand of the ordinal comparison resolves to a declared `choice` type that carries the `ordered` modifier (equivalently: the operand's TypedChoiceElement.Ordered == true, or the operand field's Modifiers contains ModifierKind.Ordered). Not RHS-only — the definition is BOTH operands. (The shipped compiler under-checks this; see knownCompilerHoles.)",
+    "decisionProcedure": "Bounded structural membership check over the (at most two) operand positions of the comparison. For each operand: resolve it to its declared choice type and test `ModifierKind.Ordered ∈ declaredModifiers` or `TypedChoiceElement.Ordered == true`. No search, no fixpoint, no interval arithmetic, no guard normal-form matching. The bound is the operand arity (2). This satisfies the ratification gate's 'name the decision procedure / search bound' requirement: the reject side is decided by a finite two-operand membership test.",
+    "strategy": "ProofStrategy.DeclarationAttribute (src/Precept/Pipeline/ProofLedger.cs:103). Discharge logic: src/Precept/Pipeline/ProofEngine.Strategies.cs:103-153 (TryDeclarationAttributeProof, Modifier arm).",
+    "notArgumentLess": "The derivation cites the generative rule 'a declared field/type modifier is a licensed class-(a) premise' plus the structural-fact validity argument below; both carry subjects (the operand field, the `ordered` declaration). No cell here rests on an argument-less rule."
+  },
+
+  "transport": {
+    "fact": "phi = 'operand O's declared choice type carries `ordered`'",
+    "readClosure": "deps(phi) = empty. The fact reads NO field value — it is a property of the declaration, not of any configuration's field contents.",
+    "killable": "never. Under the transport rule (transport-rule-restatement-2026-07-21.md § 5 provenance table), a fact whose read-closure is empty is never killed: `mayWrite(r, p, q) ∩ deps(phi) = mayWrite(r,p,q) ∩ empty = empty` on every route r and every position pair, so the frame condition is trivially satisfied. This is the same row as 'Literal denotation … killable: never; read-closure empty' and 'Catalog-declared callee attribute … the attribute is not [killable]' in that table.",
+    "availableOnEveryRoute": "Because it is earned at declaration time and never killed, the fact is available at position zero of every route and at every evaluation occasion. Transport is therefore INERT for this kind: the route/occasion axis does not change the discharge. All five occasions below discharge identically from the same structural fact; the near-miss fails all five occasions identically. The site-identity ruling (one expression reached by N routes mints N obligations) still applies to COUNTING obligations, but every one of those N obligations discharges from the same route-invariant `ordered` declaration.",
+    "citation": "transport-rule-restatement-2026-07-21.md § 5, 'Literal denotation … never; read-closure empty' and the catalog-attribute row; matrix § Vocabulary, 'Discharge mechanisms'."
+  },
+
+  "citationDuty": {
+    "ruling": "matrix § The cell, owner ruling 2026-07-21: 'A declared constraint or field modifier is available as a premise for a fault obligation, and a proof may not consume such a fact unless it names the obligation that established the fact and every obligation that preserves it, each itself discharged … class (a) is not exempt from it.'",
+    "derivedApplication": "For a VALUE modifier (`positive`, `nonzero`) the establishing obligation is establishment-at-construction and the preserving obligations are preservation-at-every-write-site of every mentioning field. For the `ordered` STRUCTURAL modifier those obligations are vacuous: (establishing) the `ordered` keyword on the choice type is checked once at parse/type-check and is the establishment; (preserving) the preserving-obligation set is EMPTY because no write can change a field's declared type — the fact has empty read-closure (see transport) so nothing preserves-or-breaks it. Under this reading the citation duty is discharged by naming 'declaration of `ordered` on the operand's choice type; preserving set = empty (type-structural, immutable across all writes)'.",
+    "flagged": "Whether the citation duty is SATISFIED by an empty preserving set (as derived above) or whether a structural/type modifier is simply OUTSIDE the citation duty is NOT explicitly ruled. The ruling's own language ('a field modifier is a constraint on one field, and its truth at an evaluation site is earned the same way') presumes a VALUE constraint earned by establishment+preservation; `ordered` constrains type structure, not value, and is not earned that way. See openFlags."
+  },
+
+  "respellability": {
+    "verdict": "yes (vacuous band)",
+    "band": "The sound-but-unprovable band is EMPTY for this kind. A choice ordinal comparison whose operand is not declared `ordered` is not merely unprovable — it is genuinely unsafe by definition (an unordered choice set has no defined ordinal order), so rejecting it is correct, not conservative. There is no sound program the rules cannot prove.",
+    "respelling": "The suggestion schema is 'add `ordered` to the declaration of ⟨deficient operand's choice type⟩' — naming every operand that lacks it. This is a declaration edit, not a proof-power widening, and the want doc's 'forces authors to be more explicit' friction applies in its lightest form (a one-keyword edit).",
+    "familyInheritance": "This is a per-cell verdict identical across all five occasions, inherited from the single-premise-class structural shape; no cell overrides it."
+  },
+
+  "knownCompilerHoles": [
+    {
+      "id": "modifier-rhs-only-operand-check",
+      "severity": "soundness hole (shipped compiler accepts a program the definition rejects)",
+      "description": "The shipped discharge verifies ONLY the right-hand operand's `ordered` bit. ResolveParamInBinaryOp (src/Precept/Pipeline/ProofEngine.cs:878-889) checks the Rhs parameter first and returns bin.Right; TryDeclarationAttributeProof then discharges on that single resolved operand. When the LEFT operand is unordered and the RIGHT is ordered, the obligation is wrongly reported Proved/DeclarationAttribute even though the definition requires BOTH ordered.",
+      "witnessToHole": "precept `ModLeftDeficient` (verified 2026-07-21): `rule Urgency >= Severity` with Urgency (LEFT) NOT ordered and Severity (RIGHT) ordered compiles clean, 0 diagnostics, obligation disposition Proved, strategy DeclarationAttribute. Contrast `ModBothDeficient` (both unordered) and every RHS-deficient near-miss below, which correctly reject PRE0112.",
+      "consequenceForCells": "The near-miss rows in the four scalar cells are VERIFIED-REJECTING only because they place the deficient operand on the RHS. A left-deficient variant of each would wrongly compile. The cells record the definition's contract (BOTH operands, iff) and flag that shipped enforcement is RHS-only."
+    },
+    {
+      "id": "modifier-quantifier-binding-ordered-not-read",
+      "severity": "soundness hole + false-reject hole (both polarities broken for a quantifier-binding operand)",
+      "description": "When an operand is a quantifier binding `x` (from `each x in C (...)`), the `ordered` bit of C's inner choice type is not correctly consulted through the modifier discharge. Two broken directions were observed: (1) with the binding on the LEFT (`x >= Severity`), the RHS-only hole above means only Severity is checked, so the ObservedLevels-not-ordered near-miss wrongly proves; (2) with the binding on the RIGHT (`Severity <= x`), the engine resolves the subject to `x`, cannot confirm x's ordered bit even when C IS declared ordered, and FALSE-REJECTS with PRE0112 'Cannot prove that x satisfies … Ordered'.",
+      "witnessToHole": "verified 2026-07-21: `ModQuantifierNearMiss` (binding LEFT, C unordered) -> wrongly Proved; `ModQuantRhsWitness` (binding RIGHT, C ORDERED) -> wrongly rejected PRE0112 on x.",
+      "compoundedBy": "collection-types.md § Implementation state: quantifier predicates (each/any/no) are 'Not yet built' as runtime governance rules. So the quantifier occasion rests on an unbuilt feature at runtime AND on two live compile-time holes."
+    }
+  ],
+
+  "cells": [
+    {
+      "cellId": "fault-modifier-transition-primitive",
+      "disposition": "Defined",
+      "occasion": "transition-row-action-operand",
+      "typeFamily": "primitive",
+      "capabilityTier": "built (mint + discharge + diagnostic all live)",
+      "obligationSchema": "⟨choice-field⟩ ⟨ordinal-cmp⟩ ⟨choice-operand⟩, at a choice ordinal comparison in a transition-row action RHS (e.g. `-> set ⟨bool-field⟩ = A ⟨>|<|>=|<=⟩ B`)",
+      "dischargeContractInstance": "Discharges IFF both A and B resolve to choice types declared `ordered`. Sole premise class (a); strategy DeclarationAttribute; decision procedure = two-operand structural membership; diagnostic on failure PRE0112 naming the deficient operand and event/state context.",
+      "transportCitation": "Fact is route-invariant (empty read-closure, never killed) — reaches the action operand at every occasion with no mayWrite intersection possible. The action RHS is phase-5 mutation on a fire route; the `ordered` declaration predates position zero and is never a write target.",
+      "citationDutyInstance": "Consuming `ordered` on A and on B cites: establishment = the `ordered` keyword on each field's choice declaration (parse/type-check); preserving set = empty (type-structural). See top-level citationDuty.flagged.",
+      "witness": {
+        "base": {
+          "note": "Flagged base — must reject, target obligation only (both operands unordered).",
+          "program": "precept ModTransitionBase\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\nfield SeverityDominates as boolean default false\n\nstate Open initial\n\nevent Triage(Level as choice of integer(1, 2, 3, 4, 5) default 3, Ur as choice of integer(1, 2, 3, 4, 5) default 3)\n\nfrom Open on Triage\n    -> set Severity = Triage.Level\n    -> set Urgency = Triage.Ur\n    -> set SeverityDominates = Severity > Urgency\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=false, PRE0112 'Cannot prove that Urgency satisfies the required modifier Ordered (used on event Triage from state Open)', obligation Unresolved. Rejects for the target obligation only."
+        },
+        "dischargeAddition": {
+          "note": "Add `ordered` to BOTH operand declarations (Severity, Urgency) and to the arg types.",
+          "program": "precept ModTransitionWitnessClean\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield SeverityDominates as boolean default false\n\nstate Open initial\n\nevent Triage(Level as choice of integer(1, 2, 3, 4, 5) ordered default 3, Ur as choice of integer(1, 2, 3, 4, 5) ordered default 3)\n\nfrom Open on Triage\n    -> set Severity = Triage.Level\n    -> set Urgency = Triage.Ur\n    -> set SeverityDominates = Severity > Urgency\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=true, 0 diagnostics, obligation disposition Proved, strategy DeclarationAttribute."
+        },
+        "nearMiss": {
+          "note": "Weakened past sufficiency: `ordered` added to the LHS operand (Severity) only; the RHS operand (Urgency) stays unordered. Partial discharge is insufficient.",
+          "program": "precept ModTransitionNearMiss\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\nfield SeverityDominates as boolean default false\n\nstate Open initial\n\nevent Triage(Level as choice of integer(1, 2, 3, 4, 5) ordered default 3)\n\nfrom Open on Triage\n    -> set Severity = Triage.Level\n    -> set SeverityDominates = Severity > Urgency\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=false, PRE0112 on Urgency (SAME obligation, 'Both choice operands must be declared ordered'), obligation Unresolved. (Also a benign PRE0158 no-write-site warning on Urgency — unrelated to the target obligation.)"
+        }
+      },
+      "flags": ["Near-miss keeps the deficient operand on the RHS so shipped enforcement rejects it; a LEFT-deficient variant would wrongly pass (see knownCompilerHoles: modifier-rhs-only-operand-check)."]
+    },
+
+    {
+      "cellId": "fault-modifier-rule-condition-primitive",
+      "disposition": "Defined",
+      "occasion": "rule-condition",
+      "typeFamily": "primitive",
+      "capabilityTier": "built (mint + discharge + diagnostic all live)",
+      "obligationSchema": "⟨choice-field⟩ ⟨ordinal-cmp⟩ ⟨choice-operand⟩ inside a `rule` condition (e.g. `rule A >= B because \"…\"`)",
+      "dischargeContractInstance": "Discharges IFF both operands resolve to choice types declared `ordered`. Sole premise class (a); strategy DeclarationAttribute; two-operand structural membership; PRE0112 on failure naming the deficient operand and 'rule at index N'.",
+      "transportCitation": "A rule condition is evaluated on every route except restore (transport-rule § 3 route relation, `rule-condition`). The `ordered` fact is route-invariant so it holds on every one of those routes with no kill possible; restore's exclusion is irrelevant because the fact is structural, not a value the sweep re-checks.",
+      "citationDutyInstance": "Same as transition cell: establishment = the `ordered` declaration on each operand's choice type; preserving set = empty.",
+      "witness": {
+        "base": {
+          "note": "Flagged base — both operands unordered; must reject.",
+          "program": "precept ModBothDeficient\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\n\nrule Severity >= Urgency because \"Severity must not sit below urgency\"\n\nstate Open initial\n\nevent Nudge(Level as choice of integer(1, 2, 3, 4, 5) ordered default 3)\n\nfrom Open on Nudge\n    -> set Severity = Nudge.Level\n    -> set Urgency = Nudge.Level\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=false, PRE0112 'Cannot prove that Urgency satisfies the required modifier Ordered (used while evaluating rule at index 0)', obligation Unresolved."
+        },
+        "dischargeAddition": {
+          "note": "Add `ordered` to both Severity and Urgency.",
+          "program": "precept ModRuleWitness\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) ordered default 3\n\nrule Severity >= Urgency because \"Severity must not sit below urgency\"\n\nstate Open initial\n\nevent Nudge(Level as choice of integer(1, 2, 3, 4, 5) ordered default 3)\n\nfrom Open on Nudge\n    -> set Severity = Nudge.Level\n    -> set Urgency = Nudge.Level\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=true, 0 diagnostics, obligation Proved, strategy DeclarationAttribute."
+        },
+        "nearMiss": {
+          "note": "Weakened past sufficiency: `ordered` on Severity only; Urgency (RHS) unordered.",
+          "program": "precept ModRuleNearMiss\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\n\nrule Severity >= Urgency because \"Severity must not sit below urgency\"\n\nstate Open initial\n\nevent Nudge(Level as choice of integer(1, 2, 3, 4, 5) ordered default 3)\n\nfrom Open on Nudge\n    -> set Severity = Nudge.Level\n    -> set Urgency = Nudge.Level\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=false, PRE0112 on Urgency (SAME obligation), obligation Unresolved."
+        }
+      },
+      "flags": ["Near-miss deficient operand on RHS (rejects); LEFT-deficient variant wrongly passes — see knownCompilerHoles."]
+    },
+
+    {
+      "cellId": "fault-modifier-state-ensure-primitive",
+      "disposition": "Defined",
+      "occasion": "state-ensure-condition",
+      "typeFamily": "primitive",
+      "capabilityTier": "built (mint + discharge + diagnostic all live)",
+      "obligationSchema": "⟨choice-field⟩ ⟨ordinal-cmp⟩ ⟨choice-operand⟩ inside an `in S ensure` (StateResident) condition",
+      "dischargeContractInstance": "Discharges IFF both operands resolve to `ordered` choice types. Sole premise class (a); strategy DeclarationAttribute; two-operand structural membership; PRE0112 on failure naming the deficient operand and 'ensure for S'.",
+      "transportCitation": "A residency ensure condition is evaluated on the `in <current>` bucket for fire/update/construction (not restore) per the evaluator's Constraint Evaluation Matrix. The `ordered` fact is route-invariant, so it holds identically at every such occasion. The site-identity ruling would mint one obligation per entry-route into S; each discharges from the same declaration, so the residency multiplicity does not change the answer.",
+      "citationDutyInstance": "establishment = `ordered` on each operand's choice type; preserving set = empty.",
+      "witness": {
+        "base": {
+          "note": "Flagged base — Urgency (RHS) unordered; must reject.",
+          "program": "precept ModEnsureBase\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\n\nstate Open initial\n\nin Open ensure Severity >= Urgency because \"While open, severity must not sit below urgency\"\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21 (as ModEnsureNearMiss): success=false, PRE0112 'Cannot prove that Urgency satisfies the required modifier Ordered (used while evaluating ensure for Open)', obligation Unresolved. (Benign PRE0158 no-write-site warnings, unrelated.)"
+        },
+        "dischargeAddition": {
+          "note": "Add `ordered` to both operands.",
+          "program": "precept ModEnsureWitness\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) ordered default 3\n\nstate Open initial\n\nin Open ensure Severity >= Urgency because \"While open, severity must not sit below urgency\"\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=true (only benign PRE0158 no-write-site warnings), obligation Proved, strategy DeclarationAttribute."
+        },
+        "nearMiss": {
+          "note": "Same as base here — the residency ensure has no additional discharge lever; weakening = leaving the RHS operand unordered.",
+          "program": "precept ModEnsureNearMiss\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\n\nstate Open initial\n\nin Open ensure Severity >= Urgency because \"While open, severity must not sit below urgency\"\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=false, PRE0112 on Urgency (SAME obligation), obligation Unresolved."
+        }
+      },
+      "flags": ["Near-miss deficient operand on RHS (rejects); LEFT-deficient variant wrongly passes — see knownCompilerHoles."]
+    },
+
+    {
+      "cellId": "fault-modifier-computed-field-primitive",
+      "disposition": "Defined",
+      "occasion": "computed-field-expression",
+      "typeFamily": "primitive",
+      "capabilityTier": "built (mint + discharge + diagnostic all live)",
+      "obligationSchema": "⟨choice-field⟩ ⟨ordinal-cmp⟩ ⟨choice-operand⟩ inside a computed-field expression (`field F as boolean <- A > B`)",
+      "dischargeContractInstance": "Discharges IFF both operands resolve to `ordered` choice types. Sole premise class (a); strategy DeclarationAttribute; two-operand structural membership; PRE0112 on failure naming the deficient operand and 'the computed expression for field F'.",
+      "transportCitation": "A computed-field expression is recomputed on every route (transport-rule § 3, `computed-field-expression` = 'every route', including restore's recompute phase). The `ordered` fact is route-invariant, so recomputation on any route — including a restore recompute — discharges identically; there is no value fact here that restore's ungoverned slot injection could kill.",
+      "citationDutyInstance": "establishment = `ordered` on each operand's choice type; preserving set = empty.",
+      "witness": {
+        "base": {
+          "note": "Flagged base — Urgency (RHS) unordered; must reject.",
+          "program": "precept ModComputedBase\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\nfield SeverityDominates as boolean <- Severity > Urgency\n\nstate Open initial\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21 (as ModComputedNearMiss): success=false, PRE0112 'Cannot prove that Urgency satisfies the required modifier Ordered (used in the computed expression for field SeverityDominates)', obligation Unresolved."
+        },
+        "dischargeAddition": {
+          "note": "Add `ordered` to both operands.",
+          "program": "precept ModComputedWitness\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield SeverityDominates as boolean <- Severity > Urgency\n\nstate Open initial\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=true (only benign PRE0158 warnings), obligation Proved, strategy DeclarationAttribute."
+        },
+        "nearMiss": {
+          "note": "Weakened past sufficiency: `ordered` on Severity only; Urgency (RHS) unordered.",
+          "program": "precept ModComputedNearMiss\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield Urgency as choice of integer(1, 2, 3, 4, 5) default 3\nfield SeverityDominates as boolean <- Severity > Urgency\n\nstate Open initial\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=false, PRE0112 on Urgency (SAME obligation), obligation Unresolved."
+        }
+      },
+      "flags": ["Near-miss deficient operand on RHS (rejects); LEFT-deficient variant wrongly passes — see knownCompilerHoles."]
+    },
+
+    {
+      "cellId": "fault-modifier-quantifier-primitive",
+      "disposition": "Defined (contract) / UNVERIFIABLE against shipped compiler (witness+near-miss rest on compiler holes)",
+      "occasion": "quantifier-predicate",
+      "typeFamily": "primitive",
+      "capabilityTier": "PARTIAL — the compile-time Modifier obligation mints and (partially) discharges, but quantifier predicates (each/any/no) are 'Not yet built' as runtime governance (collection-types.md § Implementation state), and the compile-time discharge for a quantifier-binding operand is broken in both polarities.",
+      "obligationSchema": "⟨binding⟩ ⟨ordinal-cmp⟩ ⟨choice-operand⟩ inside a quantifier predicate (`rule each x in C (x >= Severity) because \"…\"`), where the binding x carries C's inner choice element bound",
+      "dischargeContractInstance": "DEFINITION: discharges IFF both the binding's element choice type (C's inner type) AND the other operand's choice type are declared `ordered`. Sole premise class (a); strategy DeclarationAttribute; two-operand structural membership over {C-inner-type, other-operand}; PRE0112 on failure. The binding's orderedness is C's inner-type `ordered` modifier (collection-types.md:628 — 'a quantifier binding likewise carries the element bound on x inside the predicate').",
+      "transportCitation": "The quantifier predicate is evaluated wherever its host constraint is reached (transport-rule § 3, `quantifier-predicate` = 'its enclosing position's route set; element multiplicity is handled by universal quantification, not by the route'). The `ordered` fact is route-invariant; the per-element universal quantification does not touch orderedness (a structural property of the element TYPE, identical for every element).",
+      "citationDutyInstance": "establishment = `ordered` on C's inner choice type and on the other operand's choice type; preserving set = empty.",
+      "witness": {
+        "base": {
+          "note": "DEFINITION base — C unordered; SHOULD reject naming the binding's element type. Shipped compiler does NOT (hole).",
+          "program": "precept ModQuantifierBase\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield ObservedLevels as set of choice of integer(1, 2, 3, 4, 5)\n\nrule each x in ObservedLevels (x >= Severity) because \"Every observed level must be at least the baseline severity\"\n\nstate Open initial\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED-AS-HOLE 2026-07-21 (as ModQuantifierNearMiss): success=TRUE, obligation Proved, strategy DeclarationAttribute — WRONGLY accepted. ObservedLevels is not ordered but the RHS-only operand check (knownCompilerHoles) reads only Severity. The definition requires this to REJECT."
+        },
+        "dischargeAddition": {
+          "note": "Add `ordered` to C's inner type (and Severity already ordered).",
+          "program": "precept ModQuantifierWitness\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield ObservedLevels as set of choice of integer(1, 2, 3, 4, 5) ordered\n\nrule each x in ObservedLevels (x >= Severity) because \"Every observed level must be at least the baseline severity\"\n\nstate Open initial\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED 2026-07-21: success=true, obligation Proved, strategy DeclarationAttribute. (Accepts correctly — but note it would ALSO accept with C unordered, per the base above, so the pass does not confirm the contract.)"
+        },
+        "nearMiss": {
+          "note": "DEFINITION near-miss — leave C's inner type unordered while Severity is ordered; SHOULD still reject. Cannot be realized against the shipped compiler.",
+          "program": "precept ModQuantifierNearMiss\n\nfield Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3\nfield ObservedLevels as set of choice of integer(1, 2, 3, 4, 5)\n\nrule each x in ObservedLevels (x >= Severity) because \"Every observed level must be at least the baseline severity\"\n\nstate Open initial\n\nevent Nudge\n\nfrom Open on Nudge\n    -> no transition",
+          "observed": "VERIFIED-AS-HOLE 2026-07-21: success=TRUE, obligation Proved — the near-miss WRONGLY compiles clean (binding-LEFT + RHS-only hole). Attempting the mirror form `Severity <= x` to put the deficient binding on the RHS instead FALSE-REJECTS even when C IS ordered (ModQuantRhsWitness: PRE0112 on x). So neither polarity yields a valid witness/near-miss pair through the shipped compiler."
+        }
+      },
+      "flags": [
+        "The witness+near-miss pair for this cell CANNOT be verified against the shipped compiler: the discharge is broken in both polarities for a quantifier-binding operand (see knownCompilerHoles: modifier-quantifier-binding-ordered-not-read and modifier-rhs-only-operand-check).",
+        "Quantifier predicates are 'Not yet built' as runtime governance (collection-types.md § Implementation state); the cell's contract is model-derived from collection-types.md:628 and the DeclarationAttribute discharge shape.",
+        "Ratification blocker: this cell is Defined at the contract level but must not ratify as VERIFIED until both compiler holes are closed and a sound witness/near-miss pair compiles as the definition requires."
+      ]
+    }
+  ],
+
+  "summary": {
+    "cellCount": 5,
+    "cellsVerified": 4,
+    "cellsFlaggedUnverifiable": 1,
+    "occasionAxisInert": "For ProofRequirementKind.Modifier the discharge is a route-invariant structural declaration check (empty read-closure, never killed, single premise class (a)). All five occasions therefore share one discharge contract and one respellability verdict; the near-miss fails all five identically. The occasion axis changes only WHERE the comparison sits, never HOW it discharges.",
+    "keyFindings": [
+      "Modifier is the one fault kind whose ONLY premise class is (a) field modifiers and whose discharge is non-transportable/non-killable (structural, not a value fact).",
+      "Discovered a third compiler hole (beyond BUG-033 and the write-surface enumeration gap): the discharge checks only the RHS operand's `ordered` bit, so a left-deficient ordinal comparison wrongly compiles clean. Witness: ModLeftDeficient.",
+      "Discovered a compounding quantifier-binding hole: the binding's element `ordered` bit is not read as the resolved subject (RHS position false-rejects even when ordered; LEFT position never checks it).",
+      "The citation-duty application to a structural (non-value) modifier like `ordered` is not explicitly ruled — flagged for the owner."
+    ]
+  },
+
+  "openFlags": [
+    "CITATION-DUTY-SCOPE: The matrix § The cell (2026-07-21) citation duty presumes a VALUE constraint earned by establishment-at-construction + preservation-at-every-write. The `ordered` modifier is a type-STRUCTURAL property with empty read-closure — it has no value to establish or preserve. Whether the duty is discharged by an empty preserving set (declaration = establishment, nothing preserves) or whether structural modifiers are OUTSIDE the duty entirely is not ruled. Needs an owner ruling; the cells give the derivable empty-preserving-set reading but do not treat it as settled.",
+    "COMPILER-HOLE (route to bugs.md / build): the Modifier discharge verifies only the RHS operand's `ordered` bit (ResolveParamInBinaryOp checks Rhs first and returns; TryDeclarationAttributeProof discharges on the single resolved operand). Definition requires BOTH operands. Witness of unsoundness: ModLeftDeficient (`rule Urgency >= Severity`, Urgency unordered on LEFT) compiles clean, Proved. This is a P11/prevention breach for the Modifier kind and blocks ratification of every Modifier near-miss as a complete both-operands check.",
+    "COMPILER-HOLE (route to bugs.md / build): a quantifier-binding operand's element `ordered` bit is not consulted correctly — binding-on-RHS false-rejects even when the collection inner type IS ordered (ModQuantRhsWitness), and binding-on-LEFT is never checked (ModQuantifierNearMiss wrongly proves). The quantifier-predicate cell cannot be verified until this is fixed.",
+    "UNBUILT-FEATURE: quantifier predicates (each/any/no) are 'Not yet built' as runtime governance (collection-types.md § Implementation state). The compile-time Modifier obligation mints, but the occasion's full semantics rest on an unbuilt feature; the quantifier cell is Defined-contract, not verified.",
+    "MINT-SURFACE (confirmed, not a gap): ProofRequirementKind.Modifier has NO synthesized mint path — the four Operations.cs sites (:871,:879,:887,:895) are the complete surface and ModifierKind.Ordered is the only value ever required. Recorded so a future op that emits an Ordered requirement at a function-call or member-access site (which the discharge's binary-op scope-cut would silently miss, per ProofEngine.Strategies.cs:110-115) is caught as a re-opener."
+  ]
+}

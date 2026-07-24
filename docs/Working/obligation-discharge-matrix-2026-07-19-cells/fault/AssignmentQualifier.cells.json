@@ -1,0 +1,632 @@
+{
+  "$schema": "../cell.schema.json",
+  "familyId": "fault-assignmentqualifier-business",
+  "title": "Assignment-qualifier compatibility — an open business-domain source assigned to a qualifier-bearing target, discharged (or not) by guard-narrowing, across the four assignment occasions",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "the fault-family case shape: the catalog-declared safety precondition at an evaluation site. AssignmentQualifier is the one fault kind with NO catalog metadata site — the type checker synthesizes and stamps it, the proof engine discharges (proof-engine.md Decision 3, 'type checker stamps, proof engine discharges')."
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs:208",
+      "note": "the single mint site — ValidateResolvedQualifierAxes stamps an AssignmentQualifierProofRequirement onto the action's ProofRequirements exactly when the source's axis resolves Unknown (open) under dischargedAtProofStage. Engine-synthesized; not on any catalog metadata (bin/call/ma/action.ProofRequirements)."
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:36",
+      "note": "the sole discharge — TryAssignmentQualifierProof: the open source's axis value is guard-narrowed via NarrowedValueFromGuard and must ordinal-string-equal the target's declared qualifier value. Guard-narrowing is the only mechanism; there is no arg-modifier / rule / interval path for this kind."
+    },
+    {
+      "kind": "want-doc",
+      "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+      "note": "fault-prevention obligation family — faults get the identical premise-and-certificate treatment"
+    },
+    {
+      "kind": "owner-ruling",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+      "date": "2026-07-21",
+      "note": "the citation duty — a proof consuming a guard fact names the fact and its transport; class (c) is admitted for the fault family under this duty"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [
+      {
+        "spelling": "field Incoming as money in 'USD' ...   (source declares its currency statically)",
+        "whyLicensed": "A statically-declared qualifier resolves the source axis to 'USD' at the type stage (QualifierResolutionKind.Resolved), so NO AssignmentQualifier obligation is minted at all — this is not a band member, it is the case that never enters the fault surface. Recorded so the boundary between 'open, must be narrowed' and 'declared, resolved' is findable."
+      }
+    ],
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "the Respellable definition — yes iff every sound band member has a provable respelling within the surface"
+      },
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4: a family verdict ratifies only when corpus-measured; this one is model-derived, pending"
+      }
+    ],
+    "notes": [
+      "The sound-but-unprovable band: a source whose axis value is provably fixed by a means the discharge does not consult — e.g. a `rule Incoming.currency == 'USD'` (a pre-state fact, class (d)) or an OR-guard that pins two different values on two arms. TryAssignmentQualifierProof consults ONLY guard-narrowing leaves and declared qualifiers, never rules, so a rule-pinned currency is sound yet unprovable. Its respelling is the direct narrowing guard `when Incoming.currency == 'USD'` (which the surface licenses) or declaring the source qualifier statically (which removes the obligation). Both are within the surface, so respellable: yes — the power gap costs authoring friction only.",
+      "This verdict is about the MODEL's power for the three occasions that HAVE a guard context. It does NOT paper over the two structural findings recorded per cell (the stateless-handler spec/built conflict and the computed-field no-guard gap); those are definition-gap / drift questions routed to the owner, not respellability facts."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault-assignmentqualifier-transition-business",
+      "label": "AssignmentQualifier — open business-domain source assigned into a qualified target at a transition-row set-action, discharged by the row's when-guard",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "AssignmentQualifier",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:133",
+            "note": "NarrowedValueFromGuard — the guard on the transition row (TransitionRowContext → Row.Guard, GuardOfContext) supplies the narrowed axis value"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Incoming.currency == 'USD'",
+        "metavariables": [
+          {
+            "name": "Incoming",
+            "standsFor": "the open source field/expression assigned (a business-domain value with NO declared qualifier on the required axis — money/quantity/price/exchangerate)"
+          },
+          {
+            "name": "currency",
+            "standsFor": "the qualifier axis the target declares (Currency / Unit / Dimension / FromCurrency / ToCurrency / TemporalUnit — GetApplicableAssignmentQualifierAxes)"
+          },
+          {
+            "name": "'USD'",
+            "standsFor": "the target field's required qualifier value on that axis (AssignmentQualifierProofRequirement.TargetQualifier)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet. NOTE: qualifier identity is a discrete-string match (ordinal equality, ProofEngine.QualifierNarrowing.cs:60) with no numeric subsumption algebra — the matrix's stated normal-form steps (comparison-direction flip, commutative-operand reorder) are numeric and do not reach this axis. The TemporalUnit axis alone discharges by component-subset, not equality (line 57)."
+          }
+        ],
+        "wp": {
+          "statement": "Incoming.currency == 'USD'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "The source is an OPEN field (no declared currency) — the obligation exists precisely because the type checker could not resolve its axis (QualifierResolutionKind.Unknown). Class (a) field modifiers cannot discharge it: declaring a qualifier on the source makes it Resolved and MINTS NO OBLIGATION (it eliminates, not discharges). Class (b) arg constraints do not carry a qualifier-narrowing fact the discharge consults. Class (d) pre-state facts (a rule pinning the currency) are sound but the built discharge never consults rules (TryAssignmentQualifierProof reads guard-narrowing + declared qualifiers only). So the SOLE discharge is class (c): a leaf of the row's when-guard of shape `Incoming.<axis-accessor> == 'literal'`.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "qualifier guard-narrowing: the row's when-guard carries a leaf `Incoming.currency == 'USD'` (an axis-accessor equals a literal); every disjunctive branch narrows the source field on the axis to the SAME value; that value ordinal-equals the target's required qualifier → QualifierCompatibility (AssignmentQualifier discharge)",
+          "capabilityTier": "1a",
+          "strategy": "QualifierCompatibility",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "ExtractQualifierNarrowingBranches over the enclosing guard (ProofEngine.QualifierNarrowing.cs:211) yields a finite set of `field.axis == 'literal'` leaves per AND/OR branch (AND = cross-product, OR = branch-union). The obligation discharges IFF: (1) every disjunctive branch narrows the source field on the axis to a value, (2) all such values are equal, (3) that value ordinal-string-equals the target's declared qualifier value (TemporalUnit: component-subset), AND (4) the source field is not in ReassignedBefore. A `!=` or field-to-field guard narrows nothing; an OR arm that fails to narrow collapses the discharge; a narrowed value unequal to the target rejects — each naming the same obligation.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:133",
+              "note": "NarrowedValueFromGuard — all-branches-OR, reassignment-aware; the exact decision procedure"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "FLAGGED APPROXIMATE REUSE. 'Guard normal-form match' is written for a numeric WP inequality (a row fires only if its guard evaluated true; the guard reads the same pre-state/args the action reads; purity+determinism carry the value to the write). The row-fires-only-if-guard-true half transfers verbatim. But qualifier guard-narrowing is a DISTINCT derivation — discrete-value pinning by ordinal identity, all-branches-OR agreement, value-exact match — for which the matrix's § Validity arguments writes NO dedicated argument. Cited here because the schema requires a named argument and this is the closest; the missing dedicated argument is recorded as an owner openFlag. Per the ratification gate ('no cell ratifies whose derivation cites an argument-less rule'), this cell cannot RATIFY until that argument is authored."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard leaf `<source>.<axis> == '<required-value>'` normal-form-equal to <WP>, on every disjunctive branch",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet — a schema over the WP, not a constant"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept AqDefaultProbe\n\nfield Incoming as money default '0 USD' editable\nfield Settled as money in 'USD' default '0 USD'\n\nstate Draft initial\nstate Done terminal\n\nevent Settle()\nfrom Draft on Settle\n    -> set Settled = Incoming\n    -> transition Done\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile (MCP; SYNTAX/COMPILE oracle only — proof verdict used to observe BUILT behavior, not as definition authority)",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        },
+        "discharges": [
+          {
+            "id": "guard-currency-usd",
+            "kind": "guard",
+            "addition": "when Incoming.currency == 'USD'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Settle"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard leaf `Incoming.currency == 'USD'` narrows the open source field to 'USD' → ordinal-equals the target's required 'USD' → QualifierCompatibility",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live: success, 0 diagnostics, obligation Proved, strategy QualifierCompatibility."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-currency-usd",
+            "addition": "when Incoming.currency == 'EUR'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Settle"
+            },
+            "whyStillRejects": "the guard narrows the source to 'EUR', which ordinal-differs from the target's required 'USD' — must still reject, same obligation. Live: PRE0141 'the guard narrows it to EUR, which does not satisfy the required USD', obligation Unresolved.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-currency-usd",
+            "addition": "when Incoming.currency != 'USD'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Settle"
+            },
+            "whyStillRejects": "a `!=` guard narrows nothing (ExtractQualifierNarrowingLeaf is Equals-only) — no value is pinned, so the obligation is undischarged. Live: PRE0141 'no guard narrows it to the required USD', obligation Unresolved.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs:208",
+          "note": "mint site — Unknown-axis source under a set-action, dischargedAtProofStage"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/ProofLedger.cs:106",
+          "note": "ProofStrategy.QualifierCompatibility = 5 — the strategy the built engine reports on discharge"
+        },
+        {
+          "kind": "owner-ruling",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+          "date": "2026-07-21",
+          "note": "site identity is an occasion, not a syntactic position — one transition row reached by N routes mints N obligations, each proved from its route's guard"
+        }
+      ],
+      "notes": [
+        "Transport (transport-rule-restatement-2026-07-21 § 4, route-indexed frame and kill): the consumed fact φ = `Incoming.currency == 'USD'` is earned at the row's guard (phase 2) and consumed at the phase-5 set-action operand. deps(φ) = {Incoming}. It survives IFF no construct on the route between guard and site writes Incoming. The built engine enforces the same-chain half via ReassignedBefore (ProofEngine.QualifierNarrowing.cs:142). SOUNDNESS DEPENDENCY: the cross-construct half rests on the write-surface enumeration, which is asserted-not-build-enforced, with one verified wrong instance (BUG-033, the `into` binding target); a `dequeue Q into Incoming` before this set would not be registered as a write of Incoming, so the fact would wrongly survive. Recorded, not silently relied on.",
+        "The source `Incoming` here is a FIELD, not an event arg. The built narrowing extractor (TryAddQualifierEqLeaf, line 272) requires the guard accessor's object to be a TypedFieldRef — an ARG-sourced open value (`event Settle(In as money)`, `set Settled = Settle.In`, `when Settle.In.currency == 'USD'`) does NOT discharge in the built engine (verified: PRE0141 persists). Whether an arg-sourced open assignment SHOULD be narrowable (the arg is the class-(b) subject, and its axis is genuinely knowable via a guard on `Event.Arg.currency`) is a built-status gap that may also be a definition question — see openFlags.",
+        "The default `'0 USD'` on the open field does NOT resolve its currency axis (a default is a value, not a declared qualifier) — the field stays open and the obligation still mints; verified."
+      ]
+    },
+    {
+      "id": "fault-assignmentqualifier-state-hook-business",
+      "label": "AssignmentQualifier — open business-domain source assigned into a qualified target at a state entry/exit action, discharged by the state action's when-guard",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "AssignmentQualifier",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:197",
+            "note": "GuardOfContext — StateHookContext → Hook.Guard supplies the narrowing guard for a state action"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:1016",
+            "note": "'State actions support an optional when guard between the state target and the action chain' — the guard the discharge consumes is spec-sanctioned for state actions (unlike the stateless-handler case)"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Incoming.currency == 'USD'",
+        "metavariables": [
+          {
+            "name": "Incoming",
+            "standsFor": "the open source field assigned in the state action (no declared qualifier on the required axis)"
+          },
+          {
+            "name": "currency",
+            "standsFor": "the qualifier axis the target declares"
+          },
+          {
+            "name": "'USD'",
+            "standsFor": "the target field's required qualifier value on that axis"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet; qualifier identity is discrete ordinal equality (see the transition cell's note)"
+          }
+        ],
+        "wp": {
+          "statement": "Incoming.currency == 'USD'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Identical to the transition cell: the source is open, so only class (c) — the state action's own when-guard — supplies a narrowing fact the discharge consults. GuardOfContext routes StateHookContext to Hook.Guard, so the entry/exit action's `when` clause is the guard scope.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "qualifier guard-narrowing over the state action's when-guard: leaf `Incoming.currency == 'USD'` narrows the open source to 'USD' → ordinal-equals target → QualifierCompatibility",
+          "capabilityTier": "1a",
+          "strategy": "QualifierCompatibility",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "As the transition cell — ExtractQualifierNarrowingBranches over the state action's guard (Hook.Guard); discharge IFF every branch narrows the source on the axis to one common value that ordinal-equals the target's required value AND the source is not in ReassignedBefore. Weakened/absent/negated guard rejects, same obligation.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:197",
+              "note": "GuardOfContext StateHookContext arm"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "FLAGGED APPROXIMATE REUSE — same as the transition cell: 'Guard normal-form match' is numeric; qualifier guard-narrowing has no dedicated argument in § Validity arguments. Cannot ratify until the argument is authored (openFlag)."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a state-action guard `when <source>.<axis> == '<required-value>'`, narrowing on every disjunctive branch",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept AqStateHookBase\n\nfield Incoming as money default '0 USD' editable\nfield Settled as money in 'USD' default '0 USD'\n\nstate Draft initial\nstate Active terminal\n\nto Active -> set Settled = Incoming\n\nevent Go()\nfrom Draft on Go\n    -> transition Active\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile (MCP)",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        },
+        "discharges": [
+          {
+            "id": "hook-guard-currency-usd",
+            "kind": "guard",
+            "addition": "to Active when Incoming.currency == 'USD' -> set Settled = Incoming",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the entry action's when-guard narrows the open source to 'USD' → ordinal-equals target → QualifierCompatibility",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live: success, 0 diagnostics, obligation Proved, strategy QualifierCompatibility.",
+              "The `application` field is omitted: the mechanical-apply DU (cell.schema.json § application) has only 'row-guard' (by eventName) and 'event-arg-declarations' loci; a state-action guard fits neither. Placement is described in the addition text. This is a schema-coverage gap for state-action guards, noted for the cell→test converter."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "hook-guard-currency-usd",
+            "addition": "to Active when Incoming.currency == 'EUR' -> set Settled = Incoming",
+            "whyStillRejects": "narrows the source to 'EUR' ≠ target 'USD' — rejects, same obligation. Live: PRE0141 'the guard narrows it to EUR, which does not satisfy the required USD', Unresolved.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21",
+              "head": "c295d7b4"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs:208",
+          "note": "mint site (shared with the transition cell — one mint function, keyed by the enclosing action's context)"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1016",
+          "note": "state actions support an optional when guard"
+        }
+      ],
+      "notes": [
+        "Transport: the state action runs at phase 3 (exit) or phase 6 (entry) of § 3A.4; its guard is evaluated as part of the action. deps(φ) = {Incoming}; the same BUG-033 / write-surface soundness dependency as the transition cell applies, and MORE sharply here — for an ENTRY action (phase 6), the row's mutation chain (phase 5) and any exit actions (phase 3) run BEFORE it, so a write of Incoming on an earlier phase would kill φ; that cross-phase kill is exactly the write-surface enumeration the transport rule flags as asserted-not-enforced. Recorded, not relied on.",
+        "Entry vs exit is the same discharge (both route through StateHookContext → Hook.Guard). The witness uses an entry action `to Active`; an exit action `from S when ... -> set` behaves identically under the built engine."
+      ]
+    },
+    {
+      "id": "fault-assignmentqualifier-stateless-hook-business",
+      "label": "AssignmentQualifier — open business-domain source assigned in a stateless event handler; discharge depends on a stateless-handler when-guard the spec says does not exist",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "AssignmentQualifier",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "conflicted",
+        "citations": [
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:1007",
+            "note": "SOURCE 1 (definition). Verbatim: 'Handlers do not support when guards or a trailing ensure; on Event ensure ... is the separate event ensure form.' If this holds, a stateless handler has NO guard, so class (c) — the only discharge for AssignmentQualifier — is UNAVAILABLE, and an open-source assignment in a stateless handler can NEVER discharge (it can only be made to compile by declaring the source qualifier, which removes the obligation). The occasion would then mirror the computed-field cell: mint-and-always-reject, with the sole discharge structurally absent."
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:197",
+            "note": "SOURCE 2 (built behavior). GuardOfContext routes EventHandlerContext → Handler.Guard, and the built compiler ACCEPTS `on Adjust when Incoming.currency == 'USD' -> set Settled = Incoming` and discharges the obligation through that guard (live: success, Proved, QualifierCompatibility). So the parser and proof engine both treat a stateless handler as carrying a when-guard — directly contradicting spec:1007."
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Incoming.currency == 'USD'",
+        "metavariables": [
+          {
+            "name": "Incoming",
+            "standsFor": "the open source field assigned in the stateless handler"
+          },
+          {
+            "name": "currency",
+            "standsFor": "the qualifier axis the target declares"
+          },
+          {
+            "name": "'USD'",
+            "standsFor": "the target field's required qualifier value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet; discrete ordinal equality"
+          }
+        ],
+        "wp": {
+          "statement": "Incoming.currency == 'USD'"
+        }
+      },
+      "witnesses": {
+        "base": {
+          "program": "precept AqStatelessBase\n\nfield Incoming as money default '0 USD' editable\nfield Settled as money in 'USD' default '0 USD'\n\nevent Adjust()\non Adjust\n    -> set Settled = Incoming\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile (MCP)",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        }
+      },
+      "citations": [
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs:208",
+          "note": "mint site — verified to fire in a stateless handler (obligation minted, PRE0141 on the unguarded base)"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1007",
+          "note": "the stateless-event-hook grammar that forbids when-guards"
+        }
+      ],
+      "notes": [
+        "OBSERVED BUILT BEHAVIOR (documented, NOT ratified as a discharge): `on Adjust when Incoming.currency == 'USD' -> set Settled = Incoming` compiles clean and reports the obligation Proved / QualifierCompatibility. Weakened `when Incoming.currency == 'EUR'` and `when Incoming.currency != 'USD'` both reject (same obligation), so the built discharge behaves exactly like the transition and state-hook cells. If the owner rules the spec stale (stateless handlers DO carry guards), this cell converts to 'defined' identical to those two. If the owner rules the compiler wrong (spec:1007 stands), this cell converts to 'open', mirroring the computed-field cell: the occasion mints but has no discharge, and the only clean spelling declares the source qualifier (removing the obligation).",
+        "This is exactly the hazard the slice's gate 5 warns of: a snippet that 'compiles clean' but rests on a discrepancy. It is FLAGGED and routed, not counted as a verified defined cell.",
+        "Not settled here whether the drift is in the parser (accepting `when` it should reject) or the spec (stale prohibition). Either way the DEFINITION does not currently determine this cell — hence conflicted."
+      ]
+    },
+    {
+      "id": "fault-assignmentqualifier-computed-field-business",
+      "label": "AssignmentQualifier — open business-domain source in a computed-field (<-) expression carrying a residual qualifier obligation; no guard context exists to discharge it",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "AssignmentQualifier",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Analysis.cs:547",
+            "note": "EmitCarriedQualifierObligations sites the residual AssignmentQualifier obligation on the computed expression (FieldExpressionContext) so guard-narrowing 'can reach it' — but no guard reaches it (next citation)."
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:197",
+            "note": "GuardOfContext has NO arm for FieldExpressionContext (only TransitionRow / StateHook / EventHandler / Constraint) → returns null → NarrowedValueFromGuard returns null → the obligation can never discharge. The sole discharge mechanism (class (c) guard-narrowing) is structurally absent for a computed field, which carries no when-guard. Live: `field Mirror as money in 'USD' <- Incoming` (Incoming open) mints the obligation Unresolved and rejects with PRE0141 'no guard narrows it', with NO construct available to add a narrowing guard."
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Incoming.currency == 'USD'",
+        "metavariables": [
+          {
+            "name": "Incoming",
+            "standsFor": "the open source field read by the computed expression (no declared qualifier on the axis)"
+          },
+          {
+            "name": "currency",
+            "standsFor": "the qualifier axis the computed target field declares"
+          },
+          {
+            "name": "'USD'",
+            "standsFor": "the computed field's required qualifier value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet; discrete ordinal equality"
+          }
+        ],
+        "wp": {
+          "statement": "Incoming.currency == 'USD'"
+        }
+      },
+      "witnesses": {
+        "base": {
+          "program": "precept AqComputedProbe\n\nfield Incoming as money default '0 USD' editable\nfield Mirror as money in 'USD' <- Incoming\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile (MCP)",
+            "date": "2026-07-21",
+            "head": "c295d7b4"
+          }
+        }
+      },
+      "citations": [
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/TypeChecker.cs:1048",
+          "note": "computedQualifierObligations = ValidateAssignmentQualifiers(...) — the computed-field mint path, carried to the proof stage via DefaultQualifierObligations"
+        },
+        {
+          "kind": "owner-ruling",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+          "date": "2026-07-20",
+          "note": "computed-field transitivity — a write to a <- input is a write site; but this cell is about the qualifier obligation ON the computed expression itself, not preservation via its inputs"
+        }
+      ],
+      "notes": [
+        "WHY OPEN, not defined: the matrix's generative sections give guard-narrowing (class (c)) as the SOLE discharge for AssignmentQualifier. A computed field carries no when-guard (spec: computed fields are `field X as T <- expr`, no guard clause), and GuardOfContext confirms no FieldExpressionContext arm. So the obligation mints but has NO discharge path — the generative sections do not determine this cell's answer. The built behavior (always reject) is consistent with prove-or-reject / prevention (unprovable = reject), but that is the ENGINE's fallback, not a written rule that this occasion should mint-and-always-reject.",
+        "The owner must rule which of three shapes is intended: (a) the site should NEVER mint (the type checker should keep resolving computed-field qualifiers — but it cannot, since the source is genuinely open); (b) the site mints and always rejects, respellable only by declaring the source qualifier statically (`field Incoming as money in 'USD'`), which removes the obligation — the current behavior, if endorsed; or (c) a computed field admits a class-(d) discharge (a `rule Incoming.currency == 'USD'`), which the built engine does NOT consult today and the matrix has not licensed.",
+        "Consistency point for the owner: shapes (b) and the stateless-conflict's spec-side arm are the SAME structural situation — an occasion whose sole discharge mechanism (a guard) does not exist in that construct. A single ruling on 'what happens when an AssignmentQualifier occasion has no guard context' resolves both this cell and the stateless cell's spec-side reading."
+      ]
+    }
+  ]
+}

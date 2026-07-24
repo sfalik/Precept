@@ -1,0 +1,298 @@
+{
+  "$schemaNote": "Fault-family coordinate map — the denominator only (kind x occasion x type-family). No discharge arguments or witnesses are authored here (next stage). Grounded against src/Precept/Pipeline/ProofEngine.cs, ProofEngine.Analysis.cs, src/Precept/Language/{Operations,Functions,Actions,Types,ProofRequirement}.cs, src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs, docs/Working/obligation-discharge-matrix-2026-07-19.md (site-identity ruling, 2026-07-21), docs/Working/transport-rule-restatement-2026-07-21.md (23-value evaluation-site axis), and docs/Working/obligation-discharge-matrix-2026-07-19-cells/slice-3-boundary-report.md (prior live-verified findings on catalog blind spots and build gaps, reused as corroboration, not as coverage).",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 + transport-rule-restatement-2026-07-21",
+  "generatedAt": "2026-07-21",
+  "kinds": [
+    {
+      "kind": "Numeric",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Operations.cs:124-722 (73 binary-op sites: divide/modulo across integer/decimal/number and money/quantity/price/period/duration pairs)", "howMinted": "catalog-declared on BinaryOperationMeta.ProofRequirements; instantiated at src/Precept/Pipeline/ProofEngine.cs:306-307 (bin.ProofRequirements) whenever WalkExpression visits a TypedBinaryOp" },
+        { "fileLine": "src/Precept/Language/Functions.cs:189 (pow, integer exponent >= 0), :206 (sqrt, number radicand >= 0)", "howMinted": "catalog-declared on FunctionOverload.ProofRequirements; instantiated at ProofEngine.cs:313-314 (call.ProofRequirements)" },
+        { "fileLine": "src/Precept/Language/Actions.cs:116,140,218,261 (dequeue/pop require count > 0)", "howMinted": "catalog-declared on ActionMeta.ProofRequirements; instantiated at ProofEngine.cs:447-448 (action.ProofRequirements, WalkActions)" },
+        { "fileLine": "src/Precept/Language/Types.cs (e.g. :190,197,208,219,230,236,243,258,264,271,300,306,313,328,334 — CollectionCountAccessor > 0 for element accessors such as .first/.last/.peek)", "howMinted": "catalog-declared on TypeAccessor.ProofRequirements; instantiated at ProofEngine.cs:319-321 (ma.ProofRequirements)" },
+        { "fileLine": "src/Precept/Pipeline/ProofEngine.Analysis.cs:627 (CollectNumericDefaultObligations)", "howMinted": "engine-synthesized: walks a field's or arg's declared+implied ModifierKind set, reads each ValueModifierMeta.ProofSatisfactions entry that is a Numeric/SelfValue satisfaction, and stamps a NumericProofRequirement against the default literal's static value. Driven off the Modifiers catalog's ProofSatisfactions table, not a ProofRequirements slot — no catalog site in the sense the other four rows have one." }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "rule-condition", "state-ensure-condition", "event-ensure-condition", "computed-field-expression",
+        "operand-free-action-precondition", "field-default-value-expression", "event-arg-modifier-value-expression",
+        "quantifier-predicate",
+        "transition-row-guard", "state-hook-guard", "rule-activation-guard", "ensure-activation-guard",
+        "reject-message-interpolation", "constraint-rationale-interpolation"
+      ],
+      "typeFamilies": ["primitive", "temporal", "business-domain", "collection"],
+      "cells": [
+        { "cellId": "fault-numeric-transition-action-primitive", "occasion": "transition-row-action-operand", "typeFamily": "primitive", "obligationSchema": "divide/modulo: ⟨divisor:integer|decimal|number⟩ != 0, at a transition row's `set` RHS (Operations.cs e.g. IntegerDivideInteger:124)" },
+        { "cellId": "fault-numeric-transition-action-business", "occasion": "transition-row-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨divisor:Money|Quantity|Price⟩ != 0, at a transition row's `set` RHS (Operations.cs:448,468,477,495 etc.)" },
+        { "cellId": "fault-numeric-transition-action-temporal", "occasion": "transition-row-action-operand", "typeFamily": "temporal", "obligationSchema": "⟨divisor:Period|Duration⟩ != 0, at a transition row's `set` RHS (Operations.cs:377,504,513 etc.)" },
+        { "cellId": "fault-numeric-state-hook-primitive", "occasion": "state-hook-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨divisor:integer|decimal|number⟩ != 0, at a state entry/exit hook action's RHS" },
+        { "cellId": "fault-numeric-state-hook-business", "occasion": "state-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨divisor:Money|Quantity|Price⟩ != 0, at a state entry/exit hook action's RHS" },
+        { "cellId": "fault-numeric-state-hook-temporal", "occasion": "state-hook-action-operand", "typeFamily": "temporal", "obligationSchema": "⟨divisor:Period|Duration⟩ != 0, at a state entry/exit hook action's RHS" },
+        { "cellId": "fault-numeric-stateless-hook-primitive", "occasion": "stateless-hook-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨divisor:integer|decimal|number⟩ != 0, in a stateless `on Event -> set ...` handler's RHS" },
+        { "cellId": "fault-numeric-stateless-hook-business", "occasion": "stateless-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨divisor:Money|Quantity|Price⟩ != 0, in a stateless handler's RHS" },
+        { "cellId": "fault-numeric-stateless-hook-temporal", "occasion": "stateless-hook-action-operand", "typeFamily": "temporal", "obligationSchema": "⟨divisor:Period|Duration⟩ != 0, in a stateless handler's RHS" },
+        { "cellId": "fault-numeric-rule-condition-primitive", "occasion": "rule-condition", "typeFamily": "primitive", "obligationSchema": "⟨divisor:integer|decimal|number⟩ != 0, inside a `rule` condition (ProofEngine.cs:236-239)" },
+        { "cellId": "fault-numeric-rule-condition-business", "occasion": "rule-condition", "typeFamily": "business-domain", "obligationSchema": "⟨divisor:Money|Quantity|Price⟩ != 0, inside a `rule` condition" },
+        { "cellId": "fault-numeric-rule-condition-temporal", "occasion": "rule-condition", "typeFamily": "temporal", "obligationSchema": "⟨divisor:Period|Duration⟩ != 0, inside a `rule` condition" },
+        { "cellId": "fault-numeric-state-ensure-primitive", "occasion": "state-ensure-condition", "typeFamily": "primitive", "obligationSchema": "⟨divisor:integer|decimal|number⟩ != 0, inside an `in S ensure` condition (ProofEngine.cs:242-248)" },
+        { "cellId": "fault-numeric-state-ensure-business", "occasion": "state-ensure-condition", "typeFamily": "business-domain", "obligationSchema": "⟨divisor:Money|Quantity|Price⟩ != 0, inside an `in S ensure` condition" },
+        { "cellId": "fault-numeric-state-ensure-temporal", "occasion": "state-ensure-condition", "typeFamily": "temporal", "obligationSchema": "⟨divisor:Period|Duration⟩ != 0, inside an `in S ensure` condition" },
+        { "cellId": "fault-numeric-event-ensure-primitive", "occasion": "event-ensure-condition", "typeFamily": "primitive", "obligationSchema": "⟨divisor:integer|decimal|number⟩ != 0, inside an `on E ensure` condition" },
+        { "cellId": "fault-numeric-event-ensure-business", "occasion": "event-ensure-condition", "typeFamily": "business-domain", "obligationSchema": "⟨divisor:Money|Quantity|Price⟩ != 0, inside an `on E ensure` condition" },
+        { "cellId": "fault-numeric-event-ensure-temporal", "occasion": "event-ensure-condition", "typeFamily": "temporal", "obligationSchema": "⟨divisor:Period|Duration⟩ != 0, inside an `on E ensure` condition" },
+        { "cellId": "fault-numeric-computed-field-primitive", "occasion": "computed-field-expression", "typeFamily": "primitive", "obligationSchema": "⟨divisor:integer|decimal|number⟩ != 0, inside a `<-` computed-field expression (ProofEngine.cs:250-257)" },
+        { "cellId": "fault-numeric-computed-field-business", "occasion": "computed-field-expression", "typeFamily": "business-domain", "obligationSchema": "⟨divisor:Money|Quantity|Price⟩ != 0, inside a computed-field expression" },
+        { "cellId": "fault-numeric-computed-field-temporal", "occasion": "computed-field-expression", "typeFamily": "temporal", "obligationSchema": "⟨divisor:Period|Duration⟩ != 0, inside a computed-field expression" },
+        { "cellId": "fault-numeric-action-precondition-collection", "occasion": "operand-free-action-precondition", "typeFamily": "collection", "obligationSchema": "⟨collection⟩.count > 0, the dequeue/pop precondition with no operand expression (Actions.cs:116,140,218,261)" },
+        { "cellId": "fault-numeric-field-default-primitive", "occasion": "field-default-value-expression", "typeFamily": "primitive", "obligationSchema": "⟨default-literal:decimal|number⟩ ⟨cmp⟩ ⟨declared-bound⟩, per declared/implied value modifier (ProofEngine.Analysis.cs:627)" },
+        { "cellId": "fault-numeric-field-default-business", "occasion": "field-default-value-expression", "typeFamily": "business-domain", "obligationSchema": "⟨default-literal:Money|Quantity|Price⟩ ⟨cmp⟩ ⟨declared-bound⟩, per declared/implied value modifier" },
+        { "cellId": "fault-numeric-arg-default-primitive", "occasion": "event-arg-modifier-value-expression", "typeFamily": "primitive", "obligationSchema": "⟨arg-default-literal:decimal|number⟩ ⟨cmp⟩ ⟨declared-bound⟩ (CollectArgDefaultObligations, ProofEngine.cs:267, same generator as field defaults)" },
+        { "cellId": "fault-numeric-arg-default-business", "occasion": "event-arg-modifier-value-expression", "typeFamily": "business-domain", "obligationSchema": "⟨arg-default-literal:Money|Quantity|Price⟩ ⟨cmp⟩ ⟨declared-bound⟩" },
+        { "cellId": "fault-numeric-quantifier-collection", "occasion": "quantifier-predicate", "typeFamily": "collection", "obligationSchema": "⟨divisor⟩ != 0 inside a quantifier predicate ranging over ⟨collection⟩ (WalkExpression case TypedQuantifier, ProofEngine.cs:335-338)" },
+        { "cellId": "fault-numeric-transition-guard-primitive-GAP", "occasion": "transition-row-guard", "typeFamily": "primitive", "obligationSchema": "[BUILD GAP — not minted at HEAD] ⟨divisor⟩ != 0 inside a transition row's `when` guard; TypedTransitionRow.Guard is never passed to WalkExpression in CollectObligations, only consulted for guard-decomposition as a discharge fact source" },
+        { "cellId": "fault-numeric-state-hook-guard-primitive-GAP", "occasion": "state-hook-guard", "typeFamily": "primitive", "obligationSchema": "[BUILD GAP — not minted at HEAD] ⟨divisor⟩ != 0 inside a state hook's own `when` guard; TypedStateHook.Guard is never walked" },
+        { "cellId": "fault-numeric-rule-activation-guard-primitive-GAP", "occasion": "rule-activation-guard", "typeFamily": "primitive", "obligationSchema": "[BUILD GAP — not minted at HEAD] ⟨divisor⟩ != 0 inside a conditional rule's `when` activation guard; TypedRule.Guard is never walked (only .Condition is, ProofEngine.cs:239)" },
+        { "cellId": "fault-numeric-ensure-activation-guard-primitive-GAP", "occasion": "ensure-activation-guard", "typeFamily": "primitive", "obligationSchema": "[BUILD GAP — not minted at HEAD] ⟨divisor⟩ != 0 inside an ensure's `when` activation guard; TypedEnsure.Guard is never walked (only .Condition is, ProofEngine.cs:247)" },
+        { "cellId": "fault-numeric-reject-interpolation-primitive-GAP", "occasion": "reject-message-interpolation", "typeFamily": "primitive", "obligationSchema": "[BUILD GAP, structural — not minted at HEAD] ⟨divisor⟩ != 0 inside a reject row's message interpolation; CollectObligations dispatches `if (row is TypedTransitionRowSuccess success) WalkActions(...)` — TypedTransitionRowReject rows are never visited at all, so RejectReason is never walked. This is the exact site want-doc:72 cites to argue the fault axis must exist." },
+        { "cellId": "fault-numeric-constraint-rationale-interpolation-primitive-GAP", "occasion": "constraint-rationale-interpolation", "typeFamily": "primitive", "obligationSchema": "[BUILD GAP — not minted at HEAD] ⟨divisor⟩ != 0 inside a rule/ensure's `because` message interpolation; TypedRule.Message / TypedEnsure.Message are never walked (only .Condition is)" }
+      ]
+    },
+    {
+      "kind": "Presence",
+      "hasCatalogSite": false,
+      "mintSites": [
+        { "fileLine": "src/Precept/Pipeline/ProofEngine.cs:374-377 (AddPresenceObligation)", "howMinted": "engine-synthesized: constructed directly inside WalkExpression, called at :293 for a TypedFieldRef whose resolved field has DeclaredPresenceMeta.Optional, and at :301 for a TypedArgRef under includeOptionalArgRefs=true. No catalog ProofRequirements slot is consulted — DeclaredPresenceMeta.Optional itself carries an empty ProofSatisfactions array (Language/DeclaredPresence.cs:14-16), confirming presence obligations are not catalog-declared data." }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "rule-condition", "state-ensure-condition", "event-ensure-condition", "computed-field-expression",
+        "quantifier-predicate"
+      ],
+      "typeFamilies": ["primitive", "temporal", "business-domain", "collection"],
+      "cells": [
+        { "cellId": "fault-presence-transition-primitive", "occasion": "transition-row-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨optional-field:primitive⟩ is-set, referenced in value position at a transition row's action RHS (ProofEngine.cs:284-295)" },
+        { "cellId": "fault-presence-state-hook-temporal", "occasion": "state-hook-action-operand", "typeFamily": "temporal", "obligationSchema": "⟨optional-field:temporal⟩ is-set, referenced in value position at a state hook's action RHS" },
+        { "cellId": "fault-presence-stateless-hook-business", "occasion": "stateless-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨optional-field:business-domain⟩ is-set, referenced in value position at a stateless handler's action RHS" },
+        { "cellId": "fault-presence-rule-condition-collection", "occasion": "rule-condition", "typeFamily": "collection", "obligationSchema": "⟨optional-field:collection⟩ is-set, referenced in value position inside a `rule` condition (e.g. via a member access recursing into the field-ref, ProofEngine.cs:319-323)" },
+        { "cellId": "fault-presence-state-ensure-primitive", "occasion": "state-ensure-condition", "typeFamily": "primitive", "obligationSchema": "⟨optional-field:primitive⟩ is-set, referenced inside an `in S ensure` condition" },
+        { "cellId": "fault-presence-event-ensure-temporal", "occasion": "event-ensure-condition", "typeFamily": "temporal", "obligationSchema": "⟨optional-field:temporal⟩ is-set, referenced inside an `on E ensure` condition" },
+        { "cellId": "fault-presence-computed-field-business", "occasion": "computed-field-expression", "typeFamily": "business-domain", "obligationSchema": "⟨optional-field:business-domain⟩ is-set, referenced inside a computed-field expression" },
+        { "cellId": "fault-presence-quantifier-collection", "occasion": "quantifier-predicate", "typeFamily": "collection", "obligationSchema": "⟨optional-field:collection⟩ is-set, referenced inside a quantifier predicate" }
+      ]
+    },
+    {
+      "kind": "Dimension",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Operations.cs:272,281 (PeriodDimension.Date), :299,308 (PeriodDimension.Time)", "howMinted": "catalog-declared on BinaryOperationMeta.ProofRequirements, restricted to a PPeriod ParamSubject; instantiated at ProofEngine.cs:306-307" }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "rule-condition", "state-ensure-condition", "event-ensure-condition", "computed-field-expression"
+      ],
+      "typeFamilies": ["temporal"],
+      "cells": [
+        { "cellId": "fault-dimension-transition-temporal", "occasion": "transition-row-action-operand", "typeFamily": "temporal", "obligationSchema": "⟨period-operand⟩.dimension == ⟨required:Date|Time⟩, at a transition row's action RHS" },
+        { "cellId": "fault-dimension-state-hook-temporal", "occasion": "state-hook-action-operand", "typeFamily": "temporal", "obligationSchema": "⟨period-operand⟩.dimension == ⟨required:Date|Time⟩, at a state hook's action RHS" },
+        { "cellId": "fault-dimension-stateless-hook-temporal", "occasion": "stateless-hook-action-operand", "typeFamily": "temporal", "obligationSchema": "⟨period-operand⟩.dimension == ⟨required:Date|Time⟩, at a stateless handler's action RHS" },
+        { "cellId": "fault-dimension-rule-condition-temporal", "occasion": "rule-condition", "typeFamily": "temporal", "obligationSchema": "⟨period-operand⟩.dimension == ⟨required:Date|Time⟩, inside a `rule` condition" },
+        { "cellId": "fault-dimension-state-ensure-temporal", "occasion": "state-ensure-condition", "typeFamily": "temporal", "obligationSchema": "⟨period-operand⟩.dimension == ⟨required:Date|Time⟩, inside an `in S ensure` condition" },
+        { "cellId": "fault-dimension-event-ensure-temporal", "occasion": "event-ensure-condition", "typeFamily": "temporal", "obligationSchema": "⟨period-operand⟩.dimension == ⟨required:Date|Time⟩, inside an `on E ensure` condition" },
+        { "cellId": "fault-dimension-computed-field-temporal", "occasion": "computed-field-expression", "typeFamily": "temporal", "obligationSchema": "⟨period-operand⟩.dimension == ⟨required:Date|Time⟩, inside a computed-field expression" }
+      ]
+    },
+    {
+      "kind": "Modifier",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Operations.cs:871,879,887,895 (choice ordinal comparison operators)", "howMinted": "catalog-declared on BinaryOperationMeta.ProofRequirements (ModifierKind.Ordered required on the PChoice operand); instantiated at ProofEngine.cs:306-307" }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "rule-condition", "state-ensure-condition",
+        "computed-field-expression", "quantifier-predicate"
+      ],
+      "typeFamilies": ["primitive"],
+      "cells": [
+        { "cellId": "fault-modifier-transition-primitive", "occasion": "transition-row-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨choice-field⟩ declares 'ordered', at an ordinal comparison (>,<,>=,<=) in a transition row's action RHS" },
+        { "cellId": "fault-modifier-rule-condition-primitive", "occasion": "rule-condition", "typeFamily": "primitive", "obligationSchema": "⟨choice-field⟩ declares 'ordered', at an ordinal comparison inside a `rule` condition" },
+        { "cellId": "fault-modifier-state-ensure-primitive", "occasion": "state-ensure-condition", "typeFamily": "primitive", "obligationSchema": "⟨choice-field⟩ declares 'ordered', at an ordinal comparison inside an `in S ensure` condition" },
+        { "cellId": "fault-modifier-computed-field-primitive", "occasion": "computed-field-expression", "typeFamily": "primitive", "obligationSchema": "⟨choice-field⟩ declares 'ordered', at an ordinal comparison inside a computed-field expression" },
+        { "cellId": "fault-modifier-quantifier-primitive", "occasion": "quantifier-predicate", "typeFamily": "primitive", "obligationSchema": "⟨choice-field⟩ declares 'ordered', at an ordinal comparison inside a quantifier predicate" }
+      ]
+    },
+    {
+      "kind": "QualifierCompatibility",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Operations.cs:423,433,524,534,625,627,637,639,1006-1175 (20+ sites: Money+Money currency-axis, Quantity+Quantity unit-axis, Price+Price unit/currency-axis)", "howMinted": "catalog-declared on BinaryOperationMeta.ProofRequirements (dual-subject, QualifierAxis.Currency / .Unit); instantiated at ProofEngine.cs:306-307" }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "rule-condition", "state-ensure-condition", "computed-field-expression"
+      ],
+      "typeFamilies": ["business-domain"],
+      "cells": [
+        { "cellId": "fault-qualifiercompat-transition-business", "occasion": "transition-row-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨left:Money|Quantity|Price⟩.⟨axis:Currency|Unit⟩ == ⟨right:same-type⟩.⟨axis⟩, at a transition row's action RHS" },
+        { "cellId": "fault-qualifiercompat-state-hook-business", "occasion": "state-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨axis⟩ == ⟨right⟩.⟨axis⟩, at a state hook's action RHS" },
+        { "cellId": "fault-qualifiercompat-stateless-hook-business", "occasion": "stateless-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨axis⟩ == ⟨right⟩.⟨axis⟩, at a stateless handler's action RHS" },
+        { "cellId": "fault-qualifiercompat-rule-condition-business", "occasion": "rule-condition", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨axis⟩ == ⟨right⟩.⟨axis⟩, inside a `rule` condition" },
+        { "cellId": "fault-qualifiercompat-state-ensure-business", "occasion": "state-ensure-condition", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨axis⟩ == ⟨right⟩.⟨axis⟩, inside an `in S ensure` condition" },
+        { "cellId": "fault-qualifiercompat-computed-field-business", "occasion": "computed-field-expression", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨axis⟩ == ⟨right⟩.⟨axis⟩, inside a computed-field expression" }
+      ]
+    },
+    {
+      "kind": "QualifierChain",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Operations.cs:492 (Money/Currency chain), :649,660,671 (Price/Dimension chain), :708 (ExchangeRate/FromCurrency chain)", "howMinted": "catalog-declared on BinaryOperationMeta.ProofRequirements (cross-type, cross-axis QualifierAxis pair on LeftSubject/RightSubject); instantiated at ProofEngine.cs:306-307" }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "rule-condition",
+        "state-ensure-condition", "computed-field-expression"
+      ],
+      "typeFamilies": ["business-domain"],
+      "cells": [
+        { "cellId": "fault-qualifierchain-transition-business", "occasion": "transition-row-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨leftAxis⟩ chains-to ⟨right⟩.⟨rightAxis⟩ (e.g. Price.Dimension composed from Money.Currency and Quantity.Unit), at a transition row's action RHS" },
+        { "cellId": "fault-qualifierchain-state-hook-business", "occasion": "state-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨leftAxis⟩ chains-to ⟨right⟩.⟨rightAxis⟩, at a state hook's action RHS" },
+        { "cellId": "fault-qualifierchain-rule-condition-business", "occasion": "rule-condition", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨leftAxis⟩ chains-to ⟨right⟩.⟨rightAxis⟩, inside a `rule` condition" },
+        { "cellId": "fault-qualifierchain-state-ensure-business", "occasion": "state-ensure-condition", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨leftAxis⟩ chains-to ⟨right⟩.⟨rightAxis⟩, inside an `in S ensure` condition" },
+        { "cellId": "fault-qualifierchain-computed-field-business", "occasion": "computed-field-expression", "typeFamily": "business-domain", "obligationSchema": "⟨left⟩.⟨leftAxis⟩ chains-to ⟨right⟩.⟨rightAxis⟩, inside a computed-field expression" }
+      ]
+    },
+    {
+      "kind": "IntervalContainment",
+      "hasCatalogSite": false,
+      "mintSites": [
+        { "fileLine": "src/Precept/Pipeline/ProofEngine.Analysis.cs:518 (CollectElementIntervalDefaultObligations, default collection element), :562 (CollectComputedFieldBoundObligations, computed field result vs its own declared bound)", "howMinted": "engine-synthesized: reads the field's own declared min/max (GetFieldBounds / ElementType.ValueBounds) directly; no catalog ProofRequirements slot" },
+        { "fileLine": "src/Precept/Language/Actions.cs:460 (BuildIntervalContainmentObligation, scalar `set`), :~390-420 (GenerateElementIntervalContainmentObligation, collection element write)", "howMinted": "engine-synthesized per-field: the dispatch is catalog-REGISTERED (ActionMeta.DynamicObligationGenerator, a function-pointer field assigned at Actions.cs:76 for the Set action kind — see Language/Action.cs:30/46) but the obligation instance itself is built dynamically from the target field's declared bounds at Actions.cs:281-329 (GenerateIntervalContainmentObligations), not declared as static catalog data. Invoked from src/Precept/Pipeline/ProofEngine.cs:454-469 (scalar) and :487-489 (element write)." }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "computed-field-expression", "field-default-value-expression", "event-arg-modifier-value-expression"
+      ],
+      "typeFamilies": ["primitive", "business-domain", "collection"],
+      "cells": [
+        { "cellId": "fault-intervalcontainment-transition-primitive", "occasion": "transition-row-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨assigned-expr:decimal|number⟩) <= ⟨declaredMax⟩, at a scalar `set` in a transition row (Actions.cs:281-303)" },
+        { "cellId": "fault-intervalcontainment-transition-business", "occasion": "transition-row-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨assigned-expr:Money|Quantity⟩) <= ⟨declaredMax⟩, at a scalar `set` in a transition row" },
+        { "cellId": "fault-intervalcontainment-transition-collection", "occasion": "transition-row-action-operand", "typeFamily": "collection", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨element-expr⟩) <= ⟨declaredMax⟩, at an element-introducing action (enqueue/add/push/append/insert/put) into a numeric-bounded collection (GenerateElementIntervalContainmentObligation)" },
+        { "cellId": "fault-intervalcontainment-state-hook-primitive", "occasion": "state-hook-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨assigned-expr⟩) <= ⟨declaredMax⟩, at a scalar `set` in a state hook" },
+        { "cellId": "fault-intervalcontainment-stateless-hook-primitive", "occasion": "stateless-hook-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨assigned-expr⟩) <= ⟨declaredMax⟩, at a scalar `set` in a stateless handler" },
+        { "cellId": "fault-intervalcontainment-computed-field-primitive", "occasion": "computed-field-expression", "typeFamily": "primitive", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨computed-expr⟩) <= ⟨declaredMax⟩, against the computed field's own declared bound (ProofEngine.Analysis.cs:562)" },
+        { "cellId": "fault-intervalcontainment-computed-field-business", "occasion": "computed-field-expression", "typeFamily": "business-domain", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨computed-expr:Money|Quantity⟩) <= ⟨declaredMax⟩" },
+        { "cellId": "fault-intervalcontainment-field-default-primitive", "occasion": "field-default-value-expression", "typeFamily": "primitive", "obligationSchema": "⟨declaredMin⟩ <= ⟨default-literal⟩ <= ⟨declaredMax⟩ (ProofEngine.Analysis.cs:562, non-list scalar default path shares CollectComputedFieldBoundObligations' bound source via CollectDefaultObligations)" },
+        { "cellId": "fault-intervalcontainment-field-default-collection", "occasion": "field-default-value-expression", "typeFamily": "collection", "obligationSchema": "⟨declaredMin⟩ <= interval(⟨each-default-list-element⟩) <= ⟨declaredMax⟩, per element of a `default [...]` literal on a numeric-bounded collection (ProofEngine.Analysis.cs:503-530)" },
+        { "cellId": "fault-intervalcontainment-arg-default-primitive", "occasion": "event-arg-modifier-value-expression", "typeFamily": "primitive", "obligationSchema": "⟨declaredMin⟩ <= ⟨arg-default-literal⟩ <= ⟨declaredMax⟩ (CollectArgDefaultObligations, ProofEngine.cs:267)" }
+      ]
+    },
+    {
+      "kind": "LengthContainment",
+      "hasCatalogSite": false,
+      "mintSites": [
+        { "fileLine": "src/Precept/Pipeline/ProofEngine.Analysis.cs:481 (CollectElementLengthDefaultObligations, default collection element), :671 (CollectLengthDefaultObligation, field default)", "howMinted": "engine-synthesized: reads the field's own declared minlength/maxlength (plus notempty->minlength 1 folding) directly; no catalog ProofRequirements slot" },
+        { "fileLine": "src/Precept/Language/Actions.cs:429 (BuildLengthContainmentObligation, scalar `set`), :343-388 (GenerateElementLengthContainmentObligation, collection element write)", "howMinted": "engine-synthesized per-field via the same ActionMeta.DynamicObligationGenerator catalog-registered hook as IntervalContainment (Actions.cs:76, GenerateIntervalContainmentObligations lines 302-317); invoked from ProofEngine.cs:454-469 and :479-481" }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "field-default-value-expression"
+      ],
+      "typeFamilies": ["primitive", "collection"],
+      "cells": [
+        { "cellId": "fault-lengthcontainment-transition-primitive", "occasion": "transition-row-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨declaredMinLength⟩ <= length(⟨assigned-string-expr⟩) <= ⟨declaredMaxLength⟩, at a scalar `set` into a length-bounded string field" },
+        { "cellId": "fault-lengthcontainment-transition-collection", "occasion": "transition-row-action-operand", "typeFamily": "collection", "obligationSchema": "⟨declaredMinLength⟩ <= length(⟨element-string-expr⟩) <= ⟨declaredMaxLength⟩, at an element-introducing action into a string-bounded collection" },
+        { "cellId": "fault-lengthcontainment-state-hook-primitive", "occasion": "state-hook-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨declaredMinLength⟩ <= length(⟨assigned-string-expr⟩) <= ⟨declaredMaxLength⟩, at a scalar `set` in a state hook" },
+        { "cellId": "fault-lengthcontainment-stateless-hook-primitive", "occasion": "stateless-hook-action-operand", "typeFamily": "primitive", "obligationSchema": "⟨declaredMinLength⟩ <= length(⟨assigned-string-expr⟩) <= ⟨declaredMaxLength⟩, at a scalar `set` in a stateless handler" },
+        { "cellId": "fault-lengthcontainment-field-default-primitive", "occasion": "field-default-value-expression", "typeFamily": "primitive", "obligationSchema": "⟨declaredMinLength⟩ <= length(⟨default-string-literal⟩) <= ⟨declaredMaxLength⟩" },
+        { "cellId": "fault-lengthcontainment-field-default-collection", "occasion": "field-default-value-expression", "typeFamily": "collection", "obligationSchema": "⟨declaredMinLength⟩ <= length(⟨each-default-list-element⟩) <= ⟨declaredMaxLength⟩, per string element of a `default [...]` literal" }
+      ]
+    },
+    {
+      "kind": "CountContainment",
+      "hasCatalogSite": false,
+      "mintSites": [
+        { "fileLine": "src/Precept/Pipeline/ProofEngine.cs:598-651 (CountContainmentObligation, write-site: Empties/ReplacesValue/Grows/Shrinks)", "howMinted": "engine-synthesized: computed per-mutation from the field's declared mincount/maxcount and the action's catalog ActionEffectClass classification (Grows/Shrinks/Empties/ReplacesValue); no catalog ProofRequirements slot — the catalog only supplies the effect-class label the generator switches on" },
+        { "fileLine": "src/Precept/Pipeline/ProofEngine.Analysis.cs:693-716 (CollectCountDefaultObligation)", "howMinted": "engine-synthesized: a field's `default [...]` literal element count compared against declared mincount/maxcount" }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "field-default-value-expression"
+      ],
+      "typeFamilies": ["collection"],
+      "cells": [
+        { "cellId": "fault-countcontainment-transition-collection", "occasion": "transition-row-action-operand", "typeFamily": "collection", "obligationSchema": "⟨declaredMinCount⟩ <= post-mutation-count(⟨collection⟩) <= ⟨declaredMaxCount⟩, on any mutating action (grow/shrink/clear/replace) in a transition row" },
+        { "cellId": "fault-countcontainment-state-hook-collection", "occasion": "state-hook-action-operand", "typeFamily": "collection", "obligationSchema": "⟨declaredMinCount⟩ <= post-mutation-count(⟨collection⟩) <= ⟨declaredMaxCount⟩, on a mutating action in a state hook" },
+        { "cellId": "fault-countcontainment-stateless-hook-collection", "occasion": "stateless-hook-action-operand", "typeFamily": "collection", "obligationSchema": "⟨declaredMinCount⟩ <= post-mutation-count(⟨collection⟩) <= ⟨declaredMaxCount⟩, on a mutating action in a stateless handler" },
+        { "cellId": "fault-countcontainment-field-default-collection", "occasion": "field-default-value-expression", "typeFamily": "collection", "obligationSchema": "⟨declaredMinCount⟩ <= count(⟨default-list-literal⟩) <= ⟨declaredMaxCount⟩" }
+      ]
+    },
+    {
+      "kind": "KeyPresence",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Actions.cs:176", "howMinted": "catalog-declared on ActionMeta.ProofRequirements (RequireAbsence: true — e.g. an `append ... by` ordering-key uniqueness precondition); instantiated at ProofEngine.cs:447-448" }
+      ],
+      "occasions": [
+        "operand-free-action-precondition", "state-hook-action-operand", "stateless-hook-action-operand"
+      ],
+      "typeFamilies": ["collection"],
+      "cells": [
+        { "cellId": "fault-keypresence-transition-collection", "occasion": "operand-free-action-precondition", "typeFamily": "collection", "obligationSchema": "⟨key⟩ not-in ⟨collection⟩ (or must-be-in, per RequireAbsence), the action's own precondition in a transition row (Actions.cs:176)" },
+        { "cellId": "fault-keypresence-state-hook-collection", "occasion": "state-hook-action-operand", "typeFamily": "collection", "obligationSchema": "⟨key⟩ not-in ⟨collection⟩, the action's own precondition in a state hook" },
+        { "cellId": "fault-keypresence-stateless-hook-collection", "occasion": "stateless-hook-action-operand", "typeFamily": "collection", "obligationSchema": "⟨key⟩ not-in ⟨collection⟩, the action's own precondition in a stateless handler" }
+      ]
+    },
+    {
+      "kind": "IndexBounds",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Actions.cs:192,220 (insert-at / remove-at, IndexBoundsMode.AtOrBefore / .StrictlyBefore)", "howMinted": "catalog-declared on ActionMeta.ProofRequirements; instantiated at ProofEngine.cs:447-448" },
+        { "fileLine": "src/Precept/Language/Types.cs:245,273,315 (.at(N) accessor)", "howMinted": "catalog-declared on TypeAccessor.ProofRequirements; instantiated at ProofEngine.cs:319-321 (ma.ProofRequirements)" }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "rule-condition", "computed-field-expression"
+      ],
+      "typeFamilies": ["collection"],
+      "cells": [
+        { "cellId": "fault-indexbounds-transition-collection", "occasion": "transition-row-action-operand", "typeFamily": "collection", "obligationSchema": "0 <= ⟨index⟩ < ⟨collection⟩.count (or <= for insert-at), at an indexed action/accessor in a transition row" },
+        { "cellId": "fault-indexbounds-state-hook-collection", "occasion": "state-hook-action-operand", "typeFamily": "collection", "obligationSchema": "0 <= ⟨index⟩ < ⟨collection⟩.count, at an indexed action/accessor in a state hook" },
+        { "cellId": "fault-indexbounds-stateless-hook-collection", "occasion": "stateless-hook-action-operand", "typeFamily": "collection", "obligationSchema": "0 <= ⟨index⟩ < ⟨collection⟩.count, at an indexed action/accessor in a stateless handler" },
+        { "cellId": "fault-indexbounds-rule-condition-collection", "occasion": "rule-condition", "typeFamily": "collection", "obligationSchema": "0 <= ⟨index⟩ < ⟨collection⟩.count, at a `.at(N)` accessor inside a `rule` condition" },
+        { "cellId": "fault-indexbounds-computed-field-collection", "occasion": "computed-field-expression", "typeFamily": "collection", "obligationSchema": "0 <= ⟨index⟩ < ⟨collection⟩.count, at a `.at(N)` accessor inside a computed-field expression" }
+      ]
+    },
+    {
+      "kind": "DimensionalProduct",
+      "hasCatalogSite": true,
+      "mintSites": [
+        { "fileLine": "src/Precept/Language/Operations.cs:605 (QuantityTimesQuantity)", "howMinted": "catalog-declared on BinaryOperationMeta.ProofRequirements (dual-subject, dimension-vector product against the curated DimensionCatalog); instantiated at ProofEngine.cs:306-307" }
+      ],
+      "occasions": ["transition-row-action-operand", "rule-condition", "computed-field-expression"],
+      "typeFamilies": ["business-domain"],
+      "cells": [
+        { "cellId": "fault-dimensionalproduct-transition-business", "occasion": "transition-row-action-operand", "typeFamily": "business-domain", "obligationSchema": "dimension(⟨left:Quantity⟩) x dimension(⟨right:Quantity⟩) in CuratedDimensions, at a transition row's action RHS" },
+        { "cellId": "fault-dimensionalproduct-rule-condition-business", "occasion": "rule-condition", "typeFamily": "business-domain", "obligationSchema": "dimension(⟨left⟩) x dimension(⟨right⟩) in CuratedDimensions, inside a `rule` condition" },
+        { "cellId": "fault-dimensionalproduct-computed-field-business", "occasion": "computed-field-expression", "typeFamily": "business-domain", "obligationSchema": "dimension(⟨left⟩) x dimension(⟨right⟩) in CuratedDimensions, inside a computed-field expression" }
+      ]
+    },
+    {
+      "kind": "AssignmentQualifier",
+      "hasCatalogSite": false,
+      "mintSites": [
+        { "fileLine": "src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs:208", "howMinted": "engine-synthesized by the type checker: stamped directly onto the action's ProofRequirements when an OPEN field (no declared qualifier on the axis) is assigned to a qualifier-bearing target field, under an enclosing guard that must narrow it. Not declared on any catalog metadata — the type checker owns the qualifier resolver and the proof engine only discharges (docs/compiler/proof-engine.md, Decision 3: 'type checker stamps, proof engine discharges')." }
+      ],
+      "occasions": [
+        "transition-row-action-operand", "state-hook-action-operand", "stateless-hook-action-operand",
+        "computed-field-expression"
+      ],
+      "typeFamilies": ["business-domain"],
+      "cells": [
+        { "cellId": "fault-assignmentqualifier-transition-business", "occasion": "transition-row-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨open-field-expr⟩.⟨axis⟩ == ⟨target⟩.⟨axis⟩ under guard-narrowing, at an assignment into a qualified target field in a transition row" },
+        { "cellId": "fault-assignmentqualifier-state-hook-business", "occasion": "state-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨open-field-expr⟩.⟨axis⟩ == ⟨target⟩.⟨axis⟩ under guard-narrowing, at an assignment in a state hook" },
+        { "cellId": "fault-assignmentqualifier-stateless-hook-business", "occasion": "stateless-hook-action-operand", "typeFamily": "business-domain", "obligationSchema": "⟨open-field-expr⟩.⟨axis⟩ == ⟨target⟩.⟨axis⟩ under guard-narrowing, at an assignment in a stateless handler" },
+        { "cellId": "fault-assignmentqualifier-computed-field-business", "occasion": "computed-field-expression", "typeFamily": "business-domain", "obligationSchema": "⟨open-field-expr⟩.⟨axis⟩ == ⟨target⟩.⟨axis⟩ under guard-narrowing, at an open-axis computed-field expression carrying a residual assignment-qualifier obligation (ProofEngine.Analysis.cs:546-548, EmitCarriedQualifierObligations)" }
+      ]
+    }
+  ],
+  "notes": "SCOPE AND METHOD. Grounding for mint sites and occasions comes from reading src/Precept/Pipeline/ProofEngine.cs (CollectObligations, WalkExpression, WalkActions), ProofEngine.Analysis.cs, ProofEngine.Intervals.cs, the four requirement-declaring catalogs (Operations.cs, Functions.cs, Actions.cs, Types.cs), Action.cs (the DynamicObligationGenerator catalog field), TypeChecker.Expressions.AssignmentQualifiers.cs, and DeclaredPresence.cs — not from precept_compile, which per the corrected inputs is a syntax/compile oracle only. Where slice-3-boundary-report.md's own live-verified findings corroborate a source-reading conclusion, that is cited as corroboration, not as the ground truth itself.\n\n1) FIVE KINDS HAVE NO CATALOG SITE, confirmed independently by an exhaustive grep of every `new <Kind>ProofRequirement(` construction across src/Precept/: Presence (ProofEngine.cs:374), IntervalContainment (ProofEngine.Analysis.cs:518,562 plus Actions.cs:460), LengthContainment (ProofEngine.Analysis.cs:481,671 plus Actions.cs:429), CountContainment (ProofEngine.cs:641, ProofEngine.Analysis.cs:703), AssignmentQualifier (TypeChecker.Expressions.AssignmentQualifiers.cs:208). This matches the corrected-input's own citation set and slice-3-boundary-report.md finding #1 (independently re-derived here, not copied).\n\n2) NUMERIC HAS A SPLIT MINT IDENTITY. The dominant path is catalog-declared (BinaryOperationMeta/FunctionOverload/ActionMeta/TypeAccessor.ProofRequirements), but ProofEngine.Analysis.cs:627 (CollectNumericDefaultObligations) synthesizes additional Numeric obligations by reading the Modifiers catalog's ProofSatisfactions table (not a ProofRequirements slot) against a field/arg default literal. hasCatalogSite is recorded true for the kind as a whole because the majority of its mint sites are genuinely catalog-declared, but this default-value path is a second, engine-driven mechanism that a catalog-only enumeration would also miss — it is one of the seven dynamic mechanisms slice-3 named, independently reconfirmed here at its exact line.\n\n3) THE DYNAMIC-GENERATOR HOOK IS CATALOG-REGISTERED BUT ITS OUTPUT IS SYNTHESIZED. IntervalContainment's and LengthContainment's write-site (non-default) obligations run through ActionMeta.DynamicObligationGenerator — a function-pointer field literally declared on the catalog (Action.cs:30/46, assigned at Actions.cs:76 for the Set action kind). The dispatch is catalog metadata; the obligation instance is built dynamically per field from GetFieldBounds/declared min/max, which is why hasCatalogSite is recorded false for both kinds — no catalog member declares a bound value or a ProofRequirement instance, only the fact that Set actions should run a generator at all. This is a real nuance a strict binary catalog/synthesized split loses, and is called out explicitly here per the corrected input's instruction to find the real mint sites rather than trust catalog-only vocabulary.\n\n4) TEN EVALUATION POSITIONS ARE DEFINITIONALLY REQUIRED BUT MINT NOTHING AT HEAD (build gaps), independently confirmed here by reading CollectObligations/WalkActions/WalkExpression: TypedTransitionRow.Guard, TypedStateHook.Guard, TypedRule.Guard, and TypedEnsure.Guard are consulted only as discharge fact sources (GuardOfContext / ExtractGuardBranches), never passed to WalkExpression — so transition-row-guard, state-hook-guard, rule-activation-guard, and ensure-activation-guard mint nothing. TypedRule.Message / TypedEnsure.Message are never walked at all, so constraint-rationale-interpolation mints nothing. Most strikingly, CollectObligations's per-row dispatch is `if (row is TypedTransitionRowSuccess success) WalkActions(...)` (ProofEngine.cs:216-217) — TypedTransitionRowReject rows are never visited by any walk, so reject-message-interpolation is not under-walked, it is structurally unreachable in the current pipeline. This is the exact site want-doc:72 cites to argue the fault axis has to exist at all, so its absence from the mint surface is a first-order gap, not a minor one. These findings corroborate (via independent source-reading) rather than merely repeat slice-3-boundary-report.md finding #9's already-live-verified list. Representative GAP cells are recorded once per affected occasion (primitive family only) in the Numeric kind rather than crossed with every type family, since the disposition (nothing minted) does not vary by operand type; the same gap applies identically wherever these occasions would otherwise appear for Dimension/Modifier/QualifierCompatibility/QualifierChain/DimensionalProduct — omitted from those kinds' cell lists for space and flagged here rather than silently dropped.\n\n5) TWO EVALUATION-SITE CATEGORIES ARE LEFT OUT OF EVERY KIND'S OCCASION LIST AS UNRESOLVED: type-qualifier-expression and collection-inner-type-modifier-value-expression. I could not determine, from source in the time available, which kind(s) if any actually construct a ProofRequirement at these positions, and slice-3-boundary-report.md independently recorded both as unmeasured (with the added confound that an undeclared reference in these positions produces zero diagnostics at HEAD, meaning the expression is not even type-checked there). field-modifier-value-expression is similarly left out for the same reason for every kind except where an engine-synthesized default/write-site path demonstrably reads a modifier's own declared bound (which is a different mechanism than walking a modifier's expression as a fault site).\n\n6) access-mode-guard IS AN UNRESOLVED COORDINATE. No code path in ProofEngine.cs walks TypedAccessMode.Guard. I could not determine in this pass whether that is a deliberate scope exclusion (access-mode guards are a governance/type-checking concern, not a fault-proof site) or an eleventh build gap beyond slice-3's ten. Left out of every kind's occasions rather than guessed.\n\n7) construction-row-action-operand IS AN UNRESOLVED COORDINATE. The ObligationContext DU (ProofLedger.cs:85-92) has exactly eight subtypes — TransitionRowContext, ConstraintContext, StateHookContext, EventHandlerContext, FieldExpressionContext, FieldDefaultContext, ArgDefaultContext — with no distinct construction-specific context. CollectObligations walks TransitionRows/EventHandlers/StateHooks/Rules/Ensures/computed-and-default expressions only; there is no separate construction-row pass. Whether construction fires through TransitionRowContext (an initial transition row) or EventHandlerContext (the initial event's own handler, structurally identical to a stateless handler) was not resolved against the parser/grammar in the time budget for this pass, even though the transport-rule-restatement doc's route table treats construction-row-action-operand and stateless-hook-action-operand as two distinct site categories. Left out of every kind's occasion list rather than asserted; flagged here as a genuine gap in this coordinate map, not a pruned-empty cell.\n\n8) TYPE-FAMILY APPLICABILITY VERIFIED AGAINST DOC TEXT WHERE POSSIBLE: Presence applies to all four families per collection-types.md:779 ('optional | any field type (including collections)'). Choice (Modifier's only family) is documented in primitive-types.md, confirming primitive rather than business-domain. IntervalContainment's applicability to the temporal family (whether duration/period fields can carry declared min/max via a Numeric SelfValue ProofSatisfaction) is UNVERIFIED in this pass — GetFieldBounds (ProofEngine.Intervals.cs:332) is generic over any field carrying such a modifier satisfaction, but I did not check whether any temporal-lane modifier ever produces one; left out of IntervalContainment's typeFamilies rather than assumed, flagged here.\n\n9) CELL-LIST COMPRESSION, STATED EXPLICITLY RATHER THAN SILENT. For Presence, whose obligation schema ('subject is-set') is provably invariant across the four type families (the family only changes which label the subject's type carries, never the schema's shape), the eight occasions are each paired with one representative family (cycled across all four) rather than the full 32-cell mechanical cross, to avoid 24 cells that would repeat an identical schema shape. For Numeric's six build-gap occasions, one primitive-family cell each is recorded rather than the full three/four-family cross, per point 4 above. Every other kind's cell list is the genuine full occasion x type-family cross for that kind's (typically narrow, 1-3 family) applicable set, with no compression.\n\n10) THIS COORDINATE MAP DOES NOT CARRY DISPOSITIONS (defined/open/deferred/empty/conflicted) OR DECISION PROCEDURES. Per the task's own scope, discharge arguments and witnesses are the next stage; this file is the denominator only. It also does not re-litigate the prior fault-1..fault-19 per-operator cell files or the fault-axis-disposition-map.csv's 101-site x 23-category x 4-family enumeration — that prior work was built against the catalog-only framing the corrected inputs explicitly supersede (it is cited in slice-3-boundary-report.md as containing 13 unsound and 6 needs-rework verdicts out of 19 files, zero passed), and this document reindexes the same evaluation-site and type-family vocabularies by the 13 ProofRequirementKind members instead of by catalog-member-instance, per this task's instructions. The prior work's per-operator granularity (e.g., IntegerDivideInteger vs DecimalDivideDecimal as separate rows) is a finer axis this task was not asked to reproduce.\n\n11) mid(str,start,length)'s undeclared positivity precondition and pow's exponent requirement being stated only on the integer overload (both raised in slice-3-boundary-report.md as open catalog-fidelity questions, not fault-family coordinate-map questions) are out of scope for this pass and are not re-adjudicated here.\n\n12) overflow (NumericOverflow / IntervalContainmentProofRequirement's NumericOverflow diagnostic under an unbounded interval) and temporal-arithmetic overflow are excluded from this map's cell content per the matrix's own owner-ruled deferral (matrix § The approximate lane, 2026-07-21) and the transport-rule-restatement doc's explicit out-of-scope statement; IntervalContainment's cells above describe the declared-bound containment check only, not the separate overflow question."
+}

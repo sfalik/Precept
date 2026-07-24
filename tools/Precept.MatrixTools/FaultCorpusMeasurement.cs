@@ -16,6 +16,7 @@ public sealed record FaultCorpusRow(
     string RequirementKind,
     string RequirementDescription,
     string ContextClass,
+    string ContextDetail,
     string Disposition,
     string? Strategy,
     string? EmittedDiagnostic);
@@ -96,6 +97,7 @@ public static class FaultCorpusMeasurement
                 RequirementKind: o.Requirement.Kind.ToString(),
                 RequirementDescription: o.Requirement.Description,
                 ContextClass: o.Context.GetType().Name,
+                ContextDetail: DescribeContext(o.Context),
                 Disposition: o.Disposition.ToString(),
                 Strategy: o.Strategy?.ToString(),
                 EmittedDiagnostic: o.EmittedDiagnostic?.ToString())).ToArray();
@@ -131,6 +133,21 @@ public static class FaultCorpusMeasurement
             // sites, so every instance is constructed in pipeline code.
             CatalogKindsWithNoCatalogSite: ["Presence", "IntervalContainment", "LengthContainment", "CountContainment", "AssignmentQualifier"]);
     }
+
+    /// <summary>
+    /// A finer-grained context label than <see cref="ObligationContext"/>'s runtime type name —
+    /// distinguishes a rule condition from a state/event ensure condition (both surface as
+    /// <c>ConstraintContext</c>), so the corpus measurement can match against the fault cell
+    /// files' evaluation-site-category vocabulary (rule-condition / state-ensure-condition /
+    /// event-ensure-condition), which the plain context-class name collapses.
+    /// </summary>
+    private static string DescribeContext(ObligationContext context) => context switch
+    {
+        ConstraintContext { Constraint: RuleIdentity } => "ConstraintContext/Rule",
+        ConstraintContext { Constraint: EnsureIdentity ensure } =>
+            $"ConstraintContext/Ensure:{ensure.Kind}",
+        _ => context.GetType().Name,
+    };
 
     private static ImmutableArray<(string, int)> Tally(IEnumerable<string> values) =>
         values.GroupBy(v => v, StringComparer.Ordinal)
