@@ -559,19 +559,44 @@ pass. It needs an owner ruling; the analysis below is complete enough to make th
 - **Decision needed before**: any spec text is written. Both Decision 1 and Decision 2 are unaffected
   by which way this lands.
 
-- **Deleted prior canon, for the record.** `git show c4d0abf8:docs/LiteralSystemDesign.md` stated the
-  broad rule: `null` *"is coerced to empty string `\"\"` in string interpolation contexts"* — all
-  interpolation, not just messages. Treated as **evidence, not authority**: its premise is void. The
-  `null` literal was removed entirely from v2 (`precept-language-spec.md:610` — "The `null` literal is
-  removed entirely — `optional` fields use `is set`/`is not set` for presence testing"), and the rule
-  was a value-level null-coercion rule predating both `optional` and presence proofs. Its *scope* is
-  genuine evidence that the broad reading was once the thinking; its *conclusion* rests on a mechanism
-  that no longer exists. It points toward (B).
+- **The prior-canon trajectory — and it runs against tolerance, not toward it.** An earlier draft of
+  this design read the history backwards; the corrected reading is load-bearing enough to lay out in
+  full, because it is the closest thing canon has to a settled direction on this exact question.
 
-- **Spec-first check**: grepped `precept-language-spec.md`, `literal-system.md`, and
-  `soundness-and-coverage.md` for a prior scope statement on interpolation tolerance. The only
-  on-point text was the deleted `LiteralSystemDesign.md` rule, addressed above. **No live canon
-  settles the scope** — this is a genuine design decision, not implementation against a locked spec.
+  1. **`git show c4d0abf8:docs/LiteralSystemDesign.md:121`** stated the broad tolerant rule: *"In
+     expressions, `null` … is coerced to empty string `\"\"` in string interpolation contexts"* — all
+     interpolation, silent, no author involvement.
+  2. **`git show 9ab60e47` (EvaluatorDesign.md, "Null Handling")** then *reversed* it: *"`.length` on
+     a `null` value produces an evaluation error … `null` is not coerced to empty string."* This is
+     not a deletion with a void premise — it is a deliberate replacement of silent coercion with
+     error-on-access.
+  3. **Current canon** went further than either. The `null` literal was removed entirely
+     (`docs/compiler/literal-system.md:145` — *"The language has no `null` literal. Optional fields
+     use `is set` / `is not set`"*), absence became a first-class runtime value
+     (`docs/runtime/evaluator.md:228` — `PreceptValue` *"is the unified value representation for every
+     scalar, reference, and absent value"*, with an explicit `IsAbsent`), and access to an optional
+     was made to *require a guard*: `docs/language/primitive-types.md:118` — `.length` *"Requires
+     presence guard (`is set`) for optional fields."*
+
+  Every step moved **away** from silent tolerance of absence in a string. So the deleted rule is not
+  evidence for (B) — it is the position canon has spent three revisions walking back. **This corrects
+  the earlier draft, which cited it as pointing toward (B); it points the other way**, toward the
+  strict reading and toward Decision 4's "no language-chosen sentinel" recommendation.
+
+- **Spec-first check — and canon is not silent, contrary to the earlier draft.** Grepping
+  `primitive-types.md`, `literal-system.md`, and `evaluator.md` for absence/coercion:
+  - Canon **does** settle the general question: absence is *not* silently coerced anywhere, and
+    accessing an optional requires a presence guard (`primitive-types.md:118`, `literal-system.md:145`,
+    `evaluator.md:228`). R2 is consistent with this — an accessor like `.length` is a consumer that
+    needs a guard, which is exactly what `primitive-types.md:118` already says.
+  - Canon is silent on **one** narrower point only: the bare-render position `{Opt}`, where the value
+    is coerced to display text and nothing is accessed. That is the sliver this design occupies, and
+    it is where R1 lives.
+  So this is a genuine design decision on the bare-render sliver — but it is a decision that must
+  **swim upstream against a documented three-revision trajectory**, which is a materially different
+  situation from the "no live canon settles this" the earlier draft claimed. R1 (tolerate the bare
+  render) is the part in tension with that trajectory and needs the strongest justification; R2
+  (consumers need guards) is already canon.
 
 ### Decision 4: What an absent value renders as — TBD
 
