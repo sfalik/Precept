@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-07-23
+status: Draft — UNLOCKED 2026-07-23 by adversarial review; see § Review record. Was `Locked 2026-07-23` for a few hours; do not build against it.
 phase-target: TBD — follows the linkage design; both precede the fault-family re-ratification
 comparable-systems-research-status: strong
 sources-consulted:
@@ -30,6 +30,33 @@ sources-consulted:
 ---
 
 # Constraint establishment and preservation obligations
+
+## Review record — why this is no longer locked (2026-07-23)
+
+This document was locked and then reviewed adversarially the same day. Three findings are serious enough that it cannot stand as written. They are recorded here rather than patched, because two of them are wrong in the premises rather than in the details.
+
+**1. Decision 2 would introduce a soundness hole — the opposite of what the document claims it is.** Preservation is keyed to handlers (§ Semantic Rules), and the same decision deletes the per-write minting path (§ Inventory). But a state entry or exit action is not a handler, and the matrix names five write-site categories, not one. Verified at HEAD:
+
+```precept
+field Total as decimal default 0 nonnegative max 1000
+state Open initial
+state Closed terminal
+event Finish()
+to Closed
+    -> set Total = 5000
+from Open on Finish
+    -> transition Closed
+```
+
+Today this is **rejected** — `PRE0078`, `IntervalContainment` `Unresolved` at `[5000 .. 5000]` — and the compiler's own output reports `eventHandlers: []`, confirming the site belongs to no handler. Under this design the modifier spelling stops minting there and the rule spelling never did, so the file would compile clean with a declared `max` violated by a write the compiler can see. That is a power-widening in the unsound direction, inside a document whose § The cost calls it a soundness correction. No acceptance criterion covers a non-handler write site.
+
+**2. Decision 2's scope does not match its own justification.** § 2.4 names **eleven** constraint modifiers as shorthand for rules; the decision collapses **one** requirement kind. `LengthContainment` and `CountContainment` are left untouched, so `maxlength 10` keeps minting its own kind while `rule X.length <= 10` mints something else — which is precisely the divergence the decision rejects Alternative 1 for. A third option was not considered: select the kind by the constraint's **normal form** rather than its spelling, which § 2.4's own second bullet endorses ("proof participation is a function of a constraint's decidability, not its syntactic form"). The "only two ways" inference is therefore unsound. Separately, the denominator arithmetic is wrong in both directions: if `ConstraintPreservation` carries the bound-containment fault code, then by the 2026-07-21 ruling's own criterion it joins the fault family, and the obligation-family axis stops being a partition.
+
+**3. The weakest-precondition rule is not total, and its validity argument asserts that it is.** The substitution `WP(C, w ; rest) = WP(C, rest)[target(w) := rhs(w)]` requires every write to be a field assigned an expression. Eleven of the fifteen action kinds are not: `append Items V` has a target and no right-hand side — the post-state value is `Items ++ [V]`, an expression that appears nowhere in the source — and `dequeue F into X` has two targets. The document asserts totality twice, in § Semantic Rules and again in the backward-substitution validity argument. Both statements are false against the action catalog, which the document's own dependency list half-acknowledges by citing BUG-033. Every collection constraint therefore has no computable weakest precondition under this rule.
+
+**Also found, not fatal but disqualifying for ratification**: Decision 1's cost is measurable and was deferred rather than measured — a sweep of `samples/` finds 7 of 78 files (9%) whose constraints mention a computed field and would newly reject on establishment, with a floor of 23 files affected on the preservation side; the design's own falsifier 1 trips at a quarter of the corpus, and its stated remedy is to reopen a locked owner ruling. And every matrix line citation in the document is stale, because matrix rev 10 landed the same day and shifted them — a locked document whose evidence chain does not resolve cannot be spot-checked at ratification.
+
+**What survived review**: the three witness files reproduce exactly as described; the § 2.4 quotes are real and in force, so Decision 2's *premise* is sound even though its scope and inference are not; the "intermediate states need not be checked" argument holds, and rests on locked spec rather than on unbuilt runtime behaviour; Decision 3 is well-grounded; and Decision 4's soundness claim holds under either ruling, though its amendment bookkeeping is inverted — relative to premise class (d) as the matrix defines it, the design shrinks first and calls the reversal a widening.
 
 ## Goal
 

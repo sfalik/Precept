@@ -27,6 +27,132 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-044: The `Dimension` requirement accepts `PeriodDimension.Any` as satisfying any required dimension — the unsound direction (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, adversarial review of the qualifier-compatibility validity argument. Source-verified; behavioural repro not yet constructed.
+- **Symptom**: `ProofEngine.Strategies.cs:99` — `return dimension == PeriodDimension.Any || dimension == dimReq.RequiredDimension;`. An operand whose temporal dimension is `Any` satisfies *every* dimension requirement.
+- **Why that is the wrong direction**: `Any` means the operand could carry any temporal dimension, so it establishes nothing about which one it carries. The sibling path takes the opposite and correct view — `QualifiersAreCompatible` (`ProofEngine.Qualifiers.cs:126-133`) explicitly refuses `Any` on the `TemporalDimension` axis. Two paths, same question, opposite answers, and the accepting one is the one that can license a mismatch.
+- **Scope / class**: SOUNDNESS, over-accept. Reach is limited to the `Dimension` requirement kind, which is now in the type-requirement family rather than the fault family.
+- **Fix complexity**: small — refuse `Any` and let the obligation stay unresolved, matching the qualifier path.
+- **Status**: Active — source-derived, repro owed.
+
+### BUG-043: A large UCUM exponent silently wraps the dimension vector, and a large negative one crashes the compiler
+
+- **Discovered**: 2026-07-23, adversarial review of the dimensional-product validity argument.
+- **Symptom, two halves.** *Wraparound*: `DimensionVector.Multiply` is unchecked `int` addition (`Ucum/DimensionVector.cs:16-23`) and `UcumParser` parses exponents with `int.TryParse` and no range bound (`UcumParser.cs:89`). A unit built from exponents summing past `int.MaxValue` wraps, so a product whose true dimension is `L^4294967298` is accepted as area. *Crash*: `quantity in 'm^-2147483648'` throws `ArgumentOutOfRangeException` out of `UcumExactFactor.Pow` — the compiler falls over rather than emitting a diagnostic.
+- **Scope / class**: the wraparound is a soundness hole reachable only through absurd unit strings; the crash is a robustness defect on malformed input, which matters more because the language server runs the same parser on every keystroke.
+- **Fix complexity**: small — bound the exponent at parse time and emit a diagnostic; use checked arithmetic in the vector operations.
+- **Status**: Active.
+
+### BUG-042: A log-by uniqueness guard is not framed against writes on the route, and `contains` on a log-by tests values rather than keys (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, adversarial review of the key-presence validity argument. **Both halves behaviourally confirmed via `precept_compile` at HEAD.** Distinct from BUG-038, which is about the guard naming a *different* key; here the key is identical throughout.
+- **Symptom A — no frame-and-kill on the collection.** Two appends of the same key in one operation, each under its own membership guard, both discharge:
+
+  ```precept
+  precept GuardedHookAppend
+
+  field Ledger as log of string by integer
+  field Fixed as integer default 7
+
+  event Record(Payload as string)
+
+  state Active initial
+  state Done terminal
+
+  from Active when not (Ledger contains Fixed)
+      -> append Ledger "exit" by Fixed
+
+  from Active on Record when not (Ledger contains Fixed)
+      -> append Ledger Record.Payload by Fixed
+      -> transition Done
+  ```
+
+  → `success: true`; **both** `KeyPresence` obligations `Proved` by `GuardInPath`. The phase-3 exit action appends key 7; the phase-5 row action appends it again. The same shape reproduces with two appends in a single chain.
+- **Symptom B — the guard may not be testing keys at all.** On a log-by, `contains` is overloaded: value membership for the element type, key membership for the key type, disambiguated by operand type with the element branch tried first (`TypeChecker.Expressions.cs:874-877`, `:833-834`), and the choice is not recorded — both collapse to one `OperationKind.CollectionContains`. So for `log of integer by integer`, `when not (Ledger contains Record.Key)` asks whether the key value appears among the *payloads*. Compiles clean, obligation `Proved`, duplicate key admitted. Widening applies too: `log of decimal by integer` with an `integer` key also lands on the element branch.
+- **Scope / class**: SOUNDNESS, over-accept, on the collection-uniqueness guarantee.
+- **Fix complexity**: medium for A (apply the frame-and-kill the numeric strategies carry, with the collection in the dependency set); medium-to-large for B, which needs the key/value axis recorded in the typed tree so a proof can tell which membership a guard established.
+- **Status**: Active — soundness hole, two independent halves.
+
+### BUG-041: A quantity product checks the dimension and discards the unit scale — a silently wrong magnitude (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, adversarial review of the dimensional-product validity argument. **Behaviourally confirmed via `precept_compile` at HEAD.**
+- **Symptom**:
+
+  ```precept
+  precept ScaleGap
+
+  field Speed as quantity in 'km/h' default '10 km/h' positive
+  field Elapsed as quantity in 's' default '2 s' positive
+  field Distance as quantity in 'km' <- Speed * Elapsed
+
+  state Open initial terminal
+  ```
+
+  → `success: true`, `DimensionalProduct` **Proved**. `10 km/h × 2 s` is about `0.0056 km`; the compiler admits the product into a field declared `quantity in 'km'` and labels it `km`. Wrong by 3600×. The same shape on the mass axis (`5 kg/km × 3 mm` into `quantity in 'kg'`) is wrong by 10⁶.
+- **Root cause**: `TryResolveDimensionVector` reads `parsed.Unit.Vector` (`ProofEngine.Qualifiers.cs:92`) and discards the `Scale` the parsed unit carries (`Ucum/UcumParsedUnit.cs:7`). The result's unit label is then produced by the compound-cancellation policy, whose matcher compares dimension *names* and returns the numerator code verbatim, unconverted (`TypeChecker.Expressions.TypedConstants.cs:23`, `:30`).
+- **Scope / class**: SOUNDNESS — not a fault in the runtime-trap sense, but a clean compile producing a numerically wrong answer, which is the guarantee Precept sells.
+- **Fix complexity**: medium — compose the scale alongside the dimension and either apply the conversion or refuse the product when the scales do not cancel.
+- **Status**: Active — soundness hole.
+
+### BUG-040: Quantities with different units on the same dimension are proved compatible for addition — including counting units canon says must be rejected (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, adversarial review of the qualifier-compatibility validity argument. **Behaviourally confirmed via `precept_compile` at HEAD.**
+- **Symptom**: both additions below report `QualifierCompatibility` **Proved** and the file compiles with no error.
+
+  ```precept
+  precept UnitMix
+
+  field Kilos as quantity in 'kg' default '0 kg' nonnegative
+  field Grams as quantity in 'g' default '0 g' nonnegative
+  field MassTotal as quantity in 'kg' default '0 kg'
+
+  field Boxes as quantity in 'box' default '0 box' nonnegative
+  field Eaches as quantity in 'each' default '0 each' nonnegative
+  field CountTotal as quantity in 'box' default '0 box'
+
+  event Recalc()
+
+  on Recalc
+      -> set MassTotal = Kilos + Grams
+      -> set CountTotal = Boxes + Eaches
+  ```
+
+  `kg + g` is a silent 1000× magnitude error. `box + each` is worse than wrong — canon requires it to be rejected: `business-domain-types.md:397` — *"Cross-counting-unit operations — including addition (`qty_each + qty_box`) … fail with PRE0137 `CrossCountingUnitOperation`."* No `PRE0137` is emitted.
+- **Root cause**: `QualifiersAreCompatible` falls back from token equality to **dimension-name** equality on the `Unit` and `Dimension` axes (`ProofEngine.Qualifiers.cs:141-160`). Every counting unit resolves to the shared `count` dimension (`UnitDimensionHelper.cs:63-64`, with `each`/`box`/`case` in that set), and `kg`/`g` both resolve to `mass`.
+- **Related**: the same fallback makes `quantity of 'mass'` compatible with `quantity in 'kg'`, though `of` pins only a dimension family and admits any unit in it.
+- **Scope / class**: SOUNDNESS, over-accept, on the qualifier axis for every non-currency comparison.
+- **Fix complexity**: medium — the fallback needs to be removed or restricted to cases where a conversion is applied; the currency axis is unaffected and works correctly.
+- **Status**: Active — soundness hole.
+
+### BUG-039: An interpolated value escapes its string's declared `maxlength` — the length proof widens a numeric hole to its integer digit width (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, adversarial review of the string-length validity argument. **Behaviourally confirmed via `precept_compile` at HEAD.**
+- **Symptom**: compiles with **zero diagnostics**, both length obligations `Proved`.
+
+  ```precept
+  precept LengthHole
+
+  field Score as number min 0 max 9 default 0 editable
+  field Ratio as decimal min 0 max 9 maxplaces 4 default 0 editable
+  field A as string maxlength 1 default "x"
+  field B as string maxlength 1 default "x"
+
+  event Fire()
+
+  on Fire
+      -> set A = "{Score}"
+      -> set B = "{Ratio}"
+  ```
+
+  `Score` is the approximate lane bounded `[0, 9]`; a governance-admissible `0.30000000000000004` renders to 19 characters against a cap of 1 the compiler proved. `Ratio` at `2.5001` renders to 6 against the same cap.
+- **Root cause**: `DecimalDigitWidth` (`ProofEngine.Lengths.cs:191-194`) refuses only when an interval's **endpoints** are non-integral — `if (decimal.Truncate(min) != min || decimal.Truncate(max) != max) return null;`. An interval with integral endpoints admits non-integral members, so `[0, 9]` is treated as one digit wide.
+- **Wider than the fractional case**: the rendered width of a business-domain hole is taken over the unit-*normalized* magnitude while the render carries the declared unit, and no allowance is made for a unit or currency suffix, a sign, or a decimal point. `quantity in 'g' min '1000 g' max '9000 g'` interpolated into `maxlength 1` also proves.
+- **Underlying gap**: canon states only that *"Any scalar type is coercible to string"* (`precept-language-spec.md:1553`). There is no specified rendering for `decimal`, `number`, temporal or business-domain values — so the width the analyzer computes is being compared against a rendering that is nowhere defined.
+- **Scope / class**: SOUNDNESS, over-accept, on a `[StaticallyPreventable]` fault code.
+- **Fix complexity**: medium — a numeric hole must widen to unbounded unless its type, its value bounds *and* a declared precision bound jointly pin the width in the operand's own declared unit; and the rendering contract needs stating in canon before any of that is sound.
+- **Status**: Active — soundness hole.
+
 ### BUG-038: A log-by uniqueness obligation is discharged by a membership guard on the WRONG key — the key operand is never compared (SOUNDNESS hole)
 
 - **Discovered**: 2026-07-23, while writing the key-presence validity argument. **Behaviourally confirmed via `precept_compile` at HEAD**; root cause line-verified in source.

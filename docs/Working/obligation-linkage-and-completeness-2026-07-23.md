@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-07-23
+status: Draft — UNLOCKED 2026-07-23 by adversarial review; see § Review record. Was `Locked 2026-07-23` for a few hours; do not build against it.
 phase-target: TBD — precedes the constraint-obligation build (matrix § Storage names constraint-obligation design time as the trigger for these catalog entries)
 comparable-systems-research-status: strong
 sources-consulted:
@@ -24,6 +24,24 @@ sources-consulted:
 ---
 
 # Linkage and completeness for constraint establishment and preservation
+
+## Review record — why this is no longer locked (2026-07-23)
+
+Locked and then reviewed adversarially the same day. Three findings, recorded rather than patched.
+
+**1. The admissibility condition has no rejection power.** Both its conjuncts are true by construction. "Every check in the coverage record is discharged" can never be the reason for a rejection, because an undischarged obligation already rejects the file on its own under no-deferral. And "the proof's citation equals the coverage record" is trivially satisfied, since the record is a function of the fact and the same engine computes both sides — there is no independently derived second value to disagree with. So the citation duty as encoded here is a serialization annotation with no accept/reject consequence, and all the rejection power in the design lives in the completeness check.
+
+Three things follow. Decision 1 — which fork to take on the encoding — was immaterial, because the two encodings agree in the only way that matters: neither can fail. Acceptance criterion 7 describes a state the pipeline cannot reach. And the Goal, that `OrderTotals` must not compile, is discharged entirely by the companion design; nothing here is load-bearing for it.
+
+**2. `Expected(C)` misses two of the four mutating operations.** Its preservation leg quantifies over `Handlers`. The update patch on an editable field and `Restore` are both writers § 3A.4 enumerates, and neither belongs to a handler — the spec lists `Create`, `Fire`, `Update` and `Restore` as peer operations, and the matrix names the editable-field door as a first-class write-site category with its own case shape. So a rule over an editable field gets no expected preservation check for the edit door, the set comparison passes, and the file compiles with the rule breakable through `Update`. That is the failure class this document exists to close, reintroduced through its own quantifier.
+
+The same section also contradicts itself four lines apart on whether a cross-field modifier mentions one field or two. The matrix is explicit that it is two. Verified at HEAD: `field Floor as decimal max Ceiling` with a handler writing `Ceiling` produces **zero** proof obligations.
+
+**3. Both witnesses used to justify Decisions 3 and 5 are misattributed.** The qualifier-modifier hole is offered as proof that the per-file check is blind to a missing category — but it is not a missing write-site category. The site is present and demonstrably obligated for the `min` spelling on the same line of the same file, so the per-file set comparison would catch it. And BUG-033, offered as the instance motivating an independently derived expected set, is the *counterexample*: two structurally independent consumers, in different pipeline components, made the identical mistake. This document's own falsifier 4 says that condition means the independence is procedural fiction. It was met before the document was written.
+
+**Also found**: Decision 4 contradicts a locked ruling without quoting it — the matrix rules that a proof consuming a written value names the write it came from, while the decision places `PriorAction` in the group needing no record, and acceptance criterion 12 still demands a test for that situation. `DeclaredDefault` is exempted on grounds ("it *is* an establishment fact") that the 2026-07-21 ruling treats as the definition of a value-fact. The `DeclaredPresence` split enumerates `clear` and stops, without reaching the `omit` reset, on which the matrix carries an unresolved canon conflict. And "the eleven existing requirement kinds" is wrong — the discriminated union has thirteen.
+
+**What survived review**: Decision 2 (two catalog kinds rather than one parameterized kind) is sound and correctly grounded, with the Event-B precedent quoted faithfully. Decision 6 (compiler-internal severity) is right and its dead-rows precedent applies. Set equality rather than containment is correct under the exact-power contract, with the reason stated rather than asserted. The premise partition is total over the eleven certificate premise kinds, even though two placements are wrong. And § The cost's correction to the matrix's own rationale is accurate — it identifies that the citation duty relocates the enumeration rather than removing it, and stops one step short of finding 1.
 
 ## Goal
 
