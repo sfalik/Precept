@@ -27,6 +27,30 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-046: A divisor whose declared interval excludes zero is not proved non-zero — the file is rejected saying it "can be zero" (false rejection)
+
+- **Discovered**: 2026-07-23, fact-checking the divisor validity argument. **Behaviourally confirmed via `precept_compile` at HEAD.**
+- **Symptom**:
+
+  ```precept
+  precept BoundedDivisor
+
+  field A as decimal min 1 max 100 default 5.0
+  field Num as decimal default 100.0
+  field Result as decimal default 0.0
+
+  event Compute()
+
+  on Compute
+      -> set Result = Num / A
+  ```
+
+  → **rejected**, `PRE0083` — *"Division is unsafe: 'A' can be zero in event handler 'Compute'"* — with the divisor obligation `Unresolved`. Every value `A` can hold is at least 1, and the compiler proved both bound obligations on the same field in the same run. The message asserts something the declaration forbids.
+- **Scope / class**: false rejection, so the safe direction, but the diagnostic states a falsehood about the author's own declaration, which is worse than a bare refusal. `max -1` on the negative side behaves the same way.
+- **Relationship to BUG-045**: these are mirror images on the same obligation. The engine composes non-zero-ness through multiplication where it must not, and fails to read it off a declared interval where it could. Both point at the same missing piece — the divisor check reasons over sign and hole predicates rather than over the magnitude interval it already computes elsewhere.
+- **Fix complexity**: small-to-medium — consult the divisor's declared interval and discharge when the interval excludes zero. The interval is already computed for containment obligations on the same field.
+- **Status**: Active — false rejection with a misleading message.
+
 ### BUG-045: A divisor built by multiplying two `nonzero` operands is proved non-zero, but the product can underflow to exactly zero — on the exact lane as well as the approximate one (SOUNDNESS hole)
 
 - **Discovered**: 2026-07-23, probing the boundaries of the divisor precondition before drafting its validity argument. **Behaviourally confirmed via `precept_compile` at HEAD, on both lanes.**
@@ -48,7 +72,22 @@ surfaced for proper fixing.
 
   → `success: true`, `Divisor must be non-zero` **Proved**. Both defaults are `1e-28`, accepted as satisfying `nonzero`. Their product is `1e-56`, below `decimal`'s smallest representable magnitude, so it rounds to **exactly zero** and the division faults.
 
-  The same file with `number` in place of `decimal` also proves, with `1e-200 * 1e-200` underflowing to `0.0` on the IEEE lane.
+  The `number` lane needs a different witness, and the first version of this entry got it wrong (corrected 2026-07-23 by fact-check). A `1e-200` *default* is rejected — the literal is decimal-folded to zero before it reaches the IEEE lane (`PRE0079`) — and the `1e-28` defaults above do not underflow as doubles. Arguments carry the case cleanly instead, compiling with **zero diagnostics**:
+
+  ```precept
+  precept UnderflowNumberArgs
+
+  field Result as number default 0.0
+
+  event Compute(A as number nonzero, B as number nonzero, Num as number)
+
+  on Compute
+      -> set Result = Compute.Num / (Compute.A * Compute.B)
+  ```
+
+  → `success: true`, no diagnostics at all, `Divisor must be non-zero` **Proved** by `CompositionalConstraint`. Governance admits `1e-200` for a `nonzero` argument, and `1e-200 * 1e-200` underflows to `0.0`.
+
+- **The two lanes fail by different mechanisms**, which the first version of this entry also got backwards. `decimal` has no exponent range — it is a 96-bit integer with a scale of 0 to 28 — so the loss is rounding at maximum scale (`1e-14 * 1e-15` is exactly `1e-29`, one digit past the scale, and rounds to zero). `double` genuinely underflows its exponent range. The conclusion is unchanged and is what matters: exactness of `decimal` arithmetic does not rescue the composition, because the failure is not a rounding-versus-exact question at all.
 - **Why this is worse than the recorded open question**: the matrix's 2026-07-21 approximate-lane ruling already names this shape — *"Two nonzero finite `number` operands can multiply to exactly `0.0` … `nonzero` on every operand does not give a nonzero product. Recorded here as open, unrouted, and owed a decision."* Two corrections. First, it is not an open question about what the definition should say; the shipped engine **actively proves** the divisor safe today. Second, it is **not confined to the `number` lane** — `decimal` underflows to zero as well, so the exact lane is affected, and the exactness of decimal arithmetic (which several validity arguments lean on) does not save it.
 - **Scope / class**: SOUNDNESS, over-accept, on the headline fault the language names first — division by zero.
 - **Related**: this is the boundary that any divisor validity argument has to be written around. The defensible rule licenses a divisor whose non-zero-ness is established **directly** — a modifier on the divisor's own field or argument, a guard on the divisor expression, a non-zero literal — and refuses one derived through arithmetic over `nonzero` operands. Multiplication does not preserve non-zero-ness in a finite representation, on either lane.
