@@ -87,19 +87,25 @@
     }
   ],
   "respellability": {
-    "verdict": "no",
+    "verdict": "yes",
     "evidence": "model-derived",
     "corpusMeasurement": "pending",
-    "licensedNonBandExamples": [],
     "citations": [
       {
         "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+        "note": "the Index-bounds decomposition rule supplies the licensed spelling"
+      },
+      {
+        "kind": "matrix",
         "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
-        "note": "the Respellable bullet: the verdict is a per-contract-family statement, and there is no defined contract here to measure a band against"
+        "note": "the Respellable bullet — the verdict is per contract family"
       }
     ],
     "notes": [
-      "Family verdict recorded 'no' provisionally, not as the Vocabulary's surface-shrink 'no'. Every cell in this file is disposition 'open' (no licensed discharge contract exists to measure sound-but-unprovable spellings against), so 'is every sound program in the band respellable' has no defined contract to be answered against. 'No' is the honest not-yet-resolvable placeholder pending the missing-rule report being resolved by an owner ruling that authors the cross-subject relational discharge argument."
+      "Changed from 'no' to 'yes' on 2026-07-23. The previous verdict rested on there being no defined contract to measure a band against; there is one now.",
+      "The licensed respelling for an access that does not discharge is to declare the two bounds the rule reads: a nonnegative/min-0 and an upper bound on the index, and a mincount on the collection. Both are ordinary modifiers, available at every occasion, and neither requires a guard position — which is what makes the verdict 'yes' at the three occasions that cannot host a guard.",
+      "Residual band, named rather than hidden: an index whose upper bound cannot be declared because it is produced by an unbounded computation. The respelling there is to bind the computation to a bounded field first, which is a real spelling within the surface but a less obvious one. Corpus measurement decides whether this residual is empty in practice; the verdict does not ratify on this paper argument alone."
     ]
   },
   "cells": [
@@ -114,41 +120,127 @@
         "typeFamily": "collection"
       },
       "disposition": {
-        "status": "open",
+        "status": "defined",
         "citations": [
           {
             "kind": "matrix",
             "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
-            "note": "MISSING RULE: none of the seven closed validityArguments licenses a cross-subject relational discharge (index N bounded by a second field's live .count). The built engine discharges via GuardInPath, but no generative section of the matrix names that derivation, so the cell cannot be 'defined' without an owner ruling."
+            "note": "the Index-bounds decomposition rule, written 2026-07-23, closes the MISSING RULE this cell previously recorded — the cross-subject relation is discharged by splitting it into two one-sided comparisons, each of which a single-subject derivation reaches"
           },
           {
-            "kind": "code",
-            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
-            "note": "TryIndexBoundsProof / GuardInPath — the actual built discharge mechanism, unnamed in the matrix's Validity arguments"
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "fault-family case shape"
           }
         ]
       },
       "obligation": {
         "statement": "0 <= Index and Index < Items.count",
         "metavariables": [
-          { "name": "Items", "standsFor": "the collection field the indexed accessor/action reads (list / log / log-by)" },
-          { "name": "Index", "standsFor": "the index expression (the IndexBoundsProofRequirement Subject / PCollectionIndex parameter)" }
+          {
+            "name": "Items",
+            "standsFor": "the collection field the indexed accessor/action reads (list / log / log-by)"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression (the IndexBoundsProofRequirement Subject / PCollectionIndex parameter)"
+          }
         ],
         "normalization": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet (comparison-direction flip, commutative reorder)" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet (comparison-direction flip, commutative reorder)"
+          }
         ],
         "wp": {
           "statement": "0 <= Index and Index < Items.count   (StrictlyBefore, .at / remove-at; 0 <= Index and Index <= Items.count for insert-at, IndexBoundsMode.AtOrBefore, Actions.cs:192)"
         }
       },
-      "applicablePremiseClasses": ["a", "b", "c", "d"],
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
       "premiseAvailability": "This is a transition-row write occasion, so the fault-family full read-set is available. The obligation has TWO independent subjects and premise availability differs per subject. The index draws its own bound from (b) an event-arg modifier (nonnegative supplies the 0 <= Index half) or from (c) a guard conjunct. The collection's cardinality is a live .count read: it is a pre-state fact (d) when the write plan does not touch Items, or a written-value fact (the 2026-07-21 carry-forward provenance) when an earlier action in the plan grows/shrinks Items. The ONLY route confirmed live to establish the RELATIONAL conjunct Index < Items.count is (c) the row guard, since neither (a) nor (b) alone can express one field bounded by another's live cardinality (verified: a statically-bounded index against a mincount-bounded collection does NOT discharge — see the computed-field cell's static probe). Under the 2026-07-21 citation duty a discharge consuming a declared collection fact (a mincount modifier, or a rule about Items.count) would have to name that fact's establishing + every preserving obligation; the built discharge below does not consume such a fact — it reads Items.count directly at the guard — so no declared-fact citation is owed by it.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "derivation": "decompose into the two conjuncts and discharge each from declared bounds: the lower half `0 <= Index` from a declared nonnegative/min-0 on the index (a field modifier, or an arg modifier where the index is an argument), and the upper half from `hi(Index) < lo(Items.count)`, where the count lower bound is the engine's sequenced count interval seeded from the collection's declared mincount and advanced by each mutation's per-kind delta. Mode is StrictlyBefore for `.at(N)` and `remove at N`; for `insert at N` the catalog's AtOrBefore mode makes the upper test `hi(Index) <= lo(count)`, because positions 0..count are insertable.",
+          "validityArguments": [
+            "Index-bounds decomposition"
+          ],
+          "decisionProcedure": "Two independent one-sided integer comparisons over already-computed intervals: read the index expression's proven interval and the collection's sequenced count interval, then test lo(Index) >= 0 and hi(Index) < lo(count) (<= for AtOrBefore). Both are finite exact-integer comparisons; reject iff either test fails or either interval is unbounded on the needed side.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "the Index-bounds decomposition argument: two one-sided comparisons, exact integer lane, sequenced count lower bound"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/ProofRequirement.cs:250-257",
+              "note": "IndexBoundsMode — StrictlyBefore for .at(N) and remove-at, AtOrBefore for insert-at"
+            }
+          ],
+          "notImplementedAtHead": "The built engine does not attempt this route — TryIndexBoundsProof sources both bounds from guard facts only. Recorded as BUG-037 with a compiled witness; the definition licenses it, the compiler under-implements it."
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "decompose into the two conjuncts and discharge each from a guard conjunct on the governing guard — `when Index >= 0 and Index < Items.count` supplies both halves directly, one per conjunct, with each disjunctive branch establishing both.",
+          "validityArguments": [
+            "Index-bounds decomposition",
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Normal-form match of each half against the guard's conjuncts, per disjunctive branch (a finite set); reject iff any branch leaves either half unmatched.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "Index-bounds decomposition for the split; Guard normal-form match for each half, which carries the transport rule's frame-and-kill on the guard facts"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+              "note": "TryIndexBoundsProof — the built discharge, whose own comment describes establishing both bounds per disjunctive branch"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "schema": "declare `nonnegative` (or `min 0`) and `max ⟨K⟩` on ⟨Index⟩, and `mincount ⟨M⟩` on ⟨Collection⟩, with ⟨K⟩ < ⟨M⟩"
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard conjunct `when ⟨Index⟩ >= 0 and ⟨Index⟩ < ⟨Collection⟩.count`"
+        }
+      ],
       "witnesses": {
         "base": {
           "program": "precept IdxTransition\n\nstate Active initial\nstate Done terminal\n\nfield Items as list of decimal\nfield Entry as decimal default 0.0\n\nevent Load(V as decimal)\nevent Pick(Index as integer)\nevent Finish()\n\nfrom Active on Load\n    -> append Items Load.V\n    -> no transition\n\nfrom Active on Pick\n    -> set Entry = Items.at(Pick.Index)\n    -> no transition\n\nfrom Active on Finish\n    -> transition Done\n",
           "expected": {
             "outcome": "reject",
-            "missingPremiseClasses": ["a", "b", "c", "d"],
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "c",
+              "d"
+            ],
             "noOtherDiagnostics": true
           },
           "provenance": {
@@ -163,8 +255,13 @@
             "id": "whole-condition-guard",
             "kind": "guard",
             "addition": "when Pick.Index >= 0 and Pick.Index < Items.count and Items.count > 0   (row guard on the Pick row)",
-            "application": { "locus": "row-guard", "eventName": "Pick" },
-            "premiseClasses": ["c"],
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "premiseClasses": [
+              "c"
+            ],
             "derivation": "empirically: GuardInPath (TryIndexBoundsProof, src/Precept/Pipeline/ProofEngine.Strategies.cs:390) — the lower bound 0 <= Index, the relational upper bound Index < Items.count, and the companion non-empty Items.count > 0 are all taken from the row guard. NOT named by any matrix validityArguments entry.",
             "strategy": "GuardInPath",
             "builtStatus": "proven-today",
@@ -174,12 +271,42 @@
               "date": "2026-07-21",
               "head": "c295d7b4"
             },
-            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
             "notes": [
               "Live at HEAD c295d7b4: base + this guard compiles with ZERO diagnostics; both the IndexBounds obligation and the companion NumericProofRequirement(count>0) report Proved / GuardInPath. modelStatus is deliberately OMITTED — no named validity argument licenses this derivation (see cell disposition). builtStatus proven-today records only what the run demonstrated.",
               "CORRECTION vs fault-17 (verified at e1a14d91): fault-17 recorded that a whole-condition guard `when Index >= 0 and Index < F.count` did NOT discharge and that arg `nonnegative` + guard was required. At HEAD c295d7b4 the whole-condition guard alone discharges via GuardInPath. This is a built-power change between the two commits, recorded rather than smoothed over; the DEFINITION disposition (open) is unchanged either way.",
               "Class (b) can substitute for the lower-bound conjunct: declaring `Index as integer nonnegative` on the event arg supplies 0 <= Index from the arg modifier (type-derived), so the guard need only carry `Index < Items.count and Items.count > 0`. That is the two-locus (arg-modifier + guard) shape; the schema's application DU records only the row-guard half.",
               "Compiler-hole check (corrected input 5): this clean compile does NOT rest on BUG-033 (no `dequeue ... into` binding target) nor on the write-surface enumeration gap (no construct writes Items between the guard and the accessor within the row) — the guard fact is consumed at the same evaluation point it is established. Not flagged."
+            ]
+          },
+          {
+            "id": "declared-bounds",
+            "kind": "declaration",
+            "addition": "declare both bounds the rule reads: `nonnegative max K` on the index field or argument, and `mincount M` on the collection, with K < M. No guard is added — this is the route that reaches the occasions with no guard position.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "premiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "derivation": "Index-bounds decomposition: lower half `0 <= Index` from the declared nonnegative; upper half from hi(Index) = K < M = lo(Items.count), the collection's sequenced count lower bound seeded from mincount.",
+            "modelStatus": "licensed",
+            "builtStatus": "not-proven-today",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "programNote": "Same addition shape as the computed-field cell's compiled program, applied at this occasion.",
+            "notes": [
+              "Model-derived at this occasion. The compiled evidence for this route is on the computed-field cell, which is the strongest case because it has no guard position at all, so nothing but the declared bounds could be doing the work."
             ]
           }
         ],
@@ -187,7 +314,10 @@
           {
             "pairsWith": "whole-condition-guard",
             "addition": "when Pick.Index >= 0 and Items.count > 0   (upper-bound conjunct `Pick.Index < Items.count` dropped)",
-            "application": { "locus": "row-guard", "eventName": "Pick" },
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
             "whyStillRejects": "Live at HEAD c295d7b4: with the relational upper bound removed, the IndexBounds obligation reverts to Unresolved and PRE0100 (IndexBoundsGuard) emits naming the SAME obligation ('Items access at index Index is not bounds-checked'). Note the companion non-empty Numeric stays Proved (Items.count > 0 remains) — proving the near-miss weakens the index-bounds obligation specifically, not merely the non-empty companion.",
             "provenance": {
               "mark": "live-verified",
@@ -195,7 +325,28 @@
               "date": "2026-07-21",
               "head": "c295d7b4"
             },
-            "expected": { "outcome": "reject", "sameObligation": true }
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "declared-bounds",
+            "addition": "same declarations, with the index's upper bound loosened to equal the collection's minimum count (K = M) instead of falling below it.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "whyStillRejects": "the upper half tests hi(Index) < lo(count) strictly; at K = M the test is 10 < 10, which is false. The index may equal the count, which is one past the last position.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            },
+            "notes": [
+              "Model-derived; the arithmetic is the same one-sided test at every occasion."
+            ]
           }
         ]
       },
@@ -207,10 +358,19 @@
         ]
       },
       "citations": [
-        { "kind": "code", "ref": "src/Precept/Language/Types.cs:315", "note": "list .at(integer): NumericProofRequirement(count>0) + IndexBoundsProofRequirement(StrictlyBefore)" },
-        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule", "note": "site-identity ruling: this occasion mints one IndexBounds obligation per route into the row" }
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:315",
+          "note": "list .at(integer): NumericProofRequirement(count>0) + IndexBoundsProofRequirement(StrictlyBefore)"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+          "note": "site-identity ruling: this occasion mints one IndexBounds obligation per route into the row"
+        }
       ],
       "notes": [
+        "RESOLVED 2026-07-23. The MISSING RULE recorded below is written: matrix § Rule validity, 'Index-bounds decomposition — two one-sided comparisons over declared bounds'. The cross-subject obligation is not discharged as a relation at all — it is split into its two conjuncts, and each conjunct is a single-subject comparison the existing derivations reach. The declared-bound route needs no guard position, so it reaches all five occasions, including the three that have none. The observations below about HEAD remain accurate and are now filed as BUG-037: the built engine sources both halves from guards only, so it rejects a provably-safe access and suggests a repair that cannot be written at a computed field, a rule condition, or a state action.",
         "MISSING RULE, reported not filled: the IndexBounds obligation relates two DIFFERENT subjects — the index parameter and a separate collection field's live .count (ProofRequirement.cs:265, Subject vs UpperBoundAccessor). The matrix's seven closed validityArguments (Guard normal-form match, Arg-bound interval arithmetic, Inductive hypothesis plus sign monotonicity, Literal constant-fold for defaults, Establishment over defaults, Guard-fact substitution for relational rules, Vacuity by activation) each reasons about ONE operand's own interval or a rule's own fields; none states a derivation for a conjunction split across two premise sources where one conjunct bounds field X by field Y's cardinality. The built engine (GuardInPath) does exactly this split, but the matrix does not name it. Disposition is therefore OPEN — the discharge witness above records built behavior only, not a licensed model derivation.",
         "Occasion, not position (site-identity ruling): the .at() accessor here is one written expression; a row reached by N routes mints N obligations. The witness exercises the single-route case.",
         "The insert-at action form (Actions.cs:192, IndexBoundsMode.AtOrBefore) is a co-minting variant of this occasion with the weaker upper bound 0 <= N <= count; remove-at (Actions.cs:220) is StrictlyBefore. Both mint the same ProofRequirementKind and the same missing-rule finding applies; the .at() accessor is used as the representative witness.",
@@ -228,39 +388,103 @@
         "typeFamily": "collection"
       },
       "disposition": {
-        "status": "open",
+        "status": "defined",
         "citations": [
           {
             "kind": "matrix",
             "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
-            "note": "MISSING RULE: no validityArgument licenses the cross-subject relational IndexBounds discharge; and a state entry/exit action carries neither a handler guard nor event args, so even the built GuardInPath mechanism cannot reach it — the obligation has no discharge route at HEAD."
+            "note": "the Index-bounds decomposition rule, written 2026-07-23, closes the MISSING RULE this cell previously recorded — the cross-subject relation is discharged by splitting it into two one-sided comparisons, each of which a single-subject derivation reaches"
           },
           {
-            "kind": "code",
-            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
-            "note": "TryIndexBoundsProof requires a guard fact in path; a state action has no guard, so no discharge is reachable here even in built power"
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "fault-family case shape"
           }
         ]
       },
       "obligation": {
         "statement": "0 <= Cursor and Cursor < Items.count",
         "metavariables": [
-          { "name": "Items", "standsFor": "the collection field the indexed accessor reads" },
-          { "name": "Cursor", "standsFor": "the index expression (a field, since a state action has no event args)" }
+          {
+            "name": "Items",
+            "standsFor": "the collection field the indexed accessor reads"
+          },
+          {
+            "name": "Cursor",
+            "standsFor": "the index expression (a field, since a state action has no event args)"
+          }
         ],
         "normalization": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
         ],
-        "wp": { "statement": "0 <= Cursor and Cursor < Items.count" }
+        "wp": {
+          "statement": "0 <= Cursor and Cursor < Items.count"
+        }
       },
-      "applicablePremiseClasses": ["a", "d"],
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
       "premiseAvailability": "A state entry/exit action (`to S -> ...` / `from S -> ...`) is unconditional: it carries no `when` guard (so class (c) is unavailable) and is anchored to no event (so class (b) is unavailable — the index must come from a field, not an arg). Only (a) the modifiers of the index field and the collection, and (d) pre-state facts holding on entry/exit, are available. Neither can establish the RELATIONAL conjunct Cursor < Items.count (verified for the analogous computed-field case: static field bounds do not discharge). So no discharge route exists at HEAD — the base rejects and no addition within this occasion's surface is known to discharge. The residency fact (the entity is entering/leaving S) is structural metadata, not a guard fact (ensure-vs-rule-analysis-2026-07-20); whether it is a premise at all is an OPEN matrix item, and it would not supply the index<count relation regardless.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "derivation": "decompose into the two conjuncts and discharge each from declared bounds: the lower half `0 <= Index` from a declared nonnegative/min-0 on the index (a field modifier, or an arg modifier where the index is an argument), and the upper half from `hi(Index) < lo(Items.count)`, where the count lower bound is the engine's sequenced count interval seeded from the collection's declared mincount and advanced by each mutation's per-kind delta. Mode is StrictlyBefore for `.at(N)` and `remove at N`; for `insert at N` the catalog's AtOrBefore mode makes the upper test `hi(Index) <= lo(count)`, because positions 0..count are insertable.",
+          "validityArguments": [
+            "Index-bounds decomposition"
+          ],
+          "decisionProcedure": "Two independent one-sided integer comparisons over already-computed intervals: read the index expression's proven interval and the collection's sequenced count interval, then test lo(Index) >= 0 and hi(Index) < lo(count) (<= for AtOrBefore). Both are finite exact-integer comparisons; reject iff either test fails or either interval is unbounded on the needed side.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "the Index-bounds decomposition argument: two one-sided comparisons, exact integer lane, sequenced count lower bound"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/ProofRequirement.cs:250-257",
+              "note": "IndexBoundsMode — StrictlyBefore for .at(N) and remove-at, AtOrBefore for insert-at"
+            }
+          ],
+          "notImplementedAtHead": "The built engine does not attempt this route — TryIndexBoundsProof sources both bounds from guard facts only. Recorded as BUG-037 with a compiled witness; the definition licenses it, the compiler under-implements it."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "schema": "declare `nonnegative` (or `min 0`) and `max ⟨K⟩` on ⟨Index⟩, and `mincount ⟨M⟩` on ⟨Collection⟩, with ⟨K⟩ < ⟨M⟩"
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "not offerable at this occasion — there is no guard position here",
+          "notes": [
+            "The diagnostic must name only the classes reachable at the occasion. PRE0100 today names the guard repair unconditionally, which is unwritable here — BUG-037."
+          ]
+        }
+      ],
       "witnesses": {
         "base": {
           "program": "precept IdxStateHook\n\nstate Idle initial\nstate Reviewing terminal\n\nfield Items as list of decimal\nfield Cursor as integer default 0\nfield Entry as decimal default 0.0\n\nevent Load(V as decimal)\nevent Move(To as integer)\nevent Begin()\n\nfrom Idle on Load\n    -> append Items Load.V\n    -> no transition\n\nfrom Idle on Move\n    -> set Cursor = Move.To\n    -> no transition\n\nfrom Idle on Begin\n    -> transition Reviewing\n\nto Reviewing -> set Entry = Items.at(Cursor)\n",
           "expected": {
             "outcome": "reject",
-            "missingPremiseClasses": ["a", "d"],
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
             "noOtherDiagnostics": true
           },
           "provenance": {
@@ -269,7 +493,56 @@
             "date": "2026-07-21",
             "head": "c295d7b4"
           }
-        }
+        },
+        "discharges": [
+          {
+            "id": "declared-bounds",
+            "kind": "declaration",
+            "addition": "declare both bounds the rule reads: `nonnegative max K` on the index field or argument, and `mincount M` on the collection, with K < M. No guard is added — this is the route that reaches the occasions with no guard position.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "premiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "derivation": "Index-bounds decomposition: lower half `0 <= Index` from the declared nonnegative; upper half from hi(Index) = K < M = lo(Items.count), the collection's sequenced count lower bound seeded from mincount.",
+            "modelStatus": "licensed",
+            "builtStatus": "not-proven-today",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "programNote": "Same addition shape as the computed-field cell's compiled program, applied at this occasion.",
+            "notes": [
+              "Model-derived at this occasion. The compiled evidence for this route is on the computed-field cell, which is the strongest case because it has no guard position at all, so nothing but the declared bounds could be doing the work."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "declared-bounds",
+            "addition": "same declarations, with the index's upper bound loosened to equal the collection's minimum count (K = M) instead of falling below it.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "whyStillRejects": "the upper half tests hi(Index) < lo(count) strictly; at K = M the test is 10 < 10, which is false. The index may equal the count, which is one past the last position.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            },
+            "notes": [
+              "Model-derived; the arithmetic is the same one-sided test at every occasion."
+            ]
+          }
+        ]
       },
       "respellability": {
         "resolution": "cell-override",
@@ -279,10 +552,19 @@
         ]
       },
       "citations": [
-        { "kind": "code", "ref": "src/Precept/Language/Types.cs:315", "note": "list .at(integer) accessor catalog declaration" },
-        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "state-hook write occasion under the Fault family row" }
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:315",
+          "note": "list .at(integer) accessor catalog declaration"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "state-hook write occasion under the Fault family row"
+        }
       ],
       "notes": [
+        "RESOLVED 2026-07-23. The MISSING RULE recorded below is written: matrix § Rule validity, 'Index-bounds decomposition — two one-sided comparisons over declared bounds'. The cross-subject obligation is not discharged as a relation at all — it is split into its two conjuncts, and each conjunct is a single-subject comparison the existing derivations reach. The declared-bound route needs no guard position, so it reaches all five occasions, including the three that have none. The observations below about HEAD remain accurate and are now filed as BUG-037: the built engine sources both halves from guards only, so it rejects a provably-safe access and suggests a repair that cannot be written at a computed field, a rule condition, or a state action.",
         "MISSING RULE (same cross-subject relational finding as the transition cell): no validityArgument names the index<count decomposition. Additionally distinct here: a state entry/exit action has no guard and no args, so the built GuardInPath discharge is not merely unnamed — it is unreachable. This occasion therefore has NO known discharge at any premise combination, model or built.",
         "Live at HEAD c295d7b4: `to Reviewing -> set Entry = Items.at(Cursor)` mints IndexBounds (Unresolved) and rejects with PRE0100. The base gives BOTH Items (via the Load row) and Cursor (via the Move row) write sites so the only diagnostics are the target IndexBounds obligation (base-minimality verified: the compile yields exactly the two PRE0100 entries, which are the same obligation reported for the lowercase parameter and the named index).",
         "No discharge or near-miss witnesses are recorded: with no reachable discharge, there is no addition to weaken. The base rejection is the whole of the occasion's testable behavior.",
@@ -300,39 +582,127 @@
         "typeFamily": "collection"
       },
       "disposition": {
-        "status": "open",
+        "status": "defined",
         "citations": [
           {
             "kind": "matrix",
             "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
-            "note": "MISSING RULE: no validityArgument licenses the cross-subject relational IndexBounds discharge. A stateless handler admits a `when` guard, so the built GuardInPath discharge IS reachable — but it remains unnamed by the matrix, so the cell is open."
+            "note": "the Index-bounds decomposition rule, written 2026-07-23, closes the MISSING RULE this cell previously recorded — the cross-subject relation is discharged by splitting it into two one-sided comparisons, each of which a single-subject derivation reaches"
           },
           {
-            "kind": "code",
-            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
-            "note": "TryIndexBoundsProof / GuardInPath — reachable here via the stateless handler's guard, unnamed in the matrix"
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "fault-family case shape"
           }
         ]
       },
       "obligation": {
         "statement": "0 <= Index and Index < Items.count",
         "metavariables": [
-          { "name": "Items", "standsFor": "the collection field the indexed accessor reads" },
-          { "name": "Index", "standsFor": "the index expression (an event arg here)" }
+          {
+            "name": "Items",
+            "standsFor": "the collection field the indexed accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression (an event arg here)"
+          }
         ],
         "normalization": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
         ],
-        "wp": { "statement": "0 <= Index and Index < Items.count" }
+        "wp": {
+          "statement": "0 <= Index and Index < Items.count"
+        }
       },
-      "applicablePremiseClasses": ["a", "b", "c", "d"],
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
       "premiseAvailability": "A stateless `on E -> ...` handler is a first-class write occasion (transport-rule-restatement-2026-07-21 § Semantic Rules; stateless precepts are first-class). It admits a `when` guard (confirmed by samples/Test2.precept: `on Add1 when Add1.Amount1 + Add1.Amount2 <= 1000`), so class (c) is available; event args give (b); field modifiers (a); and a data-only precept still has pre-state facts (d). The relational conjunct Index < Items.count is again supplied only by (c) the guard. Same citation-duty note as the transition cell: the built discharge reads Items.count directly at the guard, consuming no declared collection fact, so it owes no establishing/preserving citation.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "derivation": "decompose into the two conjuncts and discharge each from declared bounds: the lower half `0 <= Index` from a declared nonnegative/min-0 on the index (a field modifier, or an arg modifier where the index is an argument), and the upper half from `hi(Index) < lo(Items.count)`, where the count lower bound is the engine's sequenced count interval seeded from the collection's declared mincount and advanced by each mutation's per-kind delta. Mode is StrictlyBefore for `.at(N)` and `remove at N`; for `insert at N` the catalog's AtOrBefore mode makes the upper test `hi(Index) <= lo(count)`, because positions 0..count are insertable.",
+          "validityArguments": [
+            "Index-bounds decomposition"
+          ],
+          "decisionProcedure": "Two independent one-sided integer comparisons over already-computed intervals: read the index expression's proven interval and the collection's sequenced count interval, then test lo(Index) >= 0 and hi(Index) < lo(count) (<= for AtOrBefore). Both are finite exact-integer comparisons; reject iff either test fails or either interval is unbounded on the needed side.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "the Index-bounds decomposition argument: two one-sided comparisons, exact integer lane, sequenced count lower bound"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/ProofRequirement.cs:250-257",
+              "note": "IndexBoundsMode — StrictlyBefore for .at(N) and remove-at, AtOrBefore for insert-at"
+            }
+          ],
+          "notImplementedAtHead": "The built engine does not attempt this route — TryIndexBoundsProof sources both bounds from guard facts only. Recorded as BUG-037 with a compiled witness; the definition licenses it, the compiler under-implements it."
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "decompose into the two conjuncts and discharge each from a guard conjunct on the governing guard — `when Index >= 0 and Index < Items.count` supplies both halves directly, one per conjunct, with each disjunctive branch establishing both.",
+          "validityArguments": [
+            "Index-bounds decomposition",
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Normal-form match of each half against the guard's conjuncts, per disjunctive branch (a finite set); reject iff any branch leaves either half unmatched.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "Index-bounds decomposition for the split; Guard normal-form match for each half, which carries the transport rule's frame-and-kill on the guard facts"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+              "note": "TryIndexBoundsProof — the built discharge, whose own comment describes establishing both bounds per disjunctive branch"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "schema": "declare `nonnegative` (or `min 0`) and `max ⟨K⟩` on ⟨Index⟩, and `mincount ⟨M⟩` on ⟨Collection⟩, with ⟨K⟩ < ⟨M⟩"
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard conjunct `when ⟨Index⟩ >= 0 and ⟨Index⟩ < ⟨Collection⟩.count`"
+        }
+      ],
       "witnesses": {
         "base": {
           "program": "precept IdxStatelessHook\n\nfield Items as list of decimal\nfield Entry as decimal default 0.0\n\nevent Load(V as decimal)\nevent Pick(Index as integer)\n\non Load\n    -> append Items Load.V\n\non Pick\n    -> set Entry = Items.at(Pick.Index)\n",
           "expected": {
             "outcome": "reject",
-            "missingPremiseClasses": ["a", "b", "c", "d"],
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "c",
+              "d"
+            ],
             "noOtherDiagnostics": true
           },
           "provenance": {
@@ -347,8 +717,13 @@
             "id": "whole-condition-guard",
             "kind": "guard",
             "addition": "when Pick.Index >= 0 and Pick.Index < Items.count and Items.count > 0   (guard on the stateless Pick handler)",
-            "application": { "locus": "row-guard", "eventName": "Pick" },
-            "premiseClasses": ["c"],
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "premiseClasses": [
+              "c"
+            ],
             "derivation": "empirically: GuardInPath (TryIndexBoundsProof, ProofEngine.Strategies.cs:390) — lower bound, relational upper bound, and non-empty companion all from the handler guard. NOT named by any matrix validityArguments entry.",
             "strategy": "GuardInPath",
             "builtStatus": "proven-today",
@@ -358,11 +733,41 @@
               "date": "2026-07-21",
               "head": "c295d7b4"
             },
-            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
             "notes": [
               "Live at HEAD c295d7b4: base + this guard compiles with ZERO diagnostics; IndexBounds and the count>0 companion both Proved / GuardInPath. modelStatus omitted — no named validity argument licenses it.",
               "Confirms a stateless `on E when ...` handler carries a real guard for discharge purposes, despite spec:1007 (cited in transport-rule-restatement-2026-07-21) reading 'stateless event handlers carry no when guard'. That spec line and samples/Test2.precept's guarded stateless handlers are in tension; flagged as a doc-vs-behavior item, not resolved here.",
               "Compiler-hole check: no `into` binding target and no intervening write to Items between guard and accessor — does not rest on BUG-033 or the write-surface enumeration gap. Not flagged."
+            ]
+          },
+          {
+            "id": "declared-bounds",
+            "kind": "declaration",
+            "addition": "declare both bounds the rule reads: `nonnegative max K` on the index field or argument, and `mincount M` on the collection, with K < M. No guard is added — this is the route that reaches the occasions with no guard position.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "premiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "derivation": "Index-bounds decomposition: lower half `0 <= Index` from the declared nonnegative; upper half from hi(Index) = K < M = lo(Items.count), the collection's sequenced count lower bound seeded from mincount.",
+            "modelStatus": "licensed",
+            "builtStatus": "not-proven-today",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "programNote": "Same addition shape as the computed-field cell's compiled program, applied at this occasion.",
+            "notes": [
+              "Model-derived at this occasion. The compiled evidence for this route is on the computed-field cell, which is the strongest case because it has no guard position at all, so nothing but the declared bounds could be doing the work."
             ]
           }
         ],
@@ -370,10 +775,36 @@
           {
             "pairsWith": "whole-condition-guard",
             "addition": "when Pick.Index >= 0 and Items.count > 0   (relational upper-bound conjunct `Pick.Index < Items.count` dropped)",
-            "application": { "locus": "row-guard", "eventName": "Pick" },
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
             "whyStillRejects": "Weakened past sufficiency: without the relational upper bound the IndexBounds obligation reverts to Unresolved and PRE0100 (IndexBoundsGuard) emits naming the same obligation. Modeled on the identical transition near-miss which was live-verified at HEAD c295d7b4 (same GuardInPath strategy, same handler-guard mechanism); provenance model-derived because this exact stateless variant was not separately compiled.",
-            "provenance": { "mark": "model-derived" },
-            "expected": { "outcome": "reject", "sameObligation": true }
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "declared-bounds",
+            "addition": "same declarations, with the index's upper bound loosened to equal the collection's minimum count (K = M) instead of falling below it.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "whyStillRejects": "the upper half tests hi(Index) < lo(count) strictly; at K = M the test is 10 < 10, which is false. The index may equal the count, which is one past the last position.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            },
+            "notes": [
+              "Model-derived; the arithmetic is the same one-sided test at every occasion."
+            ]
           }
         ]
       },
@@ -385,10 +816,19 @@
         ]
       },
       "citations": [
-        { "kind": "code", "ref": "src/Precept/Language/Types.cs:315", "note": "list .at(integer) accessor catalog declaration" },
-        { "kind": "spec", "ref": "samples/Test2.precept", "note": "stateless guarded-handler convention (`on E when ...`) grounding the discharge witness" }
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:315",
+          "note": "list .at(integer) accessor catalog declaration"
+        },
+        {
+          "kind": "spec",
+          "ref": "samples/Test2.precept",
+          "note": "stateless guarded-handler convention (`on E when ...`) grounding the discharge witness"
+        }
       ],
       "notes": [
+        "RESOLVED 2026-07-23. The MISSING RULE recorded below is written: matrix § Rule validity, 'Index-bounds decomposition — two one-sided comparisons over declared bounds'. The cross-subject obligation is not discharged as a relation at all — it is split into its two conjuncts, and each conjunct is a single-subject comparison the existing derivations reach. The declared-bound route needs no guard position, so it reaches all five occasions, including the three that have none. The observations below about HEAD remain accurate and are now filed as BUG-037: the built engine sources both halves from guards only, so it rejects a provably-safe access and suggests a repair that cannot be written at a computed field, a rule condition, or a state action.",
         "MISSING RULE (same cross-subject relational finding). Unlike the state-hook cell, the built GuardInPath discharge IS reachable here (a stateless handler admits a guard), so a discharge witness is recorded — but the discharge is unnamed by the matrix, so disposition is open, not defined.",
         "Live at HEAD c295d7b4: base `on Pick -> set Entry = Items.at(Pick.Index)` mints IndexBounds (Unresolved) and rejects with PRE0100.",
         "In a STATEFUL precept the same `on Pick` handler is rejected as PRE0092 ('event handler not valid in a stateful precept'); the stateless-handler occasion is therefore genuinely distinct from the transition-row occasion, not a spelling of it."
@@ -405,39 +845,101 @@
         "typeFamily": "collection"
       },
       "disposition": {
-        "status": "open",
+        "status": "defined",
         "citations": [
           {
             "kind": "matrix",
             "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
-            "note": "MISSING RULE: no validityArgument licenses the cross-subject relational IndexBounds discharge; and a bare rule condition has no handler guard and no event args, so the built GuardInPath mechanism is unreachable — no discharge route exists at HEAD."
+            "note": "the Index-bounds decomposition rule, written 2026-07-23, closes the MISSING RULE this cell previously recorded — the cross-subject relation is discharged by splitting it into two one-sided comparisons, each of which a single-subject derivation reaches"
           },
           {
-            "kind": "code",
-            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
-            "note": "TryIndexBoundsProof requires a guard fact in path; a rule condition has none"
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "fault-family case shape"
           }
         ]
       },
       "obligation": {
         "statement": "0 <= Watched and Watched < Items.count",
         "metavariables": [
-          { "name": "Items", "standsFor": "the collection field the .at() accessor reads" },
-          { "name": "Watched", "standsFor": "the index expression (a field, since a rule condition has no args)" }
+          {
+            "name": "Items",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Watched",
+            "standsFor": "the index expression (a field, since a rule condition has no args)"
+          }
         ],
         "normalization": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
         ],
-        "wp": { "statement": "0 <= Watched and Watched < Items.count" }
+        "wp": {
+          "statement": "0 <= Watched and Watched < Items.count"
+        }
       },
-      "applicablePremiseClasses": ["a"],
+      "applicablePremiseClasses": [
+        "a"
+      ],
       "premiseAvailability": "A bare `rule` condition is anchored to no handler: it is evaluated against the whole working copy in every reachable configuration. No guard is in scope (class c unavailable), no event fired (class b unavailable), and there is no single pre-state (the condition must hold over every configuration, so class d has no distinguished predecessor to appeal to). Only class (a), field modifiers, is available — and it cannot establish the relational Items.count bound (verified: a rule condition with mincount-bounded collection and literal-max index still rejects). No discharge route exists at HEAD. (A rule may carry a `when` activation guard, which would add class (c) — but that guard conditions the rule's ACTIVATION, and a fault site inside the rule's CONDITION is evaluated wherever the rule is checked; the built engine does not treat a rule activation guard as a GuardInPath premise for a fault obligation minted in the condition. Left as the open-disposition consequence, not asserted otherwise.)",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "derivation": "decompose into the two conjuncts and discharge each from declared bounds: the lower half `0 <= Index` from a declared nonnegative/min-0 on the index (a field modifier, or an arg modifier where the index is an argument), and the upper half from `hi(Index) < lo(Items.count)`, where the count lower bound is the engine's sequenced count interval seeded from the collection's declared mincount and advanced by each mutation's per-kind delta. Mode is StrictlyBefore for `.at(N)` and `remove at N`; for `insert at N` the catalog's AtOrBefore mode makes the upper test `hi(Index) <= lo(count)`, because positions 0..count are insertable.",
+          "validityArguments": [
+            "Index-bounds decomposition"
+          ],
+          "decisionProcedure": "Two independent one-sided integer comparisons over already-computed intervals: read the index expression's proven interval and the collection's sequenced count interval, then test lo(Index) >= 0 and hi(Index) < lo(count) (<= for AtOrBefore). Both are finite exact-integer comparisons; reject iff either test fails or either interval is unbounded on the needed side.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "the Index-bounds decomposition argument: two one-sided comparisons, exact integer lane, sequenced count lower bound"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/ProofRequirement.cs:250-257",
+              "note": "IndexBoundsMode — StrictlyBefore for .at(N) and remove-at, AtOrBefore for insert-at"
+            }
+          ],
+          "notImplementedAtHead": "The built engine does not attempt this route — TryIndexBoundsProof sources both bounds from guard facts only. Recorded as BUG-037 with a compiled witness; the definition licenses it, the compiler under-implements it."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "schema": "declare `nonnegative` (or `min 0`) and `max ⟨K⟩` on ⟨Index⟩, and `mincount ⟨M⟩` on ⟨Collection⟩, with ⟨K⟩ < ⟨M⟩"
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "not offerable at this occasion — there is no guard position here",
+          "notes": [
+            "The diagnostic must name only the classes reachable at the occasion. PRE0100 today names the guard repair unconditionally, which is unwritable here — BUG-037."
+          ]
+        }
+      ],
       "witnesses": {
         "base": {
           "program": "precept IdxRuleCond\n\nfield Items as list of decimal\nfield Watched as integer default 0\n\nrule Items.at(Watched) > 0.0 because \"watched slot stays positive\"\n\nevent Load(V as decimal)\nevent Move(To as integer)\non Load\n    -> append Items Load.V\non Move\n    -> set Watched = Move.To\n",
           "expected": {
             "outcome": "reject",
-            "missingPremiseClasses": ["a"],
+            "missingPremiseClasses": [
+              "a"
+            ],
             "noOtherDiagnostics": true
           },
           "provenance": {
@@ -446,7 +948,56 @@
             "date": "2026-07-21",
             "head": "c295d7b4"
           }
-        }
+        },
+        "discharges": [
+          {
+            "id": "declared-bounds",
+            "kind": "declaration",
+            "addition": "declare both bounds the rule reads: `nonnegative max K` on the index field or argument, and `mincount M` on the collection, with K < M. No guard is added — this is the route that reaches the occasions with no guard position.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "premiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "derivation": "Index-bounds decomposition: lower half `0 <= Index` from the declared nonnegative; upper half from hi(Index) = K < M = lo(Items.count), the collection's sequenced count lower bound seeded from mincount.",
+            "modelStatus": "licensed",
+            "builtStatus": "not-proven-today",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "programNote": "Same addition shape as the computed-field cell's compiled program, applied at this occasion.",
+            "notes": [
+              "Model-derived at this occasion. The compiled evidence for this route is on the computed-field cell, which is the strongest case because it has no guard position at all, so nothing but the declared bounds could be doing the work."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "declared-bounds",
+            "addition": "same declarations, with the index's upper bound loosened to equal the collection's minimum count (K = M) instead of falling below it.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "whyStillRejects": "the upper half tests hi(Index) < lo(count) strictly; at K = M the test is 10 < 10, which is false. The index may equal the count, which is one past the last position.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            },
+            "notes": [
+              "Model-derived; the arithmetic is the same one-sided test at every occasion."
+            ]
+          }
+        ]
       },
       "respellability": {
         "resolution": "cell-override",
@@ -456,10 +1007,19 @@
         ]
       },
       "citations": [
-        { "kind": "code", "ref": "src/Precept/Language/Types.cs:315", "note": "list .at(integer) accessor catalog declaration" },
-        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "rule-condition evaluation site under the Fault family row" }
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:315",
+          "note": "list .at(integer) accessor catalog declaration"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "rule-condition evaluation site under the Fault family row"
+        }
       ],
       "notes": [
+        "RESOLVED 2026-07-23. The MISSING RULE recorded below is written: matrix § Rule validity, 'Index-bounds decomposition — two one-sided comparisons over declared bounds'. The cross-subject obligation is not discharged as a relation at all — it is split into its two conjuncts, and each conjunct is a single-subject comparison the existing derivations reach. The declared-bound route needs no guard position, so it reaches all five occasions, including the three that have none. The observations below about HEAD remain accurate and are now filed as BUG-037: the built engine sources both halves from guards only, so it rejects a provably-safe access and suggests a repair that cannot be written at a computed field, a rule condition, or a state action.",
         "MISSING RULE (same cross-subject relational finding) AND no reachable discharge (no guard, no args). This occasion rejects and cannot be made to compile within its own surface at HEAD.",
         "Live at HEAD c295d7b4: this base (rule condition + a Load row writing Items and a Move row writing Watched, so both index and collection have write sites) mints IndexBounds (Unresolved) and rejects with EXACTLY the two target PRE0100 entries (same obligation, lowercase parameter + named index), no other diagnostics. A rule condition IS a minting fault site, unlike fault-17's guard/declaration buckets at e1a14d91 which did not mint. A further probe (rule condition with `Items mincount 10 maxcount 20` and `Watched nonnegative max 5`, so 0 <= Watched < count holds by the literal facts 5 < 10) STILL rejects with PRE0100: no static/declaration fold reaches the relational bound — GuardInPath requires a handler guard a rule condition does not have.",
         "No discharge or near-miss witnesses: no reachable discharge means no addition to weaken."
@@ -476,39 +1036,101 @@
         "typeFamily": "collection"
       },
       "disposition": {
-        "status": "open",
+        "status": "defined",
         "citations": [
           {
             "kind": "matrix",
             "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
-            "note": "MISSING RULE: no validityArgument licenses the cross-subject relational IndexBounds discharge; a computed-field expression has no guard and no args, so the built GuardInPath mechanism is unreachable — no discharge route exists at HEAD, even when both subjects are statically bounded."
+            "note": "the Index-bounds decomposition rule, written 2026-07-23, closes the MISSING RULE this cell previously recorded — the cross-subject relation is discharged by splitting it into two one-sided comparisons, each of which a single-subject derivation reaches"
           },
           {
-            "kind": "code",
-            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
-            "note": "TryIndexBoundsProof requires a guard fact in path; a computed-field expression has none"
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "fault-family case shape"
           }
         ]
       },
       "obligation": {
         "statement": "0 <= Cursor and Cursor < Items.count",
         "metavariables": [
-          { "name": "Items", "standsFor": "the collection field the .at() accessor reads" },
-          { "name": "Cursor", "standsFor": "the index expression (an input field of the computed field)" }
+          {
+            "name": "Items",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Cursor",
+            "standsFor": "the index expression (an input field of the computed field)"
+          }
         ],
         "normalization": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
         ],
-        "wp": { "statement": "0 <= Cursor and Cursor < Items.count" }
+        "wp": {
+          "statement": "0 <= Cursor and Cursor < Items.count"
+        }
       },
-      "applicablePremiseClasses": ["a"],
+      "applicablePremiseClasses": [
+        "a"
+      ],
       "premiseAvailability": "A computed field `field Selected as T <- <expr>` is recomputed after every mutation, in every operation's pipeline (transport-rule-restatement-2026-07-21 § 3, computed-field-expression: 'every route'; evaluator.md:144). It is anchored to no handler and no event: no guard (class c), no args (class b), and its inputs' values are whatever the current configuration holds (class d supplies no distinguished index<count relation). Only class (a), the modifiers of the input fields, is available. Verified below: even with Items mincount-bounded and Cursor bounded by a literal max such that 0 <= Cursor < Items.count holds by the declared bounds alone, the obligation does NOT discharge — the engine has no non-guard mechanism for the relational bound. No discharge route exists at HEAD.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "derivation": "decompose into the two conjuncts and discharge each from declared bounds: the lower half `0 <= Index` from a declared nonnegative/min-0 on the index (a field modifier, or an arg modifier where the index is an argument), and the upper half from `hi(Index) < lo(Items.count)`, where the count lower bound is the engine's sequenced count interval seeded from the collection's declared mincount and advanced by each mutation's per-kind delta. Mode is StrictlyBefore for `.at(N)` and `remove at N`; for `insert at N` the catalog's AtOrBefore mode makes the upper test `hi(Index) <= lo(count)`, because positions 0..count are insertable.",
+          "validityArguments": [
+            "Index-bounds decomposition"
+          ],
+          "decisionProcedure": "Two independent one-sided integer comparisons over already-computed intervals: read the index expression's proven interval and the collection's sequenced count interval, then test lo(Index) >= 0 and hi(Index) < lo(count) (<= for AtOrBefore). Both are finite exact-integer comparisons; reject iff either test fails or either interval is unbounded on the needed side.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "the Index-bounds decomposition argument: two one-sided comparisons, exact integer lane, sequenced count lower bound"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/ProofRequirement.cs:250-257",
+              "note": "IndexBoundsMode — StrictlyBefore for .at(N) and remove-at, AtOrBefore for insert-at"
+            }
+          ],
+          "notImplementedAtHead": "The built engine does not attempt this route — TryIndexBoundsProof sources both bounds from guard facts only. Recorded as BUG-037 with a compiled witness; the definition licenses it, the compiler under-implements it."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a",
+            "b",
+            "d"
+          ],
+          "schema": "declare `nonnegative` (or `min 0`) and `max ⟨K⟩` on ⟨Index⟩, and `mincount ⟨M⟩` on ⟨Collection⟩, with ⟨K⟩ < ⟨M⟩"
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "not offerable at this occasion — there is no guard position here",
+          "notes": [
+            "The diagnostic must name only the classes reachable at the occasion. PRE0100 today names the guard repair unconditionally, which is unwritable here — BUG-037."
+          ]
+        }
+      ],
       "witnesses": {
         "base": {
           "program": "precept IdxComputed\n\nfield Items as list of decimal\nfield Cursor as integer default 0\nfield Selected as decimal <- Items.at(Cursor)\n\nevent Load(V as decimal)\nevent Move(To as integer)\non Load\n    -> append Items Load.V\non Move\n    -> set Cursor = Move.To\n",
           "expected": {
             "outcome": "reject",
-            "missingPremiseClasses": ["a"],
+            "missingPremiseClasses": [
+              "a"
+            ],
             "noOtherDiagnostics": true
           },
           "provenance": {
@@ -517,7 +1139,63 @@
             "date": "2026-07-21",
             "head": "c295d7b4"
           }
-        }
+        },
+        "discharges": [
+          {
+            "id": "declared-bounds",
+            "kind": "declaration",
+            "addition": "declare both bounds the rule reads: `nonnegative max K` on the index field or argument, and `mincount M` on the collection, with K < M. No guard is added — this is the route that reaches the occasions with no guard position.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "premiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "derivation": "Index-bounds decomposition: lower half `0 <= Index` from the declared nonnegative; upper half from hi(Index) = K < M = lo(Items.count), the collection's sequenced count lower bound seeded from mincount.",
+            "modelStatus": "licensed",
+            "builtStatus": "not-proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-23",
+              "head": "a793a383"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "program": "precept IdxComputed\n\nfield Items as list of decimal mincount 10 maxcount 20\nfield Cursor as integer default 0 nonnegative max 5\nfield Selected as decimal <- Items.at(Cursor)\n\nevent Seed(V as decimal)\nevent Nudge(N as integer nonnegative max 5)\n\non Seed when Items.count < 20\n    -> append Items Seed.V\n\non Nudge\n    -> set Cursor = Nudge.N\n",
+            "notes": [
+              "Live at HEAD a793a383 (2026-07-23): this program is REJECTED — `IndexBounds` Unresolved, PRE0100 the sole diagnostic, with every other obligation Proved including the collection's own `List must be non-empty` from the same mincount. The expected outcome above is the DEFINITION's verdict; the divergence is BUG-037, recorded rather than smoothed over."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "declared-bounds",
+            "addition": "same declarations, with the index's upper bound loosened to equal the collection's minimum count (K = M) instead of falling below it.",
+            "application": {
+              "locus": "field-and-arg-modifiers"
+            },
+            "whyStillRejects": "the upper half tests hi(Index) < lo(count) strictly; at K = M the test is 10 < 10, which is false. The index may equal the count, which is one past the last position.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-23",
+              "head": "a793a383"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            },
+            "program": "precept IdxComputed\n\nfield Items as list of decimal mincount 10 maxcount 20\nfield Cursor as integer default 0 nonnegative max 10\nfield Selected as decimal <- Items.at(Cursor)\n\nevent Seed(V as decimal)\nevent Nudge(N as integer nonnegative max 10)\n\non Seed when Items.count < 20\n    -> append Items Seed.V\n\non Nudge\n    -> set Cursor = Nudge.N\n",
+            "notes": [
+              "Live at HEAD a793a383: rejects with the same obligation and the same diagnostic as the discharge program, so at HEAD the pair is indistinguishable — HEAD rejects both. Under the definition they differ, which is exactly what BUG-037 says the compiler does not yet see."
+            ]
+          }
+        ]
       },
       "respellability": {
         "resolution": "cell-override",
@@ -527,10 +1205,19 @@
         ]
       },
       "citations": [
-        { "kind": "code", "ref": "src/Precept/Language/Types.cs:315", "note": "list .at(integer) accessor catalog declaration" },
-        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule", "note": "computed-field transitivity: every write to an input is a write site; the .at() fault obligation mints on the computed expression" }
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:315",
+          "note": "list .at(integer) accessor catalog declaration"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+          "note": "computed-field transitivity: every write to an input is a write site; the .at() fault obligation mints on the computed expression"
+        }
       ],
       "notes": [
+        "RESOLVED 2026-07-23. The MISSING RULE recorded below is written: matrix § Rule validity, 'Index-bounds decomposition — two one-sided comparisons over declared bounds'. The cross-subject obligation is not discharged as a relation at all — it is split into its two conjuncts, and each conjunct is a single-subject comparison the existing derivations reach. The declared-bound route needs no guard position, so it reaches all five occasions, including the three that have none. The observations below about HEAD remain accurate and are now filed as BUG-037: the built engine sources both halves from guards only, so it rejects a provably-safe access and suggests a repair that cannot be written at a computed field, a rule condition, or a state action.",
         "MISSING RULE (same cross-subject relational finding) AND no reachable discharge. Distinct evidence: this is the cell whose STATIC probe pins down that the missing rule is not merely a guard-plumbing gap. Live at HEAD c295d7b4: `field Items as list of decimal mincount 10 maxcount 20` + `field Cursor as integer default 0 nonnegative max 5` + `field Selected as decimal <- Items.at(Cursor)` STILL rejects with PRE0100 on IndexBounds, even though 5 < 10 makes 0 <= Cursor < Items.count provable from the declared bounds. (The companion non-empty Numeric IS discharged from mincount 10 via DeclarationAttribute — proving the engine CAN read cardinality from a declaration for the single-subject count>0 obligation, but has no rule that combines a declared index bound with a declared cardinality bound for the relational IndexBounds obligation. That combination is precisely the missing validityArgument.)",
         "Live at HEAD c295d7b4: this base (both Items and Cursor given write sites via Load/Move) mints IndexBounds (Unresolved) and rejects with EXACTLY the two target PRE0100 entries, no other diagnostics. computed-field-expression IS a minting fault site (fault-17 folded it under rule-condition without separately verifying; verified distinctly here).",
         "No discharge or near-miss witnesses: no reachable discharge, model or built, so there is no addition to weaken. The static probe stands as the evidence that even the most-favorable premise-(a) configuration does not discharge."

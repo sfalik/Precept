@@ -27,6 +27,18 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-037: An index-bounds obligation is discharged only from a guard, so it rejects a provably-safe access and then suggests a repair the author cannot write at that site (false rejection + unusable diagnostic)
+
+- **Discovered**: 2026-07-23, while authoring the index-bounds discharge rule for the matrix. **Behaviourally confirmed via `precept_compile` at HEAD**, both the failing and the passing case.
+- **Symptom, two halves.** *False rejection*: an index access whose safety is decided by the declared bounds alone is rejected. `field Items as list of decimal mincount 10 maxcount 20` + `field Cursor as integer default 0 nonnegative max 5` + `field Selected as decimal <- Items.at(Cursor)` compiles to `IndexBounds` **Unresolved** and `PRE0100`, even though `Cursor <= 5 < 10 <= Items.count` follows from the two declarations, and even though the same file's own "List must be non-empty" obligation reports `Proved` from that `mincount`. *Unusable repair*: `PRE0100` says "add `when Cursor >= 0 and Cursor < Items.count`", but the site is a computed-field expression, which has no guard position. The same is true at a rule condition and at a state entry/exit action. Three of the five occasions where the obligation is minted cannot host the repair the message names.
+- **Root cause**: `TryIndexBoundsProof` (`ProofEngine.Strategies.cs:390`) sources both bounds from guard facts only. Its own decomposition is already correct — the comment describes establishing both bounds per disjunctive branch — but neither half can be sourced from a declared modifier, so a declared index bound and a declared `mincount` contribute nothing.
+- **Confirming control**: the identical access inside a guarded handler — `on Pick when Cursor >= 0 and Cursor < Items.count -> set Selected = Items.at(Cursor)` — reports `IndexBounds` **Proved**, strategy `GuardInPath`. So the mechanism works; only its premise sources are too narrow.
+- **Scope / class**: false rejection (the safe direction, so not a soundness hole) plus a diagnostic that names an impossible repair. The second half is the more damaging in practice — an author at a computed field is told to do something the grammar does not allow.
+- **Fix complexity**: medium. The definitional half is written — the matrix's index-bounds decomposition rule licenses each half from declared bounds, with the count lower bound read from the sequenced count interval the engine already tracks. The implementation extends the strategy's premise sources; the diagnostic needs per-occasion repair text.
+- **Priority**: quality bar for the false rejection; the misleading repair is worth fixing whenever the message is next touched.
+- **Repro**: as above.
+- **Status**: Active — false rejection, definitional rule now written.
+
 ### BUG-036: A dynamic (interpolated) TEMPORAL qualifier (`period of '{Dim}'`, `period in '{Unit}'`) builds no qualifier meta and is dropped silently — no enforcement, no diagnostic (coverage/soundness-adjacent)
 
 - **Discovered**: 2026-07-21, while re-attacking the type-structural context validity argument. **Source-derived (code reading), symptom repro pending** — an attempt to reproduce hit `choice`-declaration syntax errors, so the clean witness is not yet confirmed via `precept_compile`; the code path below is the evidence.
