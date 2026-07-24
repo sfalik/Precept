@@ -202,7 +202,15 @@ All **Owner:** WU-DOC-SYNC. No spec-behavior change; doc/enum/comment correction
 
 Nothing here is settled. Each item is framed two-sided with the locked text quoted. WF-2 cannot write acceptance criteria on these until the owner rules.
 
-### OF1 — Do constraint-message interpolation holes carry proof obligations? *(Angle 4 Finding 5)* — **most consequential**
+### OF1 — Do constraint-message interpolation holes carry proof obligations? *(Angle 4 Finding 5)* — **most consequential** — ⚠️ **RE-CHECKED 2026-07-23: the value arm is already committed in the matrix layer; only the presence arm is a live fork. Canon currently contradicts itself.**
+
+> **Value-fault arm — effectively decided, post-ledger.** The matrix's fault case shape names message interpolation as a fault evaluation site (`obligation-discharge-matrix-2026-07-19.md:205`, a generative section the owner reads at ratification), citing the want doc's own worked example, which puts a division inside a refusal message (`what-i-want-2026-07-16.md:72`). Eight cells were authored against it, **all `defined`** — four at `reject-message-interpolation`, four at `constraint-rationale-interpolation` (`fault-6-division-primitive-message-interpolation.cells.json`). The compiler's silence is booked there as a **build gap, not a definitional exclusion**.
+>
+> **But canon still says deferred.** `docs/compiler/soundness-and-coverage.md:229` records the whole fork as deferred pending an owner ruling. So the canonical doc and the matrix — which is destined to become canon — disagree. That is the live inconsistency, and it is narrower than this entry's framing: the value arm needs **confirmation or reversal of a commitment already made**, not a fresh two-sided decision.
+>
+> **Presence arm — genuinely open, and its proposed resolution is new language surface.** No matrix cell covers Presence × interpolation; `Presence` is one of four fault kinds the matrix records as having no validity argument at all. The recommendation below resolves it via *"a language guarantee that message rendering is presence-tolerant"* — that guarantee exists nowhere in `docs/`, `research/` or `src/`, and creating it is a Tier-2 language-surface change under the consultation gate. It cannot ride along with an OF1 ruling.
+>
+> **Pairs with BUG-053** (filed 2026-07-23), which records the same non-minting one position over, for optional event arguments.
 
 **Structural fact (certain):** message holes create **zero** obligations of any kind. `CollectObligations` walks a rule/ensure's `.Condition` only; `.Message` (`SemanticIndex.cs:572, :583`) is never passed to `WalkExpression`.
 - **Probe:** `rule B > 0 because "bad {10 / 0}"` → `success:true, proofObligations:[]` (no PRE0083). An optional-field hole `because "value {A}"` likewise raises no PRE0116.
@@ -228,7 +236,17 @@ Neither reading is grounded by locked spec text — `diagnostic-system.md:243/59
 
 **Frank's recommendation (not ratified — owner must rule):** **REMOVE the scaffolding now; re-open via `/design` only on concrete demand.** Two reasons: (1) the "build" arm is new catalog/language surface with zero locked-spec grounding — it cannot even be proposed inline (routes to `/design` under the Pre-Design Owner Consultation gate) and there is no demonstrated demand; the canonical example (`round(X,-1)`) is already served by the live `InvalidModifierValue` path. (2) The dead `[StaticallyPreventable]` scaffolding is actively harmful — it makes `Precept0002` pass green while the guarantee is hollow (the G17 false-green pathology); removing `FaultCode 8` + `DiagnosticCode.FunctionArgConstraintViolation` + metadata restores the honesty of the fault-prevention invariant. Also closes half of OS2's PRE0022 overlap.
 
-### OF3 — `notempty` on collection *fields*: string-only, or also collection cardinality? *(Re-extract #1)*
+### OF3 — `notempty` on collection *fields*: string-only, or also collection cardinality? *(Re-extract #1)* — ✅ **RULED 2026-06-03, five weeks BEFORE this ledger. NOT OPEN.**
+
+> **Ruling:** `notempty` is **string-only**. Owner-authorized in `docs/Working/Archive/modifier-name-axis-overlap-2026-06-03.md` (`Locked 2026-06-03`), Decision 1 — *"Retarget `notempty` from `StringAndCollectionTypes` to `StringOnly`"* — reversing the collection half of an earlier locked decision via owner Direction A. Promoted to canon 2026-06-04 and shipped in `c3209ad2`: *"it's now a string/element modifier … and no longer names collection cardinality — that's `mincount 1`"*.
+>
+> **It is structurally irreversible.** `Modifiers.cs` targets `StringOnly`, and analyzer `PRECEPT0031` fails the build if any value modifier spans both a collection kind and a scalar kind. Re-widening it would require deleting an analyzer.
+>
+> **The recommendation below reached the right answer for a weaker reason** — it counted three locked surfaces against one. The actual ground is an owner-authorized locked design that predates the ledger.
+>
+> **Residual drift, not decisions:** `primitive-types.md:582` still carries the pre-retarget text and even links to the doc that now contradicts it; and the `ElementPositionValueTokens` comment at `Modifiers.cs:356` still lists `notempty` among modifiers excluded as collection-applicable, which the code three lines below contradicts.
+>
+> **A 2026-07-23 probe wrongly reported `notempty` on a collection as "completely inert".** That was a false finding from a probe that exercised only a cardinality site. Verified: `field Tags as set of string notempty` with an element write mints `LengthContainment [1 .. ∞]` and rejects (`PRE0135`). It is live and element-routed; it is inert against *cardinality* only, which is the ruling working as intended.
 
 - `primitive-types.md:582` says `notempty` applies to `string` **and** to `set, queue, stack, log, bag, list, queue of T by P` ("equivalent to `mincount 1`").
 - `precept-language-spec.md:1150, :1671, :435` and `collection-types.md:794` say `notempty` is **string-only**; in inner-type position it constrains each element, and collection *cardinality* is exclusively `mincount 1`.
@@ -237,7 +255,21 @@ Two locked texts give incompatible answers for `field Tags as set of string note
 
 **Frank's recommendation (not ratified — owner must rule):** **string-only; `primitive-types.md:582` is the drift.** Three locked surfaces say string-only (`precept-language-spec.md:1150, :1671, :435`; `collection-types.md:794`) against primitive-types.md's one overreach. Architecturally decisive: collection cardinality vocabulary is deliberately single-source (`mincount`/`maxcount` in the Constraints catalog); making `notempty` a second spelling of `mincount 1` creates two ways to say one thing and muddies the inner-type-vs-field-level distinction (`set of string notempty` already means *each element* non-empty). Frank would downgrade this from owner-fork to **doc-drift-with-forced-resolution** — fix `primitive-types.md:582` to string-only — but keep it surfaced because it touches Constraints-catalog applicability metadata (language surface).
 
-### OF4 — Are `in`-qualified periods orderable? *(Re-extract #9)*
+### OF4 — Are `in`-qualified periods orderable? *(Re-extract #9)* — ⚠️ **RE-CHECKED 2026-07-23: NOT already ruled, and this entry understates it. It is a behavioural fork with three outcomes, not a doc fix.**
+
+> **The 2026-05-30 owner Resolution rules the premise, not the conclusion.** That Resolution permits a single-basis `period` *divisor* because it has "a well-defined unit *and* count". That is the premise the YES reading needs, and it is owner-authored. It also disposes of the objection that D14 already considered this: D14's rejected alternatives are *reference-date* and *approximate* ordering, and single-basis ordering is neither.
+>
+> **But division is one-operand admissibility; ordering is two-operand compatibility.** `period in 'days'` and `period in 'months'` are each individually admissible as divisors, yet comparing them is exactly "Is 1 month greater than 30 days?" — D14's own stated reason. So single-basis pinning does not discharge D14; **same-basis** pinning would. `collection-types.md:533` escapes this only because a set's elements share one declared basis. The scalar `<`/`>` case has no such guarantee.
+>
+> **A third canonical text contradicts both sides and nobody cited it.** `temporal-type-system.md:842` grants `nonnegative` on an *unqualified* `period`, "compared against `Period.Zero`" — an ordering relation, live in the catalog. D14's "`==` and `!=` only" is already not literally true.
+>
+> **Neither reading is implemented.** `TypeTrait` is a flat per-`TypeKind` flag and no qualifier-conditional trait mechanism exists. Verified 2026-07-23: `set of period in 'days'` → `.max` is rejected (`PRE0104`), so `collection-types.md:533` does not work today; and `rule Grace < Limit` on two `period in 'days'` fields is rejected with `PRE0018` *"Expected a period value here, but got 'period'"* — a message that never mentions ordering.
+>
+> **It cannot be ruled in isolation.** The same trait mechanism fails the opposite way for the business types: `set of money` **unqualified** → `.max` **compiles**, which `collection-types.md:530` says should be a type error. That is a live false-clean cross-currency ordering. The v1 spec-coverage audit reached the same conclusion independently and logged *"No decision recorded"*.
+>
+> **Three outcomes, not two:** (a) orderable when same-basis-pinned everywhere; (b) never orderable, and `collection-types.md:533` is the drift; (c) orderable in the collection-accessor position only, where a single declared basis is structurally guaranteed, but not for scalar comparison. (c) is consistent with all three texts and is currently proposed by nobody.
+>
+> **Do not action BUG-047's `positive`-on-`period` strip ahead of this.** That bug calls it a mechanical correction binding on D14; if OF4 rules (a) or (c), it stops being mechanical.
 
 - `collection-types.md:533` grants `.min`/`.max` on `set of period in 'days'` (single-component ordering).
 - Temporal D14 (`:1476`) states periods have **no ordering, `==`/`!=` only**, with no qualified-basis exception; `business-domain-types.md` nowhere grants ordering to `in`-qualified periods.
