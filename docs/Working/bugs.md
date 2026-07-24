@@ -27,6 +27,15 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-062: Currency lookup is case-insensitive, accepting lowercase/mixed-case codes against the uppercase-only rule (D13b)
+
+- **Discovered**: 2026-07-24, promoting the OF6 owner ruling (uppercase-only, `business-domain-types.md § D13b`). **Confirmed at HEAD via a direct `Compiler.Compile` harness.**
+- **Symptom**: `field C1 as currency default 'usd'` compiles clean (no `PRE0053`); so do `'Usd'`, `'eur'`, and `money in 'usd'`. Only a genuinely-invalid code (`'USDX'`) is rejected.
+- **Root cause**: `CurrencyCatalog` uses `OrdinalIgnoreCase` throughout and `ToUpperInvariant` on every lookup; the `business-domain-types.md § currency error table` teachable (*"Currency codes must be uppercase (ISO 4217). Use `'USD'`."*) is not wired. Case-folding entered silently (one Copilot co-authored commit), not as a recorded reversal — the AI-departure shape.
+- **Why it matters (the deciding evidence behind D13b)**: in the polymorphic `price in` slot the currency registry is consulted before the unit registry (`TypeChecker.cs:651-653`), so under case-insensitive lookup `price in 'Zar' of 'mass'` compiles clean — `Zar` (zetta-are, a live UCUM unit) silently captured as a currency, colliding with `ZAR` (South African Rand). Uppercase-only lookup makes the collision structurally impossible. Also an asymmetry: the parallel UCUM unit lookup **is** ordinal (`quantity in 'KG'` is refused), so the two registries currently disagree about whether their own documented case rule is real.
+- **Fix**: make currency lookup ordinal (drop `OrdinalIgnoreCase`/`ToUpperInvariant`), wire the teachable as a live diagnostic (`PRE0053` or a dedicated case code). Downstream comparisons can then drop the ignore-case comparer.
+- **Status**: Active — missing rejection against a locked Decision (D13b, owner ruling 2026-07-24).
+
 ### BUG-061: The `if X is set then X else …` conditional discharges presence for an event arg but not for a stored field
 
 - **Discovered**: 2026-07-24, verifying that the existing coalescing idiom covers the fallback case for presence-tolerant rendering. **Confirmed at HEAD via a direct `Compiler.Compile` harness.**

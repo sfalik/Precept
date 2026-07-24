@@ -1801,6 +1801,14 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 - **Precedent:** NodaTime serialization — every NodaTime type serializes to a string via its own pattern. `LocalDate` → `"2026-03-15"`, `Duration` → `"72:00:00"`, `Period` → `"P1Y2M3D"`. The type is the serializer.
 - **Tradeoff accepted:** String parsing at deserialization boundaries. But the parser already exists (literal parsing), and the string form is human-readable in MCP tool output.
 
+### D13b. Currency codes are uppercase-only
+
+- **What:** ISO 4217 currency codes are uppercase; lowercase or mixed-case currency input (`'usd'`, `'Zar'`) is a compile error. Currency lookup is ordinal, and the teachable at § currency error table (*"Currency codes must be uppercase (ISO 4217). Use `'USD'`."*) is a live diagnostic.
+- **Why:** Enforcing case ordinally (a) matches the already-enforced UCUM-unit rule (`quantity in 'KG'` is refused) so the two registries agree that their own documented case rule is real, and (b) eliminates ISO 4217 × UCUM case-folding collisions — `ZAR` (South African Rand) vs `Zar` (zetta-are) / `zar` (zepto-are), and `GIP`/`GiP`. In the polymorphic `price in` slot the currency registry is consulted before the unit registry, so under case-insensitive lookup `price in 'Zar' of 'mass'` compiles clean — a live UCUM unit silently captured as a currency. Uppercase-only lookup makes that collision structurally impossible.
+- **Alternatives rejected:** Case-insensitive normalization (accept `'usd'`, canonicalize to uppercase before lookup). Rejected: accepts the `Zar` ambiguity, contradicts the enforced UCUM lowercase rule, and leaves every downstream comparison responsible for carrying an ignore-case comparer rather than trusting stored canonical form. Determinism does not decide this either way — ordinal case-folding is already the sanctioned form (`primitive-types.md` § string comparison) — so the collision and the registry asymmetry are what decide it.
+- **Precedent:** ISO 4217 uppercase convention; parity with Precept's own already-ordinal UCUM unit lookup.
+- **Tradeoff accepted:** Lowercase currency input is a compile error, so any ingestion path supplying lowercase must uppercase before it reaches the contract. Accepted — the alternative silently accepts a valid unit as a currency.
+
 ### D14. `in` is a uniform assignment constraint across all types
 
 - **What:** `in` constrains assignment, not just decomposition. `period in 'months'` means only months-component periods can be assigned — same as `money in 'USD'` rejecting EUR.
