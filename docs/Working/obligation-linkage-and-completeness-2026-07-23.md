@@ -1,5 +1,5 @@
 ---
-status: Externally-Grounded
+status: Locked 2026-07-23
 phase-target: TBD — precedes the constraint-obligation build (matrix § Storage names constraint-obligation design time as the trigger for these catalog entries)
 comparable-systems-research-status: strong
 sources-consulted:
@@ -18,6 +18,9 @@ sources-consulted:
   - src/Precept.Analyzers/DiagnosticCoverageScanner.cs — how that gate computes its expected set
   - precept_compile probe (2026-07-23, HEAD) — the OrderTotals witness and the modifier/rule asymmetry probe
   - docs/Working/bugs.md — BUG-033, BUG-035, BUG-036
+  - src/Precept/Language/ActionKind.cs — the fifteen action kinds, checked against the § 3A.4 writer table
+  - src/Precept/Language/Actions.cs — ClearApplicable, which gates `clear` on the Optional modifier for scalars
+  - docs/Working/obligation-discharge-matrix-2026-07-19.md § Constraint kinds — the five constraint forms and their obligation shapes, incl. edge-triggered entry/exit ensures
 ---
 
 # Linkage and completeness for constraint establishment and preservation
@@ -338,7 +341,7 @@ What makes the novelty affordable rather than reckless is that Precept has an in
   - `docs/Working/certificate-steps-membership-2026-07-12.md:154-158` — "Step Sⱼ ::= one CertificateStepKind member, citing children ⊆ {P₁…Pₙ} ∪ {S₁…Sⱼ₋₁}, carrying its own Conclusion"
   - `docs/Working/obligation-discharge-matrix-2026-07-19.md:118` — "a proof may not consume such a fact unless it **names the obligation that established the fact and every obligation that preserves it**, each itself discharged"
   - `docs/Working/certificate-steps-membership-2026-07-12.md:354` — "DRAT's premise base being the original formula's clauses cited by index (mirror, cited above)"
-- **Strongest counter-evidence**: the 2026-07-21 ruling's own wording says a proof "names … every obligation that preserves it", which reads as a per-proof enumeration and is the shape a reader of that sentence would expect. Response: a record whose membership is enumerated and machine-checkable does name every one of them; the ruling constrains *what must be named and checked*, and is silent on the encoding. This reading is flagged for owner confirmation in § Open questions rather than assumed — it is the one place this design could be said to interpret a ruling rather than implement it.
+- **Strongest counter-evidence**: the 2026-07-21 ruling's own wording says a proof "names … every obligation that preserves it", which reads as a per-proof enumeration and is the shape a reader of that sentence would expect. Response: the two encodings check exactly the same two things — that the establishing obligation exists and passed, and that the preserving set is complete and every member passed — so the ruling's substance is met either way; it constrains what must be named and checked, and is silent on serialization. The record is not merely equivalent but strictly stronger on the one axis where they differ: under per-proof lists, two proofs consuming the same fact can cite different lists and nothing detects the disagreement, whereas one record makes that state unrepresentable. The ruling's own stated purpose — making the gap visible at the point of consumption rather than only by auditing the file — is served by both.
 - **Reversibility**: `Easy`. Pre-release with no external certificate consumers; switching to per-proof lists is a change to how the same computed set is serialized.
 - **Blast radius**: catalogs — none directly (a supporting type). Docs — `docs/compiler/proof-engine.md`, `docs/Working/certificate-steps-membership-2026-07-12.md`, `docs/tooling/mcp.md`. Samples — none. External consumers — none (pre-release).
 
@@ -389,11 +392,13 @@ The eleven premise kinds the certificate format already locked fall out cleanly 
 
 | Group | Premise kinds | What a proof must show |
 |---|---|---|
-| Fixed by declaration | `DeclaredModifier`; `DeclaredQualifier` where the qualifier is a literal | Cite the declaration. Empty establishment and preservation sets, per the 2026-07-21 refinement. No coverage record. |
+| Fixed by declaration | `DeclaredModifier`; `DeclaredQualifier` where the qualifier is a literal; `DeclaredPresence` where the field is required | Cite the declaration. Empty establishment and preservation sets, per the 2026-07-21 refinement. No coverage record. |
 | A condition on this path | `GuardCondition`, `RejectRowGuard`, `PriorAction` | Nothing to establish or preserve — these are facts about the route, and their survival to the consumption point is the transport rule's frame-and-kill, which the matrix already carries. No coverage record. |
-| Breakable by an operation | `DeclaredBound`, `RuleCondition`, `EnsureCondition`, `DeclaredPresence`, and `DeclaredQualifier` where the qualifier's value comes from a field | Cite the coverage record. |
+| Breakable by an operation | `DeclaredBound`, `RuleCondition`, `EnsureCondition`, `DeclaredQualifier` where the qualifier's value comes from a field, and `DeclaredPresence` where the field is `optional` with a default | Cite the coverage record. |
 
 `ReachabilityFact` and `DeclaredDefault` sit outside all three: the first is derived from the state graph rather than from a value, and the second *is* an establishment fact rather than a fact needing one.
+
+**Why `DeclaredPresence` splits.** The certificate format defines it as quoting whichever declaration aspect guarantees the field always has a value — "default or required shape" — and those two aspects answer the behavioural test differently. The only writer that can unset a scalar is the `clear` action, and the catalog gates it: `ClearApplicable` lists the seven collection types plus `new ModifiedTypeTarget(null, [ModifierKind.Optional])`, so on the scalar side `clear` reaches a field only when it carries `optional`. A required field's presence is therefore unbreakable by any operation and is context. An `optional` field whose presence rests on a default is breakable the moment the file contains a `clear` on it, and carries a record. This is the same split as `DeclaredQualifier` and for the same reason — one premise kind, two populations, discriminated by the instance rather than by the kind.
 
 - **Rationale**: the four situations the owner scoped are not four mechanisms — they are four premise kinds landing in the same group. Field modifiers are `DeclaredBound`; rules and ensures are `RuleCondition` and `EnsureCondition`; field-sourced qualifiers are the value-fact arm of `DeclaredQualifier`. Recognising that means one linkage mechanism serves all four, and the design does not need a per-situation answer. The partition is also derived rather than invented: it is the behavioural test applied to a vocabulary that already exists and was already closed.
 - **Tradeoff accepted**: `DeclaredQualifier` is split by a property of the instance rather than by kind, so a consumer cannot tell from the premise kind alone whether a coverage record is required. Accepted because the alternative — splitting the premise kind in two — would break the certificate format's one-kind-per-author-construct rule, since the author writes the same thing in both cases. The instance carries the discriminator (`provdeps` empty or not) and the matrix's type-structural argument already defines it.
@@ -403,6 +408,9 @@ The eleven premise kinds the certificate format already locked fall out cleanly 
   - `docs/Working/obligation-discharge-matrix-2026-07-19.md:127` — "The duty applies to a consumed fact **iff** some operation can establish or break it — a value-fact."
   - `research/architecture/compiler/structural-fact-vs-value-citation-obligation-survey.md:151` — the alternatives-rejected passage quoted above
   - `docs/Working/obligation-discharge-matrix-2026-07-19.md` § Rule validity, *Type-structural qualifier context* — `provdeps(φ) = ∅` as the discriminator
+  - `src/Precept/Language/Actions.cs:50-60` — `ClearApplicable` = the seven collection types plus `new ModifiedTypeTarget(null, [ModifierKind.Optional])`
+  - `src/Precept/Language/ActionKind.cs:7-35` — the fifteen action kinds, `Clear = 8` under the comment "Universal (collections + optional scalars)"
+  - `docs/Working/certificate-steps-membership-2026-07-12.md:347` — "**DeclaredPresence** — quotes the declaration aspect that guarantees the field always has a value (default or required shape)"
 
 ### Decision 5: Completeness is checked at two levels — per file at compile time, and per category at build time
 
@@ -464,9 +472,8 @@ One correction is owed to the matrix itself. The 2026-07-21 ruling's rationale s
 **Upstream.**
 
 - The matrix's transport rule and its type-structural qualifier argument — this design consumes both (the path-condition group in Decision 4 and the `provdeps` discriminator).
-- The eight-writer enumeration in `precept-language-spec.md` § 3A.4 — the expected set is computed against it. It is asserted rather than enforced, with BUG-033 a verified instance of it being consumed wrongly.
+- The eight-writer enumeration in `precept-language-spec.md` § 3A.4 — the expected set is computed against it. Verified complete as a category list (§ Open questions), but asserted rather than build-enforced, with BUG-033 a verified instance of it being consumed wrongly. The `WriteSiteCategories` catalog entry and `Precept0030` together close the enforcement half.
 - The certificate format's premise vocabulary — Decision 4 partitions it.
-- Owner confirmation on the Decision 1 reading of the citation ruling (§ Open questions).
 
 **Downstream.**
 
@@ -505,9 +512,12 @@ One correction is owed to the matrix itself. The 2026-07-21 ruling's rationale s
 
 ## Open questions
 
-1. **Does the coverage-record encoding satisfy the 2026-07-21 ruling?** Decision 1 reads "names … every obligation that preserves it" as satisfied by citing one record whose membership is enumerated and checkable, rather than by listing them per proof. This is the single place the design interprets a ruling rather than implementing it, and it needs owner confirmation before lock.
-2. **Is the § 3A.4 writer list complete?** The expected set is computed against it. The spec itself notes the list is catalogued only on the action half and that nothing enforces it. Closing this may be part of the `WriteSiteCategories` catalog work or may be its own item.
-3. **What is the establishment site set for an event ensure and the two transition-moment ensures?** The matrix defines it for `rule` and for residency ensures. Entry, exit, and event ensures are transition-moment or ingress-class constraints, and whether they have an establishment site distinct from their own check is not stated.
-4. **Does `DeclaredPresence` belong in the breakable group?** A field guaranteed present by its default cannot become unset by an ordinary write, but the `clear` action exists. Whether presence is one group or splits like `DeclaredQualifier` needs the action catalog checked.
+None. Four were carried in the first draft; all four are closed, and how each closed is recorded here because two of them were closed by reading rather than by deciding.
 
-These four must be resolved or removed before this doc advances to `Locked`.
+**The coverage-record encoding against the 2026-07-21 ruling** — closed as an engineering call in Decision 1, not escalated. The two encodings check the same two things and differ only in serialization, the record makes cross-proof disagreement unrepresentable rather than merely undetected, and the choice is reversible pre-release. Nothing about the ruling's substance turns on it.
+
+**Completeness of the § 3A.4 writer list** — checked, and the list is complete as an enumeration of writer *categories*. `ActionKind` has exactly fifteen members (`Set`, `Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop`, `Clear`, `Append`, `AppendBy`, `Insert`, `RemoveAt`, `Put`, `EnqueueBy`, `DequeueBy`), matching the table's "fifteen kinds"; the `into` target, the state-action positions, default materialization, computed-field recomputation, the `omit` reset, the update patch, and `Restore` account for the rest. Nothing else in the language places a value into a field slot — an argument default writes an argument, not a field, and `Inspect` is non-mutating. What is *not* verified, and never was the same claim, is that the compiler consumes all eight; BUG-033 shows it does not. That is the write-surface completeness dependency the design already carries, and it is precisely what the build-time analyzer in Decision 5 exists to catch.
+
+**The establishment site set for event, entry, and exit ensures** — already answered by the matrix, and the first draft recorded it as open through insufficient reading. Entry and exit ensures are transition-moment obligations, explicitly edge-triggered — "nothing is owed while merely resident" — so the obligation at the moment *is* the check and there is no separate establishment site. An event ensure is ingress-class and discharged by ingress evaluation, which the matrix lists as a discharge mechanism rather than something needing establishment. Establishment as a distinct site set therefore applies to exactly two constraint kinds: `rule`, at construction, and the residency `ensure`, at construction plus every entry into its anchor state. `Expected(C)` in § Semantic Rules is already written this way.
+
+**Whether `DeclaredPresence` is breakable** — checked against the action catalog and it splits, exactly like `DeclaredQualifier`. Decision 4 carries the split and the catalog evidence.
