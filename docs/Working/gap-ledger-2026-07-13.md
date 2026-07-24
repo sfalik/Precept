@@ -210,6 +210,10 @@ Nothing here is settled. Each item is framed two-sided with the locked text quot
 >
 > **Presence arm — genuinely open, and its proposed resolution is new language surface.** No matrix cell covers Presence × interpolation; `Presence` is one of four fault kinds the matrix records as having no validity argument at all. The recommendation below resolves it via *"a language guarantee that message rendering is presence-tolerant"* — that guarantee exists nowhere in `docs/`, `research/` or `src/`, and creating it is a Tier-2 language-surface change under the consultation gate. It cannot ride along with an OF1 ruling.
 >
+> **✅ VALUE-FAULT ARM RULED BY THE OWNER, 2026-07-23**: *"yes we should catch that at compile time."* Value-fault expressions in a constraint message enroll. This confirms the commitment the matrix had already made and resolves the canon self-contradiction; `docs/compiler/soundness-and-coverage.md` is corrected in the same pass, its row split so the value arm reads in-scope-not-yet-implemented with the obligation-creation sweep as its completion trigger.
+>
+> **The presence arm remains OPEN** and was deliberately not settled by that ruling — it is a different question, and the resolution on file depends on new language surface.
+>
 > **Pairs with BUG-053** (filed 2026-07-23), which records the same non-minting one position over, for optional event arguments.
 
 **Structural fact (certain):** message holes create **zero** obligations of any kind. `CollectObligations` walks a rule/ensure's `.Condition` only; `.Message` (`SemanticIndex.cs:572, :583`) is never passed to `WalkExpression`.
