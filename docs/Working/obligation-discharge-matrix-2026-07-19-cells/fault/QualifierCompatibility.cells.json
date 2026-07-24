@@ -1,4 +1,5 @@
 {
+  "$schema": "../cell.schema.json",
   "$schemaNote": "Fault-family cells for ProofRequirementKind.QualifierCompatibility. Each cell carries the discharge contract (iff + decision procedure), the transport-rule citation with the citation duty on any declared fact it consumes, and a witness triple (base -> reject / discharge-addition -> clean / near-miss -> reject-same-obligation). Every .precept snippet was syntax/compile-validated through the precept MCP (precept_compile) at HEAD on 2026-07-21; the recorded diagnostic codes and obligation dispositions are compile-oracle OBSERVATIONS of the shipped compiler, never cited as authority for what the DEFINITION says. Known compiler holes checked against every witness: BUG-033 (dequeue/pop `into` target not registered as a write site) and the un-build-enforced write-surface enumeration — no witness here rests on either (no snippet writes an operand field via an `into` target or across an exit-hook kill), so no cell is flagged for a hole. Grounded against: src/Precept/Language/Operations.cs (QualifierCompatibilityProofRequirement mint sites), src/Precept/Pipeline/ProofEngine.cs:305-307 (bin.ProofRequirements instantiation), src/Precept/Pipeline/ProofEngine.Qualifiers.cs (TryQualifierCompatibilityProof / QualifiersAreCompatible — declaration discharge), src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs (TryQualifierGuardNarrowingProof / NarrowedValueFromGuard — guard discharge), src/Precept/Language/ProofRequirement.cs:113-118 (the DU subtype), docs/Working/obligation-discharge-matrix-2026-07-19.md (rev 7 — fault case shape, citation-duty ruling, minting rule), docs/Working/transport-rule-restatement-2026-07-21.md (route index over the 23-value evaluation-site axis).",
   "kind": "QualifierCompatibility",
   "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 + transport-rule-restatement-2026-07-21",
@@ -11,7 +12,11 @@
     "notCatalogEnumeratedButRelated": "price±price mints TWO QualifierCompatibility obligations (Unit and Currency) from one binary op (Operations.cs PricePlusPrice/PriceMinusPrice); the cells below use money±money (single Currency-axis obligation) as the representative business-domain witness and note the price double-obligation where it changes the count."
   },
   "premiseClasses": {
-    "applicable": ["(a) field modifiers", "(b) arg constraints", "(c) handler/rule/ensure guard"],
+    "applicable": [
+      "(a) field modifiers",
+      "(b) arg constraints",
+      "(c) handler/rule/ensure guard"
+    ],
     "inapplicable": {
       "(d) pre-state constraint / inductive hypothesis": "N/A for this kind. A qualifier axis value is not a preservable runtime quantity: a DECLARED qualifier (`in 'USD'`, `of 'kg'`) is immutable declaration metadata — no write site can change field F's declared currency/unit, because any `set F = e` to a qualified field re-mints its OWN qualifier-compat obligation to keep the axis value invariant (Operations.cs assignment path). An OPEN field's runtime currency is a value, but no qualifier obligation carries it as a pre-state constraint fact — the engine tracks it only through the guard-narrowing (class c) and declaration (class a/b) surfaces. So there is no class-(d) fact to consume, and the citation duty for class (d) never arises here."
     },
@@ -38,7 +43,11 @@
       "occasion": "transition-row-action-operand",
       "typeFamily": "business-domain",
       "obligationSchema": "⟨left:Money|Quantity|Price⟩ ⟨+|-⟩ ⟨right:same-type⟩ requires left.⟨axis⟩ == right.⟨axis⟩, at a transition row action RHS (axis = Currency for money, Unit for quantity, Unit+Currency for price)",
-      "applicablePremiseClasses": ["(a) operand field's declared qualifier", "(b) transition event's arg qualifier", "(c) transition row `when` guard narrowing an open operand"],
+      "applicablePremiseClasses": [
+        "(a) operand field's declared qualifier",
+        "(b) transition event's arg qualifier",
+        "(c) transition row `when` guard narrowing an open operand"
+      ],
       "routeRelation": "transport § 3 `transition-row-action-operand`: fire (this row only) and inspect-fire. The row's guard fact is earned at phase 2 and consumed at the phase-5 action RHS; killed by any write to the operand field in phases 3-5 before the site.",
       "dischargeContract": "Discharges IFF the shared decision procedure resolves both operands and finds them compatible. Class (c) instance for this cell: the transition row's `when` guard (GuardOfContext -> TransitionRowContext.Row.Guard, QualifierNarrowing.cs:199) narrows an open operand field to a single axis value across all disjunctive branches, and that field is not reassigned earlier in the row's action chain.",
       "citationDuty": {
@@ -74,7 +83,10 @@
       "occasion": "state-hook-action-operand",
       "typeFamily": "business-domain",
       "obligationSchema": "⟨left⟩ ⟨+|-⟩ ⟨right⟩ requires left.⟨axis⟩ == right.⟨axis⟩, at a state entry/exit hook action RHS",
-      "applicablePremiseClasses": ["(a) operand field's declared qualifier", "(c) state hook `when` guard narrowing an open operand"],
+      "applicablePremiseClasses": [
+        "(a) operand field's declared qualifier",
+        "(c) state hook `when` guard narrowing an open operand"
+      ],
       "routeRelation": "transport § 3 `state-hook-action-operand`: fire and inspect-fire with a transition outcome touching the anchor state — exit-hook actions at phase 3, entry-hook actions at phase 6; removed on a `no transition` outcome (spec:1915). The hook guard fact is earned at phase 2 and killed by any write to the operand field before the hook action.",
       "premiseClassNote": "Class (b) is not generally available: a `from S ->` / `to S ->` hook fires on any transition into/out of S regardless of which event drove it, so a specific event's args are not reliably in scope.",
       "dischargeContract": "Discharges IFF the shared decision procedure resolves and matches both operands. Class (c) instance: the hook's `when` guard (GuardOfContext -> StateHookContext.Hook.Guard, QualifierNarrowing.cs:200) narrows an open operand across all branches, field not reassigned earlier in the hook chain.",
@@ -110,7 +122,10 @@
       "occasion": "stateless-hook-action-operand",
       "typeFamily": "business-domain",
       "obligationSchema": "⟨left⟩ ⟨+|-⟩ ⟨right⟩ requires left.⟨axis⟩ == right.⟨axis⟩, at a stateless handler (`on E -> ...`) action RHS",
-      "applicablePremiseClasses": ["(a) operand field's declared qualifier", "(b) handler event's arg qualifier"],
+      "applicablePremiseClasses": [
+        "(a) operand field's declared qualifier",
+        "(b) handler event's arg qualifier"
+      ],
       "routeRelation": "transport § 3 `stateless-hook-action-operand`: the stateless handler class, its inspection mirror, construction and its mirror. A class-(b) arg qualifier is an ingress-governed fact earned at phase 1 and never killed (nothing in a plan writes an argument — transport § 5).",
       "dischargeContract": "Discharges IFF the shared decision procedure resolves and matches both operands. Class (b) instance: an operand is an event arg declared with a qualifier on axis A (ResolveQualifierOnAxis over TypedArgRef.DeclaredQualifiers, Qualifiers.cs:273-277); its axis value is fixed by the arg's declaration and enforced at ingress.",
       "premiseClassNote": "Class (c) is UNAVAILABLE for stateless handlers: spec:1007 states 'Handlers do not support `when` guards or a trailing `ensure`'. GuardOfContext has an EventHandlerContext arm, but the definition supplies no guard for a stateless handler to narrow with. (See openFlags — the shipped parser accepts a `when` guard on a stateless handler contrary to spec:1007.)",
@@ -147,7 +162,10 @@
       "occasion": "rule-condition",
       "typeFamily": "business-domain",
       "obligationSchema": "⟨left⟩ ⟨+|-⟩ ⟨right⟩ requires left.⟨axis⟩ == right.⟨axis⟩, inside a `rule` condition (the ConstraintContext -> RuleIdentity path)",
-      "applicablePremiseClasses": ["(a) operand field's declared qualifier", "(c) rule `when` activation-guard narrowing an open operand"],
+      "applicablePremiseClasses": [
+        "(a) operand field's declared qualifier",
+        "(c) rule `when` activation-guard narrowing an open operand"
+      ],
       "routeRelation": "transport § 3 `rule-condition`: every route EXCEPT restore (the `always` bucket is evaluated on every operation; restore bypasses constraint evaluation — evaluator.md § Constraint Evaluation Matrix). The rule's `when` guard fact is earned where the guard evaluates and consumed at the condition site.",
       "premiseClassNote": "Class (b) is N/A: a `rule` condition is evaluated over entity state, not against a specific event's args.",
       "dischargeContract": "Discharges IFF the shared decision procedure resolves and matches both operands. Class (a) instance (witness below): both operand fields declare the same axis value. Class (c) instance: the rule's `when` guard (GuardOfContext -> ConstraintContext -> RuleIdentity -> semantics.Rules[i].Guard, QualifierNarrowing.cs:202-204) narrows an open operand — CONFIRMED to discharge the INNER combination obligation (see openFlags for the enclosing-comparison limitation).",
@@ -185,7 +203,10 @@
       "occasion": "state-ensure-condition",
       "typeFamily": "business-domain",
       "obligationSchema": "⟨left⟩ ⟨+|-⟩ ⟨right⟩ requires left.⟨axis⟩ == right.⟨axis⟩, inside an `in S ensure` (residency) condition (ConstraintContext -> EnsureIdentity path)",
-      "applicablePremiseClasses": ["(a) operand field's declared qualifier", "(c) ensure `when` activation-guard narrowing an open operand"],
+      "applicablePremiseClasses": [
+        "(a) operand field's declared qualifier",
+        "(c) ensure `when` activation-guard narrowing an open operand"
+      ],
       "routeRelation": "transport § 3 `state-ensure-condition`: for an `in <current>` residency ensure, the fire, update and construction routes (NOT restore — constraint evaluation is bypassed on restore), plus their inspection mirrors. The ensure `when` guard fact is earned where the guard evaluates and consumed at the condition site.",
       "premiseClassNote": "Class (b) is N/A: a residency ensure is evaluated over entity state, not against a specific event's args. Whether the residency fact itself (the entity is in S) is a premise is a separate OPEN matrix question and does not bear on the qualifier axis.",
       "dischargeContract": "Discharges IFF the shared decision procedure resolves and matches both operands. Class (a) instance (witness): both operand fields declare the same axis value. Class (c) instance: the ensure's `when` guard (GuardOfContext -> ConstraintContext -> EnsureIdentity -> semantics.Ensures[i].Guard, QualifierNarrowing.cs:205) narrows an open operand — discharges the inner combination (same enclosing-comparison limitation as the rule cell).",
@@ -223,7 +244,9 @@
       "occasion": "computed-field-expression",
       "typeFamily": "business-domain",
       "obligationSchema": "⟨left⟩ ⟨+|-⟩ ⟨right⟩ requires left.⟨axis⟩ == right.⟨axis⟩, inside a computed-field expression (`field F as <type> <- ...`; the FieldExpressionContext path)",
-      "applicablePremiseClasses": ["(a) operand field's declared qualifier"],
+      "applicablePremiseClasses": [
+        "(a) operand field's declared qualifier"
+      ],
       "routeRelation": "transport § 3 `computed-field-expression`: EVERY route — computed-field recomputation appears in every operation's pipeline including Restore (evaluator.md:144; transport § 3 restore correction). Since only class (a) declared-qualifier facts (immutable, never killed) discharge here, transport holds on every route trivially.",
       "premiseClassNote": "Classes (b) and (c) are BOTH unavailable: a computed-field expression has no event args (no b) and no guard — GuardOfContext returns null for FieldExpressionContext (QualifierNarrowing.cs:197-209), so no narrowing (no c). Discharge is class (a) declaration only.",
       "dischargeContract": "Discharges IFF both operand fields resolve a DECLARED qualifier on axis A and QualifiersAreCompatible holds. No guard fallback exists (see premiseClassNote), so an open operand in a computed field is unconditionally unresolved -> PRE0114. Decision procedure: two declaration lookups + one compatibility test; fully static.",

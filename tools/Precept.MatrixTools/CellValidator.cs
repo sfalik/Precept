@@ -275,10 +275,16 @@ public static class CellValidator
 
     private static void ResolveCitation(Context context, string reference, string location)
     {
-        // Three machine-checkable forms: path, path:line, path § anchor.
+        // Machine-checkable forms: path, path § anchor, and path followed by a
+        // line locator — a single line, a range, or a comma-separated list of
+        // either, optionally trailed by a parenthetical note naming what is at
+        // that location. All of those appear in the cell data and in the
+        // project's own citation style; recognising only the bare single line
+        // reports the rest as missing files, and that false-positive volume
+        // buries the real findings.
         string filePart = reference;
         string? anchor = null;
-        int? line = null;
+        var lines = new List<int>();
 
         var anchorSplit = reference.Split(" § ", 2);
         if (anchorSplit.Length == 2)
@@ -288,11 +294,20 @@ public static class CellValidator
         }
         else
         {
-            var lineMatch = Regex.Match(reference, @"^(?<path>.+):(?<line>\d+)$");
+            var lineMatch = Regex.Match(
+                reference,
+                @"^(?<path>.+):(?<locator>\d+(?:-\d+)?(?:\s*,\s*\d+(?:-\d+)?)*)(?:\s*\([^()]*\))?$");
             if (lineMatch.Success)
             {
                 filePart = lineMatch.Groups["path"].Value;
-                line = int.Parse(lineMatch.Groups["line"].Value);
+                foreach (var part in lineMatch.Groups["locator"].Value.Split(','))
+                {
+                    var bounds = part.Trim().Split('-');
+                    // A range is checked at both ends: the start pins where the
+                    // cited text began, the end pins how far it ran.
+                    foreach (var bound in bounds)
+                        lines.Add(int.Parse(bound));
+                }
             }
         }
 
@@ -303,10 +318,10 @@ public static class CellValidator
             return;
         }
 
-        if (line is int cited)
+        if (lines.Count > 0)
         {
             int lineCount = File.ReadLines(fullPath).Count();
-            if (cited < 1 || cited > lineCount)
+            foreach (var cited in lines.Where(l => l < 1 || l > lineCount))
                 context.Warning(CheckCitation, location,
                     $"cited line {cited} is outside '{filePart}' ({lineCount} lines) — the cited text has moved");
         }

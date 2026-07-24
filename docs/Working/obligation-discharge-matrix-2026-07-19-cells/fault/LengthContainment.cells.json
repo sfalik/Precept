@@ -1,4 +1,5 @@
 {
+  "$schema": "../cell.schema.json",
   "kind": "LengthContainment",
   "family": "fault",
   "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",

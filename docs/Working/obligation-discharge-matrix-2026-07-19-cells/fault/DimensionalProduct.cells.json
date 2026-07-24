@@ -1,4 +1,5 @@
 {
+  "$schema": "../cell.schema.json",
   "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
   "family": "fault",
   "kind": "DimensionalProduct",
@@ -10,7 +11,6 @@
     "verifiedDate": "2026-07-21",
     "compilerHoleCheck": "BUG-033 (into-binding write site) and the write-surface enumeration gap are INERT for this kind: both concern the survival of a runtime VALUE fact across a write, and DimensionalProduct consumes no value fact — it consumes the operands' declared dimension, a type-level invariant no write can change. No cell in this file rests on either hole."
   },
-
   "mintSites": [
     {
       "fileLine": "src/Precept/Language/Operations.cs:605",
@@ -19,34 +19,35 @@
       "note": "DimensionalProduct is catalog-only. It has no proof-engine-synthesized mint site (unlike PresenceProofRequirement / CountContainmentProofRequirement). The only operation carrying it is quantity*quantity; quantity*period / quantity*duration / price*quantity carry other requirement kinds instead."
     }
   ],
-
   "dischargeMechanism": {
     "name": "dimensional resolution against the curated DimensionCatalog",
     "code": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:46-99 (TryDimensionalProductProof / TryResolveDimensionVector); dispatched at ProofEngine.cs:1084-1085 → (Proved, ProofStrategy.DimensionalProduct); failure emits PRE0157 IncompatibleDimensionalProduct at ProofEngine.Diagnostics.cs:223.",
     "curatedSet": "src/Precept/Language/Ucum/DimensionCatalog.cs:9-22 — 11 aliases: length, mass, time, temperature, volume, area, speed, energy, pressure, force, count (count = DimensionVector.None, the dimensionless cancelling result).",
     "characterization": "This is a discharge MECHANISM, not a premise-class discharge — peer in status to ingress evaluation (matrix, Vocabulary, Discharge mechanisms). None of the four premise classes (a field modifiers / b arg constraints / c handler guard / d pre-state) participates: no runtime value fact is consumed. The fact consumed is each operand's DECLARED dimension qualifier, resolved from static type metadata via DimensionCatalog + UCUM parse, and combined by exact integer-exponent vector arithmetic (DimensionVector.Multiply). The result is route-invariant: the same operands yield the same verdict on every route, because a Quantity's dimension is a type invariant, not a mutable value."
   },
-
   "dischargeContractSharedAcrossCells": {
     "iff": "The DimensionalProduct obligation on ⟨left⟩ * ⟨right⟩ discharges IFF (1) TryResolveDimensionVector succeeds for BOTH operands — each operand's Unit-axis (else Dimension-axis) qualifier resolves to a DimensionVector via DimensionCatalog.All lookup or a valid UCUM parse — AND (2) the product vector leftVector.Multiply(rightVector) is a member of the curated 11-alias DimensionCatalog set (DimensionCatalog.TryGetAlias). Otherwise the obligation is Unresolved and PRE0157 is emitted.",
     "decisionProcedure": "Total finite function over declared type metadata — no premise enumeration, no search, no fixpoint. Steps: (i) resolve(left) — one FrozenDictionary lookup then, on miss, one UCUM parse; (ii) resolve(right) likewise; (iii) component-wise integer add of two 7-element dimension-exponent vectors; (iv) equality-scan of the product vector against the 11-member curated alias table. Terminates in O(1). Reject side is decided when: either resolve fails (operand has no resolvable unit/dimension qualifier — e.g. an open `quantity`), or the product vector matches no curated alias.",
     "applicablePremiseClasses": "NONE (a/b/c/d all inapplicable). See dischargeMechanism.characterization and familyOpenFlags[0].",
     "respellabilityFamilyVerdict": "no — a compounding product (e.g. m × m → area, dimensionally curated) that a rule/ensure CONDITION compares against a named-unit quantity cannot be respelled into a licensed clean form, because the product's result Unit qualifier is 'unresolved' and co-mints an undischargeable QualifierCompatibility (PRE0114) on the comparison. The DimensionalProduct obligation itself is discharged, but the surrounding comparison is not expressible. This is a surface-shrink observation routed to the owner via familyOpenFlags[1], not a paper 'yes'. Where the product CANCELS to a single named unit (kg/m × m → kg) the result unit resolves and no respelling is needed (see cell fault-dimensionalproduct-rule-condition-business witness)."
   },
-
   "transportRuleCitation": {
     "rule": "transport-rule-restatement-2026-07-21.md § 5 (What earns a fact, and on which routes) — route-indexed frame and kill.",
     "howTheFactReachesTheSite": "The consumed fact is each operand's declared dimension. Its provenance depends on the operand shape: a FIELD operand → a carried type-level fact established at the field's `in '<unit>'` / `of '<dimension>'` declaration; an ARG operand → an ingress-governed argument whose dimension is its declared qualifier; a LITERAL operand → 'Literal denotation' (transport table row: earned at the site, read-closure empty, never killable).",
     "killability": "NON-KILLABLE on every route. deps(φ) for a dimension fact is the operand's declared TYPE, not its runtime value; no write construct on any route changes a field's or argument's declared dimension (the type checker rejects assigning a mass into a `quantity in 'm'` field). Therefore the frame condition deps(φ) ∩ mayWrite(r,p,q) = ∅ holds vacuously on every route, and BUG-033 / the write-surface gap cannot make this obligation unsound.",
     "citationDutyDisposition": "The 2026-07-21 citation duty (matrix § The cell) requires a discharge that consumes a declared field-modifier / arg / guard / pre-state fact to NAME the establishing obligation and every preserving obligation, each discharged. Here there is NO establishing proof obligation and NO preserving proof obligation to name: a field/arg dimension is a type-checker invariant, not a proof-surface constraint (ProofRequirement carries no 'dimension establishment' or 'dimension preservation' subtype). The citation set is therefore empty — see familyOpenFlags[0], which routes to the owner whether that empty set is correct or whether dimension qualifiers should be modelled as citable class-(a)/(b) facts with (trivial, type-invariant) establishing/preserving obligations."
   },
-
   "coordinateMapDenominator": {
-    "occasions": ["transition-row-action-operand", "rule-condition", "computed-field-expression"],
-    "typeFamilies": ["business-domain"],
+    "occasions": [
+      "transition-row-action-operand",
+      "rule-condition",
+      "computed-field-expression"
+    ],
+    "typeFamilies": [
+      "business-domain"
+    ],
     "note": "Covered exactly, as instructed. See familyOpenFlags[2]: quantity*quantity can also be reached at other evaluation-site occasions (state-ensure-condition, event-ensure-condition, to/from-S-ensure, reject-message-interpolation, because-interpolation), which this 3-occasion denominator omits; routed to the owner as a possible generated-enumeration under-count for this kind."
   },
-
   "cells": [
     {
       "cellId": "fault-dimensionalproduct-transition-business",
@@ -73,7 +74,6 @@
       "respellability": "inherits family verdict; not exercised here — an open-quantity assignment target imposes no comparison, so the compounding-unit PRE0114 friction (familyOpenFlags[1]) does not arise in this occasion.",
       "openFlags": []
     },
-
     {
       "cellId": "fault-dimensionalproduct-rule-condition-business",
       "occasion": "rule-condition",
@@ -99,7 +99,6 @@
       "respellability": "no (family verdict). Representative band member: a COMPOUNDING product in a comparison, e.g. `rule Length * Width <= MaxFootprint` with Length,Width in 'm' and MaxFootprint in 'm^2'. Observed at HEAD: DimensionalProduct discharges (Proved) but the comparison co-mints PRE0114 QualifierCompatibility because the product's result Unit is 'unresolved' and matches no named unit — and even `rule Length * Width >= Baseline * Baseline` (product vs product) trips PRE0114 (two unresolved units do not match each other). No licensed respelling keeps the compounding-product comparison AND clears PRE0114 within the current surface. Routed via familyOpenFlags[1].",
       "openFlags": []
     },
-
     {
       "cellId": "fault-dimensionalproduct-computed-field-business",
       "occasion": "computed-field-expression",
@@ -126,7 +125,6 @@
       "openFlags": []
     }
   ],
-
   "familyOpenFlags": [
     {
       "id": "dimprod-premise-class-and-citation-duty-fit",

@@ -211,6 +211,33 @@ public class CellValidatorTests
             .Should().BeEmpty("an in-range line citation to an existing file resolves");
     }
 
+    /// <summary>
+    /// The cell data cites line ranges, comma-separated line lists, and lines
+    /// carrying a trailing parenthetical note — the citation style the matrix
+    /// prose and the project's own comment-discipline rule already use. A
+    /// checker that only recognises a bare single line reports every one of
+    /// them as a missing file, which is a false positive loud enough to bury
+    /// the real findings.
+    /// </summary>
+    [Fact]
+    public void ExtendedCitationForms_Resolve()
+    {
+        var report = ValidateFixture("citation-forms.cells.json");
+        report.Findings.Where(f => f.Check == "citation")
+            .Should().BeEmpty("ranges, lists, and parenthetical notes are citation forms in use, not broken paths");
+    }
+
+    [Fact]
+    public void CitationRangeEndingOutsideTheFile_IsWarning()
+    {
+        var report = ValidateFixture("broken-citations.cells.json");
+        report.Findings.Should().Contain(f =>
+            f.Severity == CellFindingSeverity.Warning
+            && f.Check == "citation"
+            && f.Message.Contains("88888"),
+            because: "a range whose end is past the end of the file has moved just as a single line would have");
+    }
+
     // ── Near-miss pairing ────────────────────────────────────────────────────
 
     [Fact]
