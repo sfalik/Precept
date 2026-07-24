@@ -269,11 +269,20 @@ public class CellValidatorTests
         AssertHasError(report, "near-miss", "no-nearmiss");
     }
 
+    /// <summary>
+    /// A discharge can be weakened past sufficiency in several genuinely
+    /// different ways — narrowing to the wrong value and narrowing with the
+    /// wrong sense are distinct reject-side tests of the same addition. The
+    /// reject half of the exact contract is verified only by these rows, so
+    /// capping them at one caps the only coverage that side has. The rule is
+    /// at-least-one; more is coverage, not a defect.
+    /// </summary>
     [Fact]
-    public void DischargeAdditionWithTwoNearMisses_IsError()
+    public void DischargeAdditionWithSeveralNearMisses_IsAllowed()
     {
         var report = ValidateFixture("broken-nearmiss.cells.json");
-        AssertHasError(report, "near-miss", "double-nearmiss");
+        report.Findings.Where(f => f.Check == "near-miss" && f.Message.Contains("double-nearmiss"))
+            .Should().BeEmpty("several distinct weakenings of one addition are extra reject-side coverage");
     }
 
     [Fact]

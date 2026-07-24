@@ -411,10 +411,19 @@ public static class CellValidator
                     context.Error(CheckNearMiss, location,
                         $"standing discharge '{id}' has no addition to weaken, but {count} near-miss(es) pair with it");
             }
-            else if (count != 1)
+            // At least one, not exactly one. A discharge can be weakened past sufficiency
+            // in several genuinely different ways — narrowing to the wrong value and
+            // narrowing with the wrong sense are distinct reject-side tests of the same
+            // addition. The reject half of the exact contract is verified ONLY by these
+            // rows (§ The cell, verification asymmetry), so capping them at one caps the
+            // only coverage that side has. What must never happen is an addition with no
+            // rejection test at all.
+            else if (count == 0)
             {
                 context.Error(CheckNearMiss, location,
-                    $"discharge addition '{id}' has {count} paired near-misses — exactly one is required per addition");
+                    $"discharge addition '{id}' has no paired near-miss — at least one is required per "
+                    + "addition, because a discharge with no matched rejection test leaves the reject "
+                    + "side of the contract unverified");
             }
         }
     }
