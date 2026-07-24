@@ -192,6 +192,14 @@ All **Owner:** WU-DOC-SYNC. No spec-behavior change; doc/enum/comment correction
 
 ## 3. OWNER DECISIONS — the morning-review section
 
+> ## ⚠ THIS SECTION IS A 2026-07-13 SNAPSHOT AND IS STALE
+>
+> **Rulings landed after this ledger was written and were never swept back into it.** OF5 was ruled by the owner on 2026-07-14 — the day after — and its entry below still says "owner must rule" and still quotes spec text that was deleted that same day. A reader taking this section at face value on 2026-07-23 concluded the whole plan was gated on six open forks, and was wrong about at least one of them.
+>
+> **Before treating any fork here as open, check for a ruling dated after 2026-07-13.** The owner's rulings from that window live in commit messages, in `docs/Working/exhaustive-gap-analysis-2026-07-14/`, in the owner-authored want doc (`what-i-want-2026-07-16.md`), and in the obligation-discharge matrix, which carries owner rulings from 2026-07-19 onward. They do not live here.
+>
+> Each fork is being re-checked; resolved ones are being stamped in place with the ruling, its date, and its citation. A fork with no stamp has not yet been re-checked — it is not thereby open.
+
 Nothing here is settled. Each item is framed two-sided with the locked text quoted. WF-2 cannot write acceptance criteria on these until the owner rules.
 
 ### OF1 — Do constraint-message interpolation holes carry proof obligations? *(Angle 4 Finding 5)* — **most consequential**
@@ -238,7 +246,23 @@ Two defensible readings (unit-pinned periods orderable by their single component
 
 **Frank's recommendation (not ratified — owner must rule):** **YES — orderable when unit-pinned; D14 needs the carve-out.** The two texts aren't in conflict once you read D14's own qualifier: the `in <basis>` qualifier is exactly the mechanism that removes the incomparability (`'1 month'` has no fixed length, but a single-basis period is a total order on its one component — the same honesty-about-approximation move the qualifier system exists for). `collection-types.md:533` already did the reasoning; D14 (`:1476`) just never carved out the exception and reads as an absolute "no ordering" (the drift). Resolution: orderable when pinned to a single unit basis; update D14 to reference the `in`-qualified exception. Doc fix, not a behavioral fork.
 
-### OF5 — `integer` overflow stance: three postures in one doc *(Re-extract #10)*
+### OF5 — `integer` overflow stance: three postures in one doc *(Re-extract #10)* — ✅ **RULED BY THE OWNER 2026-07-14. NOT OPEN. The entry below is a stale snapshot; read this stamp instead.**
+
+> **Ruling (owner, 2026-07-14 — commit `90f0792f`):** `integer` is **fixed-width 64-bit today**. The overflow *model* — compile-time proof-or-reject versus adopting an arbitrary-precision representation — is a **deferred post-MVP decision**, with arbitrary precision still a live option. Recorded in prose at `docs/Working/exhaustive-gap-analysis-2026-07-14/coverage-report.md:49`.
+>
+> **This overrode the recommendation below.** The recommendation wanted `:81`'s arbitrary-precision language deleted as wrong against the runtime; the owner instead kept the model open and had `:81` rewritten to state fixed-width *and disclose the deferral*. `:197`/`:203` were deliberately left as the target end-state, consistent with the standing "the spec states the target" principle.
+>
+> **The quoted contradiction no longer exists.** `primitive-types.md:81` now reads *"Fixed-width 64-bit whole numbers; no rounding. Overflow handling … is a deferred post-MVP decision"*. The text this entry quotes was deleted on 2026-07-14.
+>
+> **Reaffirmed twice since**, each an explicit owner act routing a new case *into* the same deferral rather than reopening it: temporal-arithmetic overflow (`d32d0135`, 2026-07-20) and approximate-lane infinity (`ce72725d`, 2026-07-21).
+>
+> **The philosophy-adjacent flag was already cleared** — on 2026-07-12, before this ledger was written: `proof-engine-decision-ledger-2026-07-12.md:62` records the owner leaving the present-tense overflow claims as correct-as-target, with no `philosophy.md` edit and Principle 11 un-reworded.
+>
+> **OS5 does not re-activate.** Its trigger is a *frozen* overflow model; the 07-14 ruling deferred the model rather than freezing it, so the condition is unmet. Stated directly in the same commit's record: *"Unary `-long.MinValue` negation overflow sits in the same parked lane and re-activates when the overflow model is ruled."*
+>
+> **Still genuinely open, and separate from OF5**: GATE-O (fault-code disposition for integer-conversion overflow and non-finite values), and underflow, which the matrix records as open and unrouted. Neither is this fork.
+
+
 
 `primitive-types.md` states, for `integer`: `:81` "Arbitrary-precision whole numbers; **no overflow**"; `:197` "**Overflow is a type error**"; `:205` "Checked overflow." These are three mutually exclusive postures. **Question:** is `integer` arbitrary-precision (no overflow possible), or fixed-width with checked/type-error overflow? This determines whether OS5 (unary-op obligation) and the whole `NumericOverflow` obligation family have an `integer`-lane surface at all.
 
