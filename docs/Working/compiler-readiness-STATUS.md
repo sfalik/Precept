@@ -117,16 +117,23 @@ the Resume pointer.
 | Boundary-report item | Verdict (independent check, 2026-07-24) |
 |---|---|
 | #1 — does the matrix author a fault-family validity argument at all? | **NOT a fork — authoring work.** Matrix `:260` *"Every generative rule carries a validity argument"* admits no argument-less arm; `:261`'s gate blocks ratification but assigns no disposition; `open` is defined (`:292`) as *"the model has not decided"* and the model **has** decided the fault discharge (`:207`). Already answered by action — five fault arguments were written 07-23. Granularity is settled too: one argument per generative rule, fault family indexed by requirement kind. |
-| #2 — is premise class (d) available to the fault family? | **Under independent check** (re-verifying rather than assuming). Likely answered by the 2026-07-21 citation duty (available, but only under establish-and-preserve citation) — which would make it sequencing, not a fork. |
+| #2 — is premise class (d) available to the fault family? | **ALREADY RULED** by the owner 2026-07-21 (matrix `:122`): a declared constraint or field modifier *is* available as a premise for a fault obligation, but *"a proof may not consume such a fact unless it names the obligation that established the fact and every obligation that preserves it."* `:131` states the consequence outright — *"class (d) is now admitted for the fault family under this citation duty… The row is corrected in the canon-correction pass."* The `:207` row the report quotes is known-stale bookkeeping the matrix already flags for correction. **Both of the report's "two sides" are alternatives the ruling explicitly rejected** (`:125`): excluding declared facts (contradicts `want:104` + `spec:256`) and admitting the fact *bare* (the report's own stated fear) — the ruled position is the third, admit-under-citation. The citation duty *is* what closes the known false-proof: `:124` — *"that file cannot state its own proof, because there is no establishing obligation to name."* |
 | #3 — is an evaluation site a syntactic position or an evaluation occasion? | **ALREADY RULED** by the owner 2026-07-21 — *"site identity as an evaluation occasion"* (matrix `:5`, rev 8). The report predates the ruling. |
 | the six smaller items | Not yet re-checked. Assume stale until verified. |
 
 **Correction to the boundary report:** its claim that *"the schema pins that list closed"* is
 false — `cell.schema.json:237` says the enum *"mirrors that section and **grows with it**."*
 
-**Net: no confirmed open owner question gates the rule layer.** What remains is authoring
-work — expensive (the two arguments that held took twelve adversarial rounds each) but not a
-decision.
+**Net: all three ranked "owner questions" are already answered — none gates the rule layer.**
+What remains is authoring work (expensive — the two arguments that held took twelve adversarial
+rounds each), plus two mechanical follow-ups and one sequencing dependency:
+
+- **Canon-correction owed since rev 8**: the fault row at matrix `:207` still lists premise
+  classes (b)/(c)/(a) and must be corrected to admit (d) under the citation duty.
+- **Re-ratify the ~40 (d)-citing fault cells** *after* the two designs re-lock.
+- **Sequencing (not a fork)**: `ProofRequirement` carries no establishment or preservation
+  subtype yet (matrix `:125`), so a (d) citation currently has nothing to name — those cells are
+  *definitionally licensed but not yet buildable or ratifiable* until the two designs land.
 
 ## Resume pointer — ordered next steps
 
