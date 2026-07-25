@@ -1,6 +1,6 @@
 ---
 name: research
-description: Stage 1 of the engineering lifecycle — research and exploration that feeds /design. Conduct technical, cross-domain, or feasibility research that informs Precept's language design, architecture, tooling, or product positioning. Triggers on — research, investigate, survey, compare alternatives, evaluate feasibility, prior art, precedent, landscape, "how do other tools handle X". Use this for any task whose output is a markdown document in `research/` (or a domain-owned research folder), not code. Excludes: brand identity research (use `design/brand/research/`) and UX research (use `design/system/research/`).
+description: Stage 1 of the engineering lifecycle — research and exploration that feeds /design. Conduct technical, cross-domain, or feasibility research that informs Precept's language design, architecture, tooling, or product positioning. Triggers on — research, investigate, survey, compare alternatives, evaluate feasibility, prior art, precedent, landscape, "how do other tools handle X". Use this for any task whose output is a markdown document in `research/`, not code. Brand identity research goes in `research/brand/` and UX / design-system research in `research/design-system/` — those two folders are owned by the brand and visual-system domains rather than by language and architecture work.
 ---
 
 # Precept Research (Lifecycle Stage 1)
@@ -35,8 +35,8 @@ The exception is **horizon groundwork** — research that the project intentiona
 Before any external investigation, check whether the team has already covered the ground:
 
 - **Technical / cross-domain:** `research/` (subfolders: `language/`, `architecture/`, `philosophy/`, `product/`, `security/`, plus `language/expressiveness/` for comparator studies)
-- **Brand:** `design/brand/research/`
-- **UX / design system:** `design/system/research/`
+- **Brand:** `research/brand/`
+- **UX / design system:** `research/design-system/`
 - **Raw source captures:** each domain's `references/` folder
 - **Critiques of specific artifacts:** each domain's `reviews/` folder
 
@@ -67,8 +67,8 @@ The folder taxonomy is enforced — putting research in the wrong place creates 
 | Product philosophy, positioning evidence, entity-governance landscape | `research/philosophy/` or `research/product/` |
 | Security investigations | `research/security/` |
 | UCUM, domain curation, source material | `research/language/references/` or topic-appropriate `references/` |
-| Brand identity, voice/tone, brand precedent | `design/brand/research/` (NOT `research/`) |
-| Visual system, surface design, UX patterns | `design/system/research/` (NOT `research/`) |
+| Brand identity, voice/tone, brand precedent | `research/brand/` — owned by the brand domain, not by language/architecture research |
+| Visual system, surface design, UX patterns | `research/design-system/` — owned by the product-facing visual system, not by language/architecture research |
 
 If the topic spans domains (e.g., language + UX), put it in `research/` and cross-link from the secondary domain. Cross-domain synthesis is what `research/` is for.
 
@@ -345,7 +345,7 @@ The skill enforces these as **refusal gates**. The skill refuses to mark a resea
 
 - **Don't duplicate existing research.** Check the folder structure first.
 - **Don't write opinion without evidence.** Every claim needs a source, a quote, a citation, or named precedent.
-- **Don't put brand or UX research in `research/`.** Use `design/brand/research/` or `design/system/research/`.
+- **Don't file brand or UX research in the language and architecture folders.** Brand goes in `research/brand/`, design-system and UX in `research/design-system/` — those folders are owned by the brand and visual-system domains.
 - **Don't bury conclusions.** If the research influences a proposal, link from the proposal.
 - **Don't update `docs/philosophy.md`** based on research — surface the gap and wait for owner approval per CLAUDE.md.
 - **Don't ship "research" that's actually a draft decision.** If the work is locking a decision, write the decision doc; cite the research that grounds it.

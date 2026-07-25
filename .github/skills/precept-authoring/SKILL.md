@@ -121,6 +121,8 @@ Every `rule`, `ensure`, and `reject` carries a `because "<message>"`. Make the m
 
 Call `precept_compile` with the full text. Read all diagnostics:
 
+> **Stale-server caveat:** `precept_compile` runs the build the MCP server last spawned with. If `src/Precept` / `tools/Precept.Mcp` changed this session, its output is stale — ask the owner to run **`/mcp reconnect precept`** (rebuilds on reconnect, no session restart) before relying on it.
+
 - **Errors** — fix immediately; these prevent the definition from loading.
 - **Warnings** — review each one. Common warnings include unreachable states, dead-end states, and shadowed transition rows.
 - **Hints** — informational; address if they reveal design gaps.

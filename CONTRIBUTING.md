@@ -4,17 +4,17 @@
 
 ## Doc Lifecycle
 
-Every meaningful design or implementation decision moves through seven stages. The lifecycle ensures that **why-content** (rationale, alternatives, tradeoffs, precedent) is captured at decision time and preserved as the work moves from idea to maintenance. Lifecycle skills automate the transitions between stages.
+Every meaningful design or implementation decision moves through seven stages. The lifecycle ensures that **why-content** (rationale, alternatives, tradeoffs, precedent) is captured at decision time and preserved as the work moves from idea to maintenance. Lifecycle skills automate the transitions between stages. Six of those skills exist — `/research`, `/design`, `/plan`, `/execute`, `/promote`, `/review`. The seventh stage's `/audit` skill has not been built yet.
 
 | Stage | Activity | Skill | Where work lives |
 |---|---|---|---|
 | 1 | Research / explore | `/research` | `research/` |
 | 2 | Lock a design | `/design` | `docs/Working/` |
 | 3 | Plan execution | `/plan` | `docs/Working/` (plan doc) |
-| 4 | Execute the plan | `/execute` | code + tests + PR-body Implementation Plan |
+| 4 | Execute the plan | `/execute` | code + tests + the plan document's checklist (the PR body, once the PR workflow is back in use) |
 | 5 | Promote to canonical | `/promote` | canonical `docs/` updated; design moved to `docs/Working/Archive/` with cross-link |
 | 6 | Review any stage artifact | `/review` | umbrella reviewer: any stage artifact (research / design / plan / code / promotion) or whole-item completion check |
-| 7 | Maintain | `/audit` (deferred to Phase 9) | canonical `docs/` |
+| 7 | Maintain | `/audit` — not yet built | canonical `docs/` |
 
 `/review` is the engineering-lifecycle umbrella reviewer: it dispatches a stage artifact (research / design / plan / code / promotion) to the discipline that owns it, or runs the whole-item completion check on a bare `/review <work-item>`. Its **code branch does the built-in `/review`'s PR-review job** via `/code-review` + `precept-reviewer` and intentionally **subsumes (does not invoke)** the built-in. Its **promote branch is the per-artifact reviewer for the Stage 4 → 5 transition** this section names as the most common failure mode — it verifies a single promotion landed faithfully (every enumerated canonical doc touched, `**Promoted to:**` link and archive cross-link resolve) without needing a finished work item.
 
@@ -50,27 +50,17 @@ Per the "Per-Decision Rationale (Non-Negotiable)" section in `CLAUDE.md`, locked
 
 - **New decisions** going through `/design`: **required**. The skill refuses to mark a design "Locked" without all four legs on every decision. Author can answer "no precedent — novel choice" or "no tradeoff identified — flag for review" honestly, but cannot skip.
 - **Decisions backed by Archive design docs** (Stage 4 → 5 promotion): the `/promote` skill lifts whatever depth the source provides. Pre-policy designs with Decision + Rationale only get lifted as-is with a "no further rationale recorded in source" note. **No fabrication.**
-- **Existing canonical doc § Design Rationale entries** without four legs: **grandfather**. No required backfill. `/audit` may flag these as gaps, but they don't block promotion of new work.
+- **Existing canonical doc § Design Rationale entries** without four legs: **grandfather**. No required backfill. They do not block promotion of new work. (Flagging them as gaps is Stage 7 maintenance work; the seventh stage's `/audit` skill has not been built yet.)
 
 The rule's purpose is to prevent future ambiguity at decision time, not to retroactively annotate shipped code. Honest grandfathering beats fabricated four-leg structure.
 
 ### Doc routing table
 
-When implementation work touches code, the canonical docs that may need updates depend on what's touched. The CLAUDE.md "Documentation Sync" section is the source of truth for routing:
+When implementation work touches code, the canonical docs that may need updates depend on what's touched.
 
-| Kind of change | Update |
-|---|---|
-| Pipeline stage behavior | `docs/compiler/<stage>.md` |
-| Runtime API | `docs/runtime/runtime-api.md` + relevant per-type doc |
-| Language surface (keyword, type, operator, modifier, construct) | Catalog entry first; then `docs/language/precept-language-spec.md` + relevant type doc |
-| Diagnostic added/changed | `docs/compiler/diagnostic-system.md` |
-| Catalog architecture | `docs/language/catalog-system.md` |
-| MCP tool surface | `docs/tooling/mcp.md` + DTO/formatter in `tools/Precept.Mcp/` |
-| Language server feature | `docs/tooling/language-server.md` |
-| Doc status changing (Stub → Design → Implemented) | The doc's own Status field AND any cross-referencing tables |
-| README claim invalidated | `README.md` |
+**The routing table lives in `CLAUDE.md` § Documentation Sync → Where to update for which change, and only there.** This file used to reproduce it in two places; both copies drifted from the original and from each other, so both were replaced with this pointer. If a kind of change is missing a row, add the row to `CLAUDE.md` — do not start a second table here.
 
-`/design` consults this table when populating a design doc's "Doc-update enumeration" section. `/plan` uses that enumeration to populate per-phase doc-touch obligations. `/promote` verifies those obligations at promotion time.
+`/design` consults that table when populating a design doc's "Doc-update enumeration" section. `/plan` uses that enumeration to populate per-phase doc-touch obligations. `/promote` verifies those obligations at promotion time.
 
 The skills make routing automatic — authors don't need to memorize the table, but should understand it exists so they can override when the heuristic gets a case wrong.
 
@@ -81,7 +71,7 @@ When PR-and-issue workflow is in use (main branch development), the proposal lif
 - Stage 2 (Lock a design) corresponds to "Design Review" below + the design doc in Track B
 - Stage 3 (Plan execution) corresponds to "Implementation plan" in the PR body
 
-On spike branches without PRs (current `spike/Precept-V2-Radical` workflow), the lifecycle skills (`/research`, `/design`, `/plan`, `/execute`) handle the same transitions without the GitHub gates. The discipline is the same; the enforcement mechanism differs.
+On spike branches without PRs (the current branch is `spike/Precept-V2-Radical-reset`), the lifecycle skills (`/research`, `/design`, `/plan`, `/execute`) handle the same transitions without the GitHub gates. The discipline is the same; the enforcement mechanism differs.
 
 Stages 4-7 (execute, promote, review, maintain) are the same on both workflows.
 
@@ -190,16 +180,7 @@ When ready to implement:
 
 #### 5. Documentation Sync (Same PR — Non-Negotiable)
 
-Every implementation PR must update documentation in the same pass:
-
-| What changed | Update |
-|-------------|--------|
-| New keyword, operator, or syntax | `docs/language/precept-language-spec.md` (+ relevant type doc) + the catalog entry first; `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` regenerates |
-| New or changed API behavior | `docs/runtime/runtime-api.md` |
-| New editability semantics | `docs/language/precept-language-spec.md` § Field Modifiers (or the relevant spec section) |
-| New MCP tool behavior | `docs/tooling/mcp.md` |
-| Feature claims in README | `README.md` |
-| New or changed proof engine diagnostic (C76, C92–C98, future) | `test/integrationtests/diagnostics/` — add or update a `.precept` sample that demonstrates the diagnostic scenario. See § Diagnostic Samples below. |
+Every implementation PR must update documentation in the same pass. **Which docs, for which change, is the routing table in `CLAUDE.md` § Documentation Sync → Where to update for which change.** It covers every row this section used to list separately, including editability semantics and the proof engine diagnostics that also require a sample under `test/integrationtests/diagnostics/` (see § Diagnostic Samples below).
 
 **Design docs track what EXISTS in the runtime, not what's planned.** They are updated at implementation time, never before. **Exception — Track B proposals:** For Track B proposals, the design doc is committed on the branch in "to be" form as the first artifact. It only reaches `main` alongside the implementing code. This is an exception to the general rule — Track B docs describe the target state but are gated behind the same PR as the implementation that realizes them.
 
@@ -238,9 +219,9 @@ The `test/integrationtests/diagnostics/` folder contains `.precept` files that d
 - `severity` is `error`, `warning`, or `hint`
 - `match` is `exact` or `contains`
 - `message` is the required visible diagnostic text; prefer `match=exact` and use `contains` only when the visible surface intentionally includes dynamic context that would make exact matching brittle
-- `line`, `start`, and `end` are the exact `Line`, `Column`, and `EndColumn` values emitted by `PreceptCompiler.CompileFromText()`
+- `line`, `start`, and `end` are the exact `Line`, `Column`, and `EndColumn` values emitted by `Compiler.Compile(string source)` in `src/Precept/Compiler.cs` — there is no `PreceptCompiler.CompileFromText()`, which this file used to name
 
-**Drift prevention:** Every diagnostic sample is backed by a test in `test/Precept.Tests/DiagnosticSampleDriftTests.cs`. The test reads the sample's `# Demonstrates:` header and `# EXPECT:` comments, compiles the file, and asserts the expectations match the emitted diagnostics exactly. No extra diagnostics of any severity are allowed — not just no unexpected errors. A discovery test fails if any sample file lacks the header or malformed expectation metadata. When adding a new sample, no manual test wiring is needed — the theory test auto-discovers `test/integrationtests/diagnostics/*.precept` files.
+**Nothing currently checks these expectations.** As of 2026-07-25 the eight files under `test/integrationtests/diagnostics/` carry `# Demonstrates:` headers and `# EXPECT:` comments, but no test reads either — searching the test projects for `EXPECT` finds no code that parses them. The header and expectation comments are therefore a convention maintained by hand, and a sample can drift away from what the compiler actually emits without anything failing. Write them accurately anyway, and treat a sample as unverified evidence until a checking test exists. Building that test — it would compile each sample, assert every `# EXPECT:` row matches an emitted diagnostic exactly, and fail on any extra diagnostic of any severity as well as on a missing or malformed header — is outstanding work, not a description of what is there.
 
 #### Proposal content at merge time
 
@@ -261,7 +242,7 @@ The most commonly dropped items are **deliberate exclusions** (they disappear wh
 
 #### Implementation Plan Quality Bar
 
-The `## Implementation Plan` in the PR body is the execution blueprint. A plan that says "implement narrowing" is useless; a plan that says "create `TryApplyNumericComparisonNarrowing` in `PreceptTypeChecker.cs` (~30 lines), wire into `ApplyNarrowing` after the null-comparison branch at line 2152" is actionable. Every plan must meet this bar before coding begins.
+The `## Implementation Plan` in the PR body is the execution blueprint. A plan that says "implement narrowing" is useless; a plan that says "create `TryApplyNumericComparisonNarrowing` in `src/Precept/Pipeline/TypeChecker.Expressions.cs` (~30 lines), called from the narrowing path after the null-comparison case" is actionable. Name real files — the type checker is split across several `src/Precept/Pipeline/TypeChecker.*.cs` files, so locate the one you mean before writing the plan. Every plan must meet this bar before coding begins.
 
 **Required elements per slice:**
 
@@ -326,7 +307,7 @@ The doc lifecycle (Stages 1-7) applies in full on spike branches. Without GitHub
 - `/research` — exploration in `research/`
 - `/design` — lock the design with four-leg rationale; refuses to lock without
 - `/plan` — phased execution plan with decisions surfaced as gates
-- `/execute` — vertical-slice discipline, PR-body update protocol, doc-sync per slice, catalog-first
+- `/execute` — vertical-slice discipline, doc-sync per slice, catalog-first. On a spike branch it updates the plan document's checklist after each slice instead of a PR body, and it refuses to open a pull request on a `spike/*` branch
 - `/promote` — lift "why" to canonical, archive with header. **Mandatory** — design docs cannot reach Archive without it (or the explicit historical-status header).
 - `/review` — umbrella reviewer: reviews any stage artifact (research / design / plan / code / promotion) by dispatching to the discipline that owns it, or runs the whole-item completion check on a bare `/review <work-item>` before declaring a work item closed. The code branch does the built-in `/review`'s PR-review job via `/code-review` + `precept-reviewer` and intentionally subsumes (does not invoke) the built-in.
 
@@ -365,7 +346,7 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 | WHY a decision was made | Issue body (per-decision rationale) + `research/` (full evidence base) | Permanent — rationale lives in both places |
 | What changed, why this PR exists, and HOW to implement (summary + reviewer context + checklist) | PR body | Ephemeral — dies with the PR |
 | Design doc in "to be" form (Track B) | PR branch — reaches `main` only with implementing code | Ephemeral on branch — permanent once merged |
-| AI agent directives | `.github/copilot-instructions.md` | Permanent — updated as process evolves |
+| AI agent directives | `CLAUDE.md` governs Claude Code and is loaded in every session and sub-agent spawn; `.github/copilot-instructions.md` governs Copilot. Keep them in agreement | Permanent — updated as process evolves |
 
 ### Doc Lifecycle Path
 
@@ -379,7 +360,7 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 | Lifecycle review report (Stage 6) | `docs/Working/lifecycle-review-<work-item>-YYYY-MM-DD.md` |
 | Audit reports (recurring Stage 7) | `docs/Working/<workstream>-review-YYYY-MM-DD.md` |
 
-The `/lifecycle-*` skills handle moves between these locations.
+The lifecycle skills — `/research`, `/design`, `/plan`, `/execute`, `/promote`, `/review` — handle moves between these locations.
 
 ### Why not separate implementation plan docs?
 
@@ -418,9 +399,9 @@ dotnet build                        # Build everything
 dotnet test                         # Run all tests (xUnit + FluentAssertions)
 ```
 
-### Release-Only Builds (Non-Negotiable)
+### Invariants must not depend on the build configuration (Non-Negotiable)
 
-Precept builds **Release-only**, with portable PDB symbols, across every project. `Directory.Build.props` at the repo root enforces this:
+`Directory.Build.props` at the repo root sets portable PDB symbols everywhere, and defaults the configuration to Release **only when nothing else has already set it**:
 
 ```xml
 <Project>
@@ -431,6 +412,14 @@ Precept builds **Release-only**, with portable PDB symbols, across every project
   </PropertyGroup>
 </Project>
 ```
+
+**That default does not make the repository Release-only, and the plain `dotnet build` in this file is a Debug build.** Measured 2026-07-25:
+
+- `dotnet build` at the repo root resolves `Precept.slnx`, and a solution build supplies its own configuration before `Directory.Build.props` is evaluated. The condition is false, the default never applies, and every project lands in `bin/Debug/` — verified against all eleven project outputs.
+- `dotnet build src/Precept/Precept.csproj`, building one project with no solution involved, leaves `Configuration` unset, so the default does apply and the output lands in `bin/Release/`.
+- `dotnet build -c Release` at the repo root builds the whole solution in Release. Use it when you specifically need Release output.
+
+So a given file may be compiled either way depending on how the build was invoked, and `DEBUG` is defined in the common case. **Nothing that has to hold in production may be written so that it only runs in one configuration.**
 
 **Forbidden in pipeline code:**
 
@@ -466,15 +455,11 @@ The `extension: install` task is driven by Node and works on Windows, macOS, and
 
 VS Code Insiders is auto-detected from the launching terminal's environment and routed to `code-insiders` instead of `code`.
 
-## MCP Configuration Surfaces
+## MCP Configuration Files
 
-Three MCP config files exist and must stay distinct:
+**The inventory lives in `CLAUDE.md` § Development Workflow and only there** — three files define MCP servers, plus `.claude/settings.local.json`, which is not a server definition but decides which of them Claude Code enables. That section names each file, its schema, and every server it declares. This file used to carry a second, shorter copy that had drifted; it was replaced with this pointer.
 
-- **`.vscode/mcp.json`** — VS Code/workspace-local source-first config. Uses the VS Code `servers` schema. Primary surface for contributors working on Precept in VS Code.
-- **`.mcp.json` (repo root)** — Copilot CLI repo-local config. Uses the CLI `mcpServers` schema. Points at the same source-first `tools/scripts/start-precept-mcp.js` wrapper. Does not include a `github` entry — Copilot CLI provides GitHub MCP natively.
-- **`tools/Precept.Plugin/.mcp.json`** — shipped/distribution payload in `dotnet tool run precept-mcp` form. Not for local development. Updated only via `plugin: sync payload`.
-
-Do not let these files drift into separate hand-authored contracts. Both `.vscode/mcp.json` and repo-root `.mcp.json` must point at the same source-first launch path.
+The one rule worth repeating here: do not let the two development files drift into separately hand-authored contracts. `.vscode/mcp.json` and the repo-root `.mcp.json` must keep pointing `precept` at the same source-first launch script, `tools/scripts/start-precept-mcp.js`.
 
 ### Reload rules
 
@@ -491,10 +476,14 @@ See [Precept Plugin README](tools/Precept.Plugin/README.md) for the local-vs-dis
 ### Test projects
 
 ```bash
-dotnet test test/Precept.Tests/                    # Core runtime + parser + type checker
+dotnet test test/Precept.Tests/                    # Core runtime + parser + type checker + proof engine
 dotnet test test/Precept.LanguageServer.Tests/     # Language server completions + diagnostics
 dotnet test test/Precept.Mcp.Tests/                # MCP tool integration
+dotnet test test/Precept.Analyzers.Tests/          # Roslyn analyzers in src/Precept.Analyzers
+dotnet test test/Precept.MatrixTools.Tests/        # Obligation-matrix tooling in tools/Precept.MatrixTools
 ```
+
+There are five test projects. `dotnet test` at the repo root runs all of them.
 
 ## Conventions
 

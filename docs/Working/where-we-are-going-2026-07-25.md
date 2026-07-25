@@ -65,7 +65,7 @@ Each ends where Shane looks at something and says yes.
 | 6 | Write one argument per discharge rule and per step kind | Zero rules without an argument, zero arguments naming no rule. Each records attacks by at least two people who did not write it |
 | 7 | Generate the coverage grid | No blank cells; every cell cites a rule on the closed list; re-running on unchanged inputs produces an identical file |
 | 8 | Confirm, narrow, or revert | Three counts with their lists — already handled by working code, needing new code, refused. Shane confirms we carry on, narrows what the language admits, or reverts the branch |
-| 9 | Fill the catalogs with the settled model | The discharge rules, step kinds, obligation families and write sites are all catalogued, and adding a member to any of them without teaching its consumers fails the build, demonstrated by a committed test. `CLAUDE.md`'s catalog suspension removed |
+| 9 | Fill the catalogs with the settled model, and point agents back at them | The discharge rules, step kinds, obligation families and write sites are all catalogued, and adding a member to any of them without teaching its consumers fails the build, demonstrated by a committed test. **Every caveat phase 0 added is removed**, and the instruction files say plainly that the MCP tools are the answer for language questions — see below |
 | 10 | Turn every numbered claim into a criterion and a failing test | Four counts, all zero: claims with no test, tests tracing to no claim, tests not driving the full compile path, tests red for a reason other than their stated one |
 | 11 | Build until the frozen suite is green | The suite is green and the diff against the freeze commit shows no test deleted, renamed, skipped or weakened — only tests moving red to green |
 | 12 | Confirm it is finished, by people who did not build it | The claim-to-test trace re-run shows nothing dropped; every input either compiles or produces diagnostics and terminates; and a named list of the places examined for cases where the compiler continues without proving |
@@ -88,6 +88,35 @@ the model rather than about effort. Work stops and it goes to Shane as a revert 
 also measured, and it is the rule nobody had: the establishment and preservation design ran three
 passes across two days — roughly fifty agents, three and a half hours — with a different objection
 each round, and each round was treated as needing one more pass.
+
+## Phase 0's caveats are temporary, and phase 9 removes them
+
+Phase 0 adds a warning to several instruction files saying the catalogs are incomplete and the
+canonical documents are what completeness is measured against. That is true today and it is not
+the end state. The MCP tools read the catalogs, so once the catalogs are right the tools become
+the fastest and most reliable way to answer a language question — better than reading source,
+which is what agents do when told not to trust the tools.
+
+**The guidance about the MCP tools stays what it was, with one narrow disclaimer** (owner ruling,
+2026-07-25). The tools are the primary way to answer a DSL question, ahead of reading source. The
+disclaimer: while the compiler is being aligned to the spec its **proof results** are not
+trustworthy — `precept_proofs`, and the proof obligations in `precept_compile`'s output. Syntax,
+types, patterns and diagnostics are unaffected. The confirmed case behind it: `field Bal as decimal
+nonnegative max 100` compiles clean, mints an interval containment obligation, marks it **Proved**,
+and reports the declared bound as `[−∞ .. 100]` — `nonnegative` contributes nothing, and a single
+event drives the value to −10.
+
+The reason the disclaimer is narrow, as background rather than as wording to copy into files:
+measured 2026-07-25, of 39 places where the catalogs did not reflect a decision, about 30 were in
+proof requirements and discharge, and every place the catalogs *did* reflect a decision correctly
+was language surface — type rules, declaration forms, action effect classes, function signatures.
+`CertificateSteps` does not exist, `ProofRequirementKind` has no establishment or preservation
+member, and nothing in `src/Precept/Language/` mentions premises, certificates or occasions.
+
+**That list is [`phase0-caveats-to-remove-2026-07-25.md`](phase0-caveats-to-remove-2026-07-25.md).**
+Phase 0 records every caveat it adds, with file and line, so phase 9 has an exact list to
+undo rather than an archaeology problem.** Phase 9 removes them and states plainly that the MCP
+tools are the authority for language questions.
 
 ## What closes when
 

@@ -4,9 +4,9 @@
 **Requested by:** Shane  
 **Scope:** Impact on locked brand positioning if Precept shifts from state-first framing to **entity-first, data-centric** framing  
 **Inputs read:**  
-- `design/brand/research/data-vs-state-philosophy.md`  
-- `design/brand/research/data-vs-state-architecture.md`  
-- `design/brand/research/data-vs-state-runtime.md`  
+- `research/brand/data-vs-state-philosophy.md`  
+- `research/brand/data-vs-state-architecture.md`  
+- `research/brand/data-vs-state-runtime.md`  
 - `docs/references/data-vs-state-pm-research.md`  
 - `.squad/decisions/inbox/copilot-directive-2026-04-08T00-51-03Z.md`  
 - `.squad/decisions/inbox/copilot-directive-2026-04-08T01-30-30Z.md`  

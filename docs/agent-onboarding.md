@@ -44,15 +44,15 @@ Source text flows through a six-stage compiler pipeline (Lexer → Parser → Na
 
 ### Concept 3: Lifecycle-driven design
 
-Precept work flows through a 7-stage engineering lifecycle, each backed by a skill (`/research` through `/audit`). Research feeds Design; Design feeds Plan; Plan feeds Execute; Execute feeds Promote; Promote feeds Review; Review feeds Audit. Each stage has explicit artifacts and discipline:
+Precept work flows through a seven-stage engineering lifecycle. Six of those stages are backed by a skill that exists in `.claude/skills/` — `/research`, `/design`, `/plan`, `/execute`, `/promote`, `/review`. The seventh stage's `/audit` skill has not been built yet. Research feeds Design; Design feeds Plan; Plan feeds Execute; Execute feeds Promote; Promote feeds Review. Each stage has explicit artifacts and discipline:
 
 - **Stage 1 (Research)** — produces a doc in `research/` with comparable systems, prior art, citations
 - **Stage 2 (Design)** — locks a design in `docs/Working/<topic>.md` with **four-leg rationale** (Rationale, Alternatives, Precedent, Tradeoff) per decision, **citation-with-excerpt** for every source, Philosophy Alignment + Language Design Grounding + Architecture Grounding sections
 - **Stage 3 (Plan)** — produces a phased execution plan with exit criteria
-- **Stage 4 (Execute)** — implements via vertical slices, PR-body-is-the-plan
+- **Stage 4 (Execute)** — implements via vertical slices against a live plan artifact. On a branch destined for `main` that artifact is the draft pull-request body. On a `spike/*` branch no pull request is opened at all, commits land directly on the branch, and the plan document produced by `/plan` is the tracker. **The current branch is a spike branch**, so the plan document is where work is tracked; the `/execute` skill refuses to open a pull request here. See `CONTRIBUTING.md` § Spike Workflow.
 - **Stage 5 (Promote)** — lifts content from `docs/Working/` to canonical docs; archives the design
 - **Stage 6 (Review)** — end-of-lifecycle verification a work item passed all 5 earlier stages
-- **Stage 7 (Audit)** — periodic drift detection (deferred)
+- **Stage 7 (Maintain)** — periodic drift detection over canonical docs. The seventh stage's `/audit` skill has not been built yet, so do not route work to it. Until it exists, drift is caught by `/review` and by the doc-sync obligations in `CLAUDE.md`.
 
 **Implication for agents:** Never propose a specific language-surface design in direct chat. Route to `/design`. Casual chat suggestions are brainstorming; they must not harden into "the" design without the four-leg rationale + grounding sections + citation discipline that the skill enforces. The risk the skill exists to prevent: the first thing written down becomes "the" answer.
 

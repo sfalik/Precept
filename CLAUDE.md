@@ -6,7 +6,7 @@ Precept is a domain integrity engine for .NET — a DSL runtime that governs how
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| Core runtime | `src/Precept/` | Lexer → parser → type checker → graph analyzer → proof engine → runtime evaluator |
+| Core runtime | `src/Precept/` | Lexer → parser → name binder → type checker → graph analyzer → proof engine → runtime evaluator |
 | Language server | `tools/Precept.LanguageServer/` | LSP: diagnostics, completions, hover, go-to-definition, semantic tokens, preview |
 | MCP server | `tools/Precept.Mcp/` | MCP tools wrapping core APIs |
 | VS Code extension | `tools/Precept.VsCode/` | Extension host: syntax highlighting, preview webview, commands |
@@ -23,7 +23,7 @@ Do not use: *source of truth (as a noun phrase), load-bearing, lens, surface (on
 
 **`witness`** is being retired. What a proof produces to demonstrate a violation is a **counterexample**. Use that everywhere, including where the spec still says witness.
 
-**This rule travels.** A writing rule that lives only in a skill binds the document being authored and nothing else. Copy it verbatim into every sub-agent and workflow prompt, or the vocabulary comes straight back in through them.
+**This rule binds every agent, not just the one reading it here.** `CLAUDE.md` is loaded automatically at the start of every session and every sub-agent spawn, so an agent spawned the normal way already has this section. The gap is an agent whose prompt is written by hand — a workflow stage, a scripted orchestration — which may run without loading this file at all. If you are writing a prompt for an agent that might not load `CLAUDE.md`, put this section in the prompt. Otherwise the vocabulary comes straight back in through that agent's output.
 
 The owner reads everything this project produces and has said directly that reviewing agent-written documents is exhausting because of this vocabulary. His review speed is the bottleneck for the whole project.
 
@@ -92,16 +92,17 @@ Precept uses a metadata-driven architecture. The goal is that catalogs become th
 
 **They are not that yet, and must not be worked as if they were.** Measured 2026-07-25: the `CertificateSteps` catalog does not exist at all, though `precept-language-spec.md:225` makes emitting a certificate drawn from it a condition of a proof strategy being admissible. `ProofRequirementKind` declares thirteen members and neither establishment nor preservation is among them, though the induction model rests on both. Searching `src/Precept/Language/` for *premise*, *certificate*, *verdict* or *occasion* returns nothing. And `precept-language-spec.md:1992` states in canon's own voice that five of the places data can change have no catalog entry.
 
+**The gap is concentrated in one place.** Of 39 places where the catalogs did not reflect a decision, about 30 were in proof requirements and discharge. Every place they *did* reflect a decision correctly was language surface — type rules, declaration forms, action effect classes, function signatures. So the language surface is in good shape and the proof model is where the holes are.
+
 Until further notice:
 
 - **The canonical docs win.** Where a catalog and a canonical doc disagree, the doc is right and the catalog has drifted. Fix the catalog.
 - **Never cite a catalog as evidence that something is complete.** The completeness tests prove that every member a catalog *declares* carries metadata. They cannot detect a decision that was never written into the catalog at all.
-- **Never scope work by what the catalog happens to declare.**
 - **Catalog before code still stands.** It is the discipline that gets us there.
 
 **What ends this suspension:** the catalogs become authoritative when adding a decision without teaching the catalog fails the build — every place data can change catalogued, the certificate vocabulary created, establishment and preservation declared, and the exhaustiveness analyzer applied across all of it. When that lands, delete this notice and restore the original sentence: *"Catalogs are the language specification in machine-readable form."*
 
-The canonical catalog inventory lives in [`docs/language/catalog-system.md`](docs/language/catalog-system.md). Other docs reference catalogs by name, not by count — the enumeration is the source of truth.
+The canonical catalog inventory lives in [`docs/language/catalog-system.md`](docs/language/catalog-system.md). Other docs reference catalogs by name, not by count — that enumeration is the one to trust.
 
 This is the inverse of traditional compilers (Roslyn, GCC, TypeScript), where domain knowledge is scattered across pipeline stages and enums are internal classification axes. In Precept the catalog drives everything downstream: grammar, completions, hover, semantic tokens, MCP vocabulary, diagnostics.
 
@@ -110,7 +111,7 @@ This is the inverse of traditional compilers (Roslyn, GCC, TypeScript), where do
 - **Catalog before code.** A new keyword, type, operator, modifier, or construct goes in the appropriate catalog entry first. Downstream artifacts derive from it.
 - **Never maintain parallel keyword lists.** If a parser/LS/MCP consumer hardcodes what a catalog already knows, that's a violation. `Constructs.ByLeadingToken`, `DisambiguationEntry.DisambiguationTokens`, `Modifiers`, `Actions`, `Types`, `Operators` cover their respective surfaces — derive, don't duplicate.
 - **Never hand-edit `tmLanguage.json`.** It's generated from `Tokens`, `Types`, and `Constructs` by the grammar generator.
-- **Never switch on `*Kind` enum identity to dispatch per-member behavior.** The smell is `kind switch { FooKind.Bar => …, FooKind.Baz => … }` where each arm exists "because the language says so." That behavior belongs in catalog metadata. Switching on a DU **subtype** is correct (the subtype IS the metadata shape); switching on enum identity to apply per-member behavior is the violation.
+- **Never switch on `*Kind` enum identity to dispatch per-member behavior.** The smell is `kind switch { FooKind.Bar => …, FooKind.Baz => … }` where each case exists "because the language says so." That behavior belongs in catalog metadata. Switching on a DU **subtype** is correct (the subtype IS the metadata shape); switching on enum identity to apply per-member behavior is the violation.
 - **Use discriminated unions for varying shapes.** Don't paper over shape differences with nullable fields on a flat record — use a DU base + sealed subtypes.
 
 ## The samples are examples, not a specification (Non-Negotiable)
@@ -155,31 +156,36 @@ If the runtime can do something the philosophy doesn't describe, or the philosop
 
 ## Documentation Sync (Non-Negotiable)
 
-**See also**: `CONTRIBUTING.md` § Doc Lifecycle — the 7-stage lifecycle and the lifecycle skills (`/research` through `/audit`) that automate doc-sync at each transition. The routing table below is consumed by `/design` (populates doc-update enumeration in design docs) and `/promote` (verifies obligations at promotion).
+**See also**: `CONTRIBUTING.md` § Doc Lifecycle — the 7-stage lifecycle and the lifecycle skills that automate doc-sync at each transition. Six of those skills exist — `/research`, `/design`, `/plan`, `/execute`, `/promote`, `/review`. The seventh stage's `/audit` skill has not been built yet. The routing table below is consumed by `/design` (populates doc-update enumeration in design docs) and `/promote` (verifies obligations at promotion).
 
 When making any code, interface, test, or behavior change, keep documentation in sync in the same edit pass. Unless explicitly told not to, include documentation synchronization as part of every relevant code change. Keep updates focused and factual; if uncertain whether a claim is implemented, verify from code/tests first.
 
 ### Where to update for which change
 
+**This table is the only copy.** `CONTRIBUTING.md` used to reproduce it twice and the copies drifted; both now point here. Add a row here, never in a second table somewhere else.
+
 | Kind of change | Update |
 |---|---|
 | Pipeline stage behavior | `docs/compiler/<stage>.md` § Implementation State / § Open Questions |
 | Runtime API | `docs/runtime/runtime-api.md` + affected `descriptor-types.md` / `result-types.md` / `fault-system.md` / `precept-builder.md` / `evaluator.md` |
-| Language surface (new keyword/type/operator/modifier/construct) | Add catalog entry first; then update `docs/language/precept-language-spec.md` + relevant type doc (`primitive-types.md`, `temporal-type-system.md`, `business-domain-types.md`, `collection-types.md`) |
+| Language surface (new keyword/type/operator/modifier/construct) | Add catalog entry first; then update `docs/language/precept-language-spec.md` + relevant type doc (`primitive-types.md`, `temporal-type-system.md`, `business-domain-types.md`, `collection-types.md`). `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` is regenerated from the catalog, never hand-edited |
+| Editability semantics (field modifiers) | `docs/language/precept-language-spec.md` § Field Modifiers, or the relevant spec section |
+| Catalog architecture | `docs/language/catalog-system.md` |
 | Diagnostic added/changed | `docs/compiler/diagnostic-system.md` |
-| MCP tool surface | `docs/tooling/mcp.md` + relevant DTO/formatter in `tools/Precept.Mcp/` |
+| Proof engine diagnostic added/changed (C76, C92–C98, and later ones) | `docs/compiler/diagnostic-system.md`, plus add or update the `.precept` file in `test/integrationtests/diagnostics/` that demonstrates the scenario |
+| MCP tool behavior | `docs/tooling/mcp.md` + relevant DTO/formatter in `tools/Precept.Mcp/` |
 | Language server feature | `docs/tooling/language-server.md` |
 | Doc status changing (Stub → Design → Implemented) | Update the doc's own Status field AND any cross-referencing tables (e.g., `docs/compiler/README.md`) |
 | README claim invalidated | `README.md` — never let aspirational claims sit as if implemented |
 
-### Source of Truth
+### Which document owns what
 
 - `README.md` — public project narrative and usage guide; must track real implementation. Never leave aspirational claims as if implemented.
 - `docs/` — canonical technical design decision records, architecture notes, project philosophy. Per-area READMEs are the canonical maps.
 - `research/` — evidence and precedent; cite, don't duplicate. See `/research` skill.
 - `design/brand/` — brand identity and brand-level semantic meaning.
 - `design/system/` — reusable product-facing visual-system guidance and surface specs.
-- `design/prototypes/` — durable design prototypes. Hot, code-near prototypes may live near their owning tool surface but should be promoted here when durable.
+- `design/prototypes/` — durable design prototypes. Hot, code-near prototypes may live next to the tool they belong to, but should be promoted here when durable.
 - `docs/archive/` holds superseded specs; reference only, never update.
 
 ### Transient vs Canonical references (Non-Negotiable)
@@ -195,7 +201,7 @@ When making any code, interface, test, or behavior change, keep documentation in
 
 **Transient (do NOT reference from code)**:
 - `docs/Working/` — in-flight design proposals; promote-or-archive lifecycle means content moves
-- `bugs.md` — tracking surface; entries move from Active to Fixed and eventually archive
+- `bugs.md` — a tracking list; entries move from Active to Fixed and eventually archive
 - Design-doc internal structure (`Decision 2`, `D-3`, `Option A/B/C`)
 - Workstream labels (`W-A`, `W-G`), phase labels (`Phase 4`), slice labels (`Slice 8`, `Slice 12`)
 - Finding IDs (`F-LANG-COLL-06`, `F-LANG-BIZ-10`)
@@ -309,6 +315,7 @@ dotnet test test/Precept.Tests/
 dotnet test test/Precept.LanguageServer.Tests/
 dotnet test test/Precept.Mcp.Tests/
 dotnet test test/Precept.Analyzers.Tests/
+dotnet test test/Precept.MatrixTools.Tests/
 
 # VS Code extension (from tools/Precept.VsCode/)
 npm run compile        # Build TypeScript
@@ -323,19 +330,24 @@ npm run loop:local     # Package + install locally (also a VS Code task)
 - **Runtime / language server changes** → edit `src/Precept/` or `tools/Precept.LanguageServer/` → run Build task → extension auto-detects new build, no reload needed.
 - **Extension UI / grammar / TypeScript** → edit `tools/Precept.VsCode/` → run `extension: install` task → reload window.
 - **MCP server** → edit `tools/Precept.Mcp/` → reload window → rebuild happens lazily on next tool invocation from source.
-- **Claude Code agents / skills** → edit `.claude/agents/` and `.claude/skills/` → changes appear on next session or sub-agent spawn.
-- **Shipped Copilot plugin (agents/skills markdown)** → edit workspace-native copies in `.github/agents/` and `.github/skills/` → reload window → changes appear immediately. Run `plugin: sync payload` only when updating the shipped plugin payload under `tools/Precept.Plugin/` for explicit validation. *(The shipped plugin targets Copilot consumers of Precept — it's a product artifact, not your dev tooling.)*
+- **Never hand-edit the generated agent and skill files.** Six files are generated by `tools/scripts/build-agents.js` (VS Code task `agents: build`) from `tools/agent-sources/` and `tools/skill-sources/`: `.claude/agents/precept-author.md`, `.claude/skills/precept-authoring/SKILL.md`, `.claude/skills/precept-debugging/SKILL.md`, and their three `.github` counterparts `.github/agents/precept-author.agent.md`, `.github/skills/precept-authoring/SKILL.md`, `.github/skills/precept-debugging/SKILL.md`. Edit the `body.md` / `claude.yaml` / `copilot.yaml` under the source folders and run the task. An edit made directly to one of the six is overwritten the next time it runs, silently and without a diff to review.
+- **Every other agent and skill is hand-written.** `.claude/skills/design`, `execute`, `plan`, `promote`, `research`, `review` and anything else under `.claude/agents/` have no generator — edit them in place. Changes appear on the next session or sub-agent spawn.
+- **Shipped Copilot plugin** → the payload under `tools/Precept.Plugin/` is updated by the `plugin: sync payload` task, not by hand. *(It targets Copilot consumers of Precept — a product artifact, not your dev tooling.)*
 
-Four distinct MCP config surfaces exist and must stay distinct:
+Three files define MCP servers, and they must stay distinct. A fourth file selects which of them Claude Code turns on. This list is the only inventory — `CONTRIBUTING.md` § MCP Configuration Files points here rather than repeating it. Verified against the files on disk 2026-07-25:
 
-- **`.vscode/mcp.json`** — VS Code/workspace-local source-first config. Uses the VS Code `servers` schema. Points `servers.precept` at `tools/scripts/start-precept-mcp.js`.
-- **`.mcp.json` (repo root)** — repo-local config shared by Claude Code and Copilot CLI. Uses the `mcpServers` schema. Points `mcpServers.precept` at the same `tools/scripts/start-precept-mcp.js`. Claude Code enables it via `.claude/settings.local.json` (`enabledMcpjsonServers: ["precept"]`); Copilot CLI uses it natively.
-- **`.claude/settings.local.json`** — Claude Code's per-user, per-project settings (enabled MCP servers, permissions). Not the MCP server definition itself — that lives in `.mcp.json`.
-- **`tools/Precept.Plugin/.mcp.json`** — shipped/distribution payload. Uses `mcpServers` with `dotnet tool run precept-mcp`. Do not use this surface for local development.
+- **`.vscode/mcp.json`** — VS Code / workspace-local, source-first. Uses the VS Code `servers` schema. Defines `precept`, pointed at `tools/scripts/start-precept-mcp.js`, and `github` as a remote HTTP server.
+- **`.mcp.json` (repo root)** — repo-local, shared by Claude Code and Copilot CLI. Uses the `mcpServers` schema. Defines `precept`, pointed at the same `tools/scripts/start-precept-mcp.js`, and `squad_state`, which runs the Squad CLI's state server over `npx`. No `github` entry — Copilot CLI provides GitHub MCP itself.
+- **`tools/Precept.Plugin/.mcp.json`** — the shipped distribution payload. Uses `mcpServers` with `dotnet tool run precept-mcp`, and defines `precept` only. Never use it for local development; it is updated by the `plugin: sync payload` task.
+- **`.claude/settings.local.json`** — not an MCP server definition. It is Claude Code's per-user, per-project settings file, and it decides which servers from `.mcp.json` are enabled (`enabledMcpjsonServers`) alongside tool permissions.
+
+Do not let the two development files drift into separately hand-authored contracts: `.vscode/mcp.json` and the repo-root `.mcp.json` must keep pointing `precept` at the same source-first launch script.
 
 ## Use the MCP Tools First
 
-This project ships a Precept MCP server. **Use its tools as your primary research surface** before reading source code or making assumptions about the DSL. Call `precept_ping` to confirm connectivity, then discover what's available from your session's tool list. Fall back to source code only for implementation details the tools don't cover.
+This project ships a Precept MCP server. **Use its tools as the first place you look** before reading source code or making assumptions about the DSL. Call `precept_ping` to confirm connectivity, then discover what's available from your session's tool list. Fall back to source code only for implementation details the tools don't cover.
+
+**One exception, while the compiler is being aligned to the spec: its proof results are not trustworthy.** That means `precept_proofs`, and the proof obligations in `precept_compile`'s output. The proof engine is incomplete, and in at least one confirmed case reports a proof for something false — `field Bal as decimal nonnegative max 100` compiles clean and marks its interval obligation **Proved** while reporting the declared bound as `[−∞ .. 100]`, so `nonnegative` contributes nothing and a single event drives the value to −10. Syntax, types, patterns and diagnostics are unaffected; the tools remain the right thing to ask about those.
 
 ## MCP Tool Sync
 

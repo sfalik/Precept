@@ -12,11 +12,17 @@ Research lives in this repository. Proposal decisions and canonical proposal bod
 
 ## Structure
 
-| Folder | Owner | Purpose |
-|--------|-------|---------|
-| `language/` | George + Steinbrenner | Unified language research: comparative expressiveness studies, implementation-grounded audits, and formal language references that inform GitHub proposal issues. |
-| `philosophy/` | Frank | Product-philosophy evidence: entity-first positioning, category analysis, and durable conclusions promoted from domain-specific research. Grounds claims in `docs/philosophy.md`. |
-| `sample-realism/` | Frank + Steinbrenner | *(Incoming — pending merge from `chore/misc`.)* Sample-specific realism research: corpus planning, domain benchmarks, realism criteria, and enterprise platform surveys. Philosophy-relevant conclusions are cited from `philosophy/`, not duplicated. |
+| Folder | Purpose |
+|--------|---------|
+| `language/` | Unified language research: comparative expressiveness studies, implementation-grounded audits, and formal language references that inform GitHub proposal issues. Owned by George and Steinbrenner. See [`language/README.md`](language/README.md). |
+| `architecture/` | External research on architectural patterns for the compiler and runtime: pipeline architecture, proof systems, type systems, state-graph analysis, language-server integration, runtime APIs. See [`architecture/README.md`](architecture/README.md). |
+| `philosophy/` | Product-philosophy evidence: entity-first positioning, category analysis, and durable conclusions promoted from domain-specific research. Grounds claims in `docs/philosophy.md`. Owned by Frank. |
+| `product/` | Product-level landscape and positioning research: the entity-governance landscape, product-management framing, README positioning studies. |
+| `security/` | Security investigations. |
+| `brand/` | Brand research: positioning studies, README and hero research, visual identity precedent, voice and tone. Owned by the brand domain rather than by the language and architecture work. See [`brand/README.md`](brand/README.md). |
+| `design-system/` | Design-system and UX research: semantic visual studies, cross-surface UX research, interaction-pattern analysis, accessibility findings. Owned by the product-facing visual system rather than by the language and architecture work. See [`design-system/README.md`](design-system/README.md). |
+| `references/` | Mirrored excerpts and source captures for external material a decision rests on, one subfolder per topic. Defends citations against URL rot. |
+| `archive/` | Research retired from active circulation, kept as historical context. |
 
 ## Storage Rule
 
@@ -28,10 +34,10 @@ Use `research/` for:
 - cross-domain synthesis that affects more than one domain
 - temporary incubation work that does not yet have a clear long-term owner
 
-Do not use `research/` as a catch-all for brand or UX research.
+Do not use the language and architecture folders as a catch-all for brand or UX research. Those two areas live in `research/` as well, but in their own folders, owned by their own domains.
 
-- Brand research belongs in `design/brand/research/`.
-- Design-system and UX research belongs in `design/system/research/`.
+- Brand research belongs in `research/brand/`.
+- Design-system and UX research belongs in `research/design-system/`.
 - Raw precedent and source captures belong in each domain's `references/` folder.
 - Critiques of specific artifacts belong in each domain's `reviews/` folder.
 
@@ -74,7 +80,8 @@ external-engagement: strong | partial | purely-internal
 
 ## Related
 
-- `design/brand/research/` — Brand research owned by J. Peterman.
-- `design/brand/references/` — Brand precedent, captures, and source material.
-- `design/system/research/` — Design-system and UX research owned by Elaine.
+- `research/brand/` — Brand research owned by J. Peterman. (Moved here from `design/brand/research/`; that path no longer exists.)
+- `research/design-system/` — Design-system and UX research owned by Elaine. (Moved here from `design/system/research/`; that path no longer exists.)
+- `design/brand/` — The brand artifacts themselves: brand spec, decisions, explorations, and artifact reviews. Research grounding them lives in `research/brand/`.
+- `design/system/` — The product-facing visual-system artifacts. Research grounding them lives in `research/design-system/`.
 - `docs/language/precept-language-spec.md` — The DSL spec that this research informs.

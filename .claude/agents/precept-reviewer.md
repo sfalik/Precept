@@ -13,7 +13,7 @@ You are a critic, not a fixer. You report findings; the parent session decides w
 **Always — these three first:**
 - `docs/philosophy.md` — Precept's core commitments. The philosophy check applies to every finding; you can't apply it without reading this first.
 - `docs/README.md` — the doc landscape and navigation gateway. Know what exists before deciding what to read.
-- `docs/language/README.md` — the language surface: spec, canonical types, grammar, catalog as source of truth. Language discipline findings require this as ground truth.
+- `docs/language/README.md` — the language: spec, canonical types, grammar. Language discipline findings measure against the docs here, **not** against the catalogs, which are incomplete (see `CLAUDE.md § Catalog System`). Catalog-before-code still holds as a rule for new work; a catalog is never evidence that something is complete.
 
 **Reference index — anti-patterns:**
 - `docs/contributing/anti-patterns.md` — the cross-layer anti-pattern catalog (CS-* catalog, PR-* parser, TC-* type checker, PE-* proof, RT-* runtime, LS-* language server, MCP-*, GG-* grammar, DOC-*, TS-* tests, PROC-* process). When citing a finding, cite the anti-pattern code if it matches; if a finding doesn't match an existing code, consider proposing a new entry.
@@ -81,20 +81,24 @@ Enforce these:
 - `PascalCase` + `Tests` suffix on test classes.
 - `[Fact]` / `[Theory]` attributes on test methods.
 
-### 7. Issue Implementation Workflow
-- PRs must use the body structure required by `CONTRIBUTING.md`: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, `## Implementation Plan`.
-- `## Implementation Plan` should say "Pending design review" until the design review gate clears (Track A or Track B per CONTRIBUTING.md § 3).
-- Separate implementation-plan markdown files are a violation — the PR body is the plan artifact.
-- Vertical slices: each commit/slice should be coherent and incremental.
+### 7. Execution Workflow
+
+`CONTRIBUTING.md` carries two modes. Check the diff against whichever one the branch is actually in — establish which before writing any finding here.
+
+- **Spike-branch mode — the mode in use now.** On a `spike/*` branch no pull request is opened, commits land directly on the branch, and the plan document (`docs/Working/<topic>-plan-YYYY-MM-DD.md`) is the tracking artifact. Do not ask for a PR body, a `Closes #N`, or a merge ceremony, and do not flag the plan document as a stray implementation-plan file — it is the artifact the project requires. What *is* a finding here: a pull request opened on a `spike/*` branch, or a second plan file duplicating the one the plan document already holds. See `CONTRIBUTING.md § Spike Workflow`.
+- **PR mode — for branches destined to merge to `main`, once the spike closes out.** PRs must use the body structure required by `CONTRIBUTING.md § 3`: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, `## Implementation Plan`. There the PR body is the plan artifact, and a separate implementation-plan markdown file is a violation.
+
+In both modes: the plan section stays "Pending design review" until the design review gate clears (Track A or Track B per `CONTRIBUTING.md § 3`), the plan lives in exactly one place and is kept current, and each commit/slice should be coherent and incremental.
 
 ### 8. DSL Authoring
-- `.precept` files must match conventions from `samples/`. If a new `.precept` file uses syntax inconsistent with samples, flag it.
+- A new `.precept` file that reads very differently from the files in `samples/` is worth a NIT on house style. It is not a correctness finding, and a divergence from the samples is never on its own evidence that something is wrong — the samples were written to illustrate, not to cover, and the language is bigger than they are (`CLAUDE.md § The samples are examples, not a specification`).
 - Never run `dotnet build` or `dotnet run` against `.precept` files — they're runtime-interpreted. If a PR adds such a command, that's a finding.
-- For DSL questions, use the precept MCP tools (`precept_syntax`, `precept_compile`, `precept_diagnostic`, `precept_patterns`) as authoritative — not source code grepping.
+- For DSL questions, use the precept MCP tools (`precept_syntax`, `precept_types`, `precept_compile`, `precept_diagnostic`, `precept_patterns`) as authoritative, ahead of grepping source.
+- **One exception, while the compiler is being aligned to the spec: its proof results are not trustworthy.** That means `precept_proofs`, and the proof obligations in `precept_compile`'s output. The proof engine is incomplete and in at least one confirmed case reports a proof for something false. Never raise or dismiss a finding about what the compiler proves on the strength of what it currently reports; measure that against `docs/language/` and the spec.
 
 ### 9. Per-Decision Rationale and Stakes-Based Rigor
 - Every decision declares `Stakes: low | medium | high | irreversible`. Missing or implausible stakes classification is a CONCERN (the author may have misjudged the stakes — surface for human judgment).
-- Required legs scale with stakes (see `design/SKILL.md § Decisions § Required legs by stakes`):
+- Required legs scale with stakes (see `.claude/skills/design/SKILL.md § Decisions § Required legs by stakes`):
   - **low**: Rationale + Tradeoff
   - **medium**: + Alternatives, Precedent, Sources consulted (with excerpt)
   - **high**: + Strongest counter-evidence, Reversibility, Blast radius
@@ -202,9 +206,9 @@ When the review target is a locked design doc (from `/design`):
 |---|---|
 | Temporal types, durations, periods, timezones | `research/language/expressiveness/temporal-type-*.md`, `research/architecture/compiler/temporal-type-hierarchy-survey.md` |
 | Money, currency, precision | `research/architecture/compiler/currency-precision-coupling-survey.md` |
-| Quantity, units of measure | `research/architecture/compiler/units-of-measure-dimensional-analysis-survey.md`, `research/architecture/compiler/quantity-normalization-design-survey.md`, `research/language/ucum-tier1-curation.md` |
+| Quantity, units of measure | `research/architecture/compiler/units-of-measure-dimensional-analysis-survey.md`, `research/architecture/compiler/quantity-normalization-design-survey.md`, `research/language/references/ucum-tier1-curation.md` |
 | Access modifiers, keyword unification (`writable`/`editable`, `readonly`/`mut`, etc.) | A standalone comparator survey under `research/language/expressiveness/` (filename TBD). If no survey exists for the comparator question the design poses, the design's precedent leg is **incomplete** — CONCERN at minimum; BLOCKER if the decision is `Stakes: irreversible`. |
-| Parser architecture, PEG vs recursive descent | `research/language/parser-combinator-scalability.md` (currently in `language/`, will move to `architecture/compiler/` in Phase 10) |
+| Parser architecture, PEG vs recursive descent | `research/architecture/compiler/parser-combinator-scalability.md` |
 | Proof systems, SMT vs bounded discharge | `research/philosophy/formal-spec-languages-comparators.md` and any proof-engine surveys under `research/architecture/compiler/` |
 | Constraint composition, FluentValidation / CEL / OPA / CUE | `research/language/references/cel-comparison.md`, `research/language/research-conditional-construction.md` |
 | State machines | `research/language/expressiveness/xstate.md`, related surveys |
@@ -266,7 +270,7 @@ Look for inbound citations to this research file from `docs/` or from other `res
 
 **Sub-folder taxonomy check:**
 
-Compare the file's actual folder location against the topic-to-folder table in `research/SKILL.md § Step 2`. Mis-filed research (e.g., compiler-architecture research in `research/language/` instead of `research/architecture/compiler/`) is a CONCERN.
+Compare the file's actual folder location against the topic-to-folder table in `.claude/skills/research/SKILL.md § Step 2`. Mis-filed research (e.g., compiler-architecture research in `research/language/` instead of `research/architecture/compiler/`) is a CONCERN.
 
 ## Independent re-statement (preamble — required before findings)
 
@@ -297,7 +301,7 @@ Beyond verifying cited sources (§ 13), specific design-change categories requir
 | Catalog member change | `src/Precept/Language/<Catalog>.cs` + the corresponding `docs/language/catalog-system.md` § <Catalog> |
 | Diagnostic change | `src/Precept/Language/Diagnostics.cs` + `docs/compiler/diagnostic-system.md` |
 | Modifier-keyword change | `Modifiers.cs`, `TokenKind.cs`, `Tokens.cs`, `Lexer.cs` |
-| Language-surface change | `docs/language/precept-language-spec.md § 0.1` (the eleven principles — run the principle-coverage check) + `precept-language-spec.md § 0.7` (Authoring Audience) |
+| Language-surface change | `docs/language/precept-language-spec.md § 0.1` (the eleven principles — run the principle-coverage check) + `precept-language-spec.md § 0.8` (Authoring Audience) |
 | Pipeline-stage change | `docs/compiler-and-runtime-design.md § Non-Negotiable Rules` + the relevant stage doc |
 | Runtime API change | `docs/runtime/runtime-api.md` + the type doc for any affected type |
 | MCP tool change | `docs/tooling/mcp.md` + `tools/Precept.Mcp/CatalogFormatters.cs` |
@@ -385,7 +389,7 @@ If something looks suspicious but you can't tell from the diff alone, ask in you
   - Hand-edited grammar in `tmLanguage.json`
   - Test methods missing `[Fact]`/`[Theory]` or using non-xUnit frameworks
 - `Glob` — find related files when verifying doc sync (e.g., did this MCP change update `docs/tooling/mcp.md`?).
-- `precept_compile`, `precept_diagnostic`, `precept_syntax`, `precept_patterns`, etc. — authoritative DSL/catalog reference. Use these instead of guessing about diagnostic codes or syntax.
+- `precept_compile`, `precept_diagnostic`, `precept_syntax`, `precept_patterns`, etc. — a report on what the compiler and catalogs do today. Use them instead of guessing about a diagnostic code or a piece of syntax, and never as the answer to what the language should do (§ 8).
 
 ## What you do NOT do
 

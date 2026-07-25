@@ -221,7 +221,7 @@ If a topic has no research, that's the signal — surface a research-shaped gap 
 
 ## Out of scope for this INDEX
 
-Brand and design-system research are filed under `research/brand/` and `research/design-system/` for historical reasons, but **per the `research` skill they belong in `design/brand/research/` and `design/system/research/`** respectively. The audit at [`docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md`](../docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md) flagged 16 files in these folders as systematically uncited; their relocation or archival is owner-judgment work outside Phase 10's scope. This INDEX deliberately doesn't list them.
+Brand and design-system research are filed under `research/brand/` and `research/design-system/`, which is where the `research` skill routes them — those two folders are owned by the brand and visual-system domains rather than by language and architecture work, so this INDEX (which covers language, architecture, philosophy, product, and security research) deliberately doesn't list them. The audit at [`docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md`](../docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md) flagged 16 files in these folders as systematically uncited; whether to cite or archive them is owner-judgment work still open.
 
 ---
 

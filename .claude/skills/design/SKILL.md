@@ -49,7 +49,7 @@ Read these before writing any section of the design. They ground every decision;
 **Always — these three first:**
 - `docs/philosophy.md` — Precept's core commitments. Every section of the design is evaluated against these.
 - `docs/README.md` — the doc landscape and navigation gateway. Know what exists before deciding what to read.
-- `docs/language/README.md` — the language surface: spec, canonical types, grammar, catalog as source of truth. Precept's design decisions are language decisions; this is the primary substance.
+- `docs/language/README.md` — the language: spec, canonical types, grammar. Precept's design decisions are language decisions; this is the primary substance. The docs here are what a design is measured against — **not** the catalogs, which are incomplete (see `CLAUDE.md § Catalog System`). Catalog-before-code still applies to anything the design ships; a catalog is never evidence that something is complete.
 
 **Then navigate by topic using the README system.**
 
@@ -99,18 +99,20 @@ sources-consulted:
 
 Fill the principle-coverage matrix. Every principle from `docs/language/precept-language-spec.md § 0.1` (eleven principles) is a row. No row may be left blank — if a principle is unaffected, say "N/A" explicitly with a one-line justification. The matrix forces engagement with the full principle set, not a curated subset.
 
+The row labels below are the spec's own names for the eleven principles. If they ever disagree with `§ 0.1`, the spec is right — re-read it and correct this table.
+
 | Principle | Affected? (Y/N) | How served (1 sentence + cite) | Tension (1 sentence or N/A) | Tradeoff (1 sentence or N/A) |
 |---|---|---|---|---|
-| 1. Prevention not detection | | | | |
+| 1. Prevention, not detection | | | | |
 | 2. One file, complete rules | | | | |
-| 3. Determinism | | | | |
+| 3. Deterministic semantics | | | | |
 | 4. Full inspectability | | | | |
 | 5. Keyword-anchored readability | | | | |
-| 6. Governance not validation | | | | |
-| 7. Compile-time totality | | | | |
-| 8. Honesty about approximation | | | | |
+| 6. Explicit domain meaning over primitive convenience | | | | |
+| 7. Compile-time-first static checking | | | | |
+| 8. Approximation honesty | | | | |
 | 9. Mandatory rationale (`because`) | | | | |
-| 10. Static semantic checking | | | | |
+| 10. Totality (every expression evaluates to a result) | | | | |
 | 11. Static completeness (no runtime faults from well-typed programs) | | | | |
 
 Then, for any row marked Affected? = Y with a Tension or Tradeoff that isn't N/A: state the tradeoff being accepted and why it's justified, in 2-3 sentences. See `docs/philosophy.md` for the canonical commitments.
@@ -135,7 +137,7 @@ Which principles or deliberate exclusions in `docs/language/precept-language-spe
 
 [Required when the design touches language surface — new token, keyword, construct, modifier, type, operator, accessor, or expression form. Omit with an explicit one-line note for designs that don't touch language surface.]
 
-Precept's primary author is the **domain expert**, not the developer (see `docs/philosophy.md § Who authors a precept` and `docs/language/precept-language-spec.md § 0.7 Authoring Audience`). Language surface decisions must serve that reader. Provide:
+Precept's primary author is the **domain expert**, not the developer (see `docs/philosophy.md § Who authors a precept` and `docs/language/precept-language-spec.md § 0.8 Authoring Audience`). Language surface decisions must serve that reader. Provide:
 
 **Worked example.** A 5-10 line `.precept` snippet a domain expert would actually write using this feature. Plausible domain (financial, lifecycle, regulatory, scheduling, etc.), not a synthetic compiler-test fragment. Show the feature in its intended context, not in isolation.
 
@@ -180,7 +182,7 @@ For constructs that don't introduce expressions, state the binding rule, evaluat
 
 **Proof obligations.** For constructs that introduce new proof obligations, state what the proof engine must establish before the construct is accepted. Cite the ProofRequirement catalog entry the obligation maps to (or note the new entry being added).
 
-**Soundness preservation claim.** Name the specific principles from `docs/language/precept-language-spec.md § 0.1` that this construct could threaten (most often Principles 7, 10, 11 — totality, static semantic checking, static completeness). For each, state in one sentence why the principle continues to hold after this construct ships. Example: "Principle 11 holds because the new construct produces no expression form whose evaluation is undefined; the proof engine discharges divisor safety and bounds before any runtime path is reachable."
+**Soundness preservation claim.** Name the specific principles from `docs/language/precept-language-spec.md § 0.1` that this construct could threaten (most often Principles 7, 10, 11 — compile-time-first static checking, totality, static completeness). For each, state in one sentence why the principle continues to hold after this construct ships. Example: "Principle 11 holds because the new construct produces no expression form whose evaluation is undefined; the proof engine discharges divisor safety and bounds before any runtime path is reachable."
 
 **Reviewer obligation.** A design touching evaluation, proof obligations, or typing without a Semantic Rules section is a BLOCKER. Prose descriptions of behavior without reduction/typing rule notation are CONCERNs for non-trivial cases.
 

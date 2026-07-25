@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Implemented — all catalogs in `src/Precept/`; team review complete (2026-04-25) |
+| Implementation state | Partial — every catalog this document inventories exists in `src/Precept/`, but the set is incomplete against the specification (measured 2026-07-25; see [§ Overview](#overview) and [§ Vision: Metadata for the Entire Language](#vision-metadata-for-the-entire-language)). Last full review of the inventory 2026-04-25. |
 | Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
 
 > **Catalog inventory.** The catalogs describe what the language IS (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements, Outcomes) and how it reports failures (Diagnostics, Faults). One is tooling-adjacent: **SemanticTokenTypes**, which carries visual classification metadata consumed by the TextMate grammar generator and the LSP semantic-tokens handler. The Slice-10 architectural decision (`docs/Working/Archive/language-server-implementation-plan.md:641, 645`) treats SemanticTokenTypes as a first-class catalog rather than a hardcoded TokenMeta → scope mapping. **This document is the canonical inventory; other docs reference catalogs by name, not by count.**
@@ -92,7 +92,9 @@
 
 ## Overview
 
-The catalog system is the **authoritative machine-readable definition of the Precept language.** The catalogs — describing what the language IS, how it reports failures, and (in the tooling-adjacent case) visual classification — form a closed, compiler-enforced registry. This document defines the catalog pattern, the canonical catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
+The catalog system is intended to become the machine-readable definition of the Precept language — a closed, compiler-enforced registry of catalogs describing what the language IS, how it reports failures, and (in the tooling-adjacent case) visual classification. This document defines the catalog pattern, the canonical catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
+
+**It is not that yet.** As of 2026-07-25 the catalogs do not hold everything the specification requires — the measured gaps are listed in [§ Vision: Metadata for the Entire Language](#vision-metadata-for-the-entire-language) below. Until that closes, the canonical documents are what completeness is measured against, and a catalog that disagrees with a canonical doc has drifted rather than the doc being wrong. Catalog-before-code still stands; it is the discipline that closes the gap. See `CLAUDE.md` § Catalog System.
 
 ## Vision: Metadata for the Entire Language
 
@@ -111,7 +113,7 @@ Every consumer reads from these catalogs:
 | LS semantic tokens | `TokenMeta.VisualCategory` → `SemanticTokenTypeMeta.CustomType` |
 | Type checker | Modifier applicability, function signatures, operation legality |
 | Parser (outcome dispatch) | `Outcomes.ByLeadingToken`, `OutcomeMeta.ArgumentKind` |
-| AI grounding | All catalogs — complete language knowledge |
+| AI grounding | All catalogs — as much of the language as has been catalogued so far, which is not yet all of it |
 | Reference docs | All 12 language definition catalogs |
 
 No consumer maintains its own parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface. The compiler refuses to build if any member is missing metadata.
@@ -120,7 +122,9 @@ No consumer maintains its own parallel copy. Adding a language feature to an enu
 
 > If something is part of the Precept language, it gets cataloged.
 
-The test: **if I enumerated every catalog's `All` property, would I have a complete description of Precept?** The catalogs needed are those whose union covers the entire language surface.
+The test: **if I enumerated every catalog's `All` property, would I have a complete description of Precept?** The catalogs needed are those whose union covers the entire language.
+
+As of 2026-07-25 the answer to that test is no — this is the principle the work is aimed at, not a description of where the catalogs stand. The gaps measured so far are listed in [§ Vision: Metadata for the Entire Language](#vision-metadata-for-the-entire-language).
 
 Fifteen catalogs in three groups (12 language-definition + 2 failure-mode + 1 tooling-adjacent).
 
@@ -1233,7 +1237,7 @@ public static class SyntaxReference
 | MCP `precept_syntax` | Serializes to a `syntaxReference` JSON object in the response |
 | Human reference docs | Generates a "Grammar Basics" section from the same properties |
 | LS hover | Tooltip text for identifier tokens, comment tokens, etc. |
-| AI grounding | Reads alongside catalog data for complete language understanding |
+| AI grounding | Reads alongside catalog data; the canonical docs remain the measure of what the language contains |
 
 This is not a catalog — there is no enum, no `GetMeta()`, no `All`. It is structured metadata about the grammar as a whole, derived from the same codebase. No hand-written docs page that drifts from the implementation.
 

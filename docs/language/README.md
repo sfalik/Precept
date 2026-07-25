@@ -16,7 +16,7 @@ Documents defining the Precept DSL surface — what the language looks like to a
 
 | Document | Purpose | Status |
 |----------|---------|--------|
-| [precept-language-spec.md](precept-language-spec.md) | Formal language specification (v2). Grows incrementally as each compiler stage locks decisions. Sections: §1 Lexer, §2 Parser, §3 Name Binding and Type Checker. | Incremental |
+| [precept-language-spec.md](precept-language-spec.md) | Formal language specification (v2). Grows incrementally as each compiler stage locks decisions. Sections: § 0 Preamble, § 1 Lexer, § 2 Parser, § 3 Name Binding and Type Checking, § 3A Language Semantics, § 4 Graph Analyzer, § 5 Proof Engine. | Incremental |
 | [precept-language-vision.md](../archive/language-design/precept-language-vision.md) | **Archived.** Former target language surface — superseded by the spec. | Archived |
 | [primitive-types.md](primitive-types.md) | Canonical reference for `string`, `integer`, `decimal`, `number`, `boolean`, `choice`. Owns numeric lane rules, conversion map, constraints, and built-in functions. | Active |
 | [temporal-type-system.md](temporal-type-system.md) | NodaTime-aligned temporal types (`date`, `time`, `datetime`, `instant`, `period`, `duration`, `timezone`, `zoneddatetime`). Typed constants, operators, and bridge functions. | Draft — [Issue #107](https://github.com/sfalik/Precept/issues/107) |
@@ -42,4 +42,4 @@ Documents defining the Precept DSL surface — what the language looks like to a
 
 - **Catalog discipline.** Every language element (token, type, operator, modifier, action, construct, expression form, accessor, constraint, proof requirement, outcome) gets a catalog entry first. The [!IMPORTANT] callout at the top of this README enumerates the questions to answer. Pipeline code derives from catalogs; it never re-encodes language knowledge.
 - **Authoring audience.** The primary author of `.precept` is the **domain expert**, not the developer. See [`philosophy.md § Who authors a precept`](../philosophy.md). This constrains keyword choices, error message wording, modifier surface complexity, and which expressions are allowed at the surface.
-- **Approximation honesty.** Every type doc states the type family's stance on approximation — exact, admits approximation in cases X/Y, or approximate-by-design. See the Approximation Stance sections in the type docs (Phase 3 of the corpus improvement plan adds these uniformly).
+- **Approximation honesty.** Every type doc states the type family's stance on approximation — exact, admits approximation in cases X/Y, or approximate-by-design. See the Approximation Stance sections in the type docs.

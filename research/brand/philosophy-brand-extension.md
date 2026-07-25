@@ -5,8 +5,8 @@
 **Scope:** Extension to `philosophy-rewrite-brand-impact.md` based on the expanded analog landscape, sample rebalancing, and the possibility of stateless / data-only precepts
 
 **Inputs read:**
-- `design/brand/research/philosophy-rewrite-brand-impact.md`
-- `design/brand/research/data-vs-state-philosophy.md`
+- `research/brand/philosophy-rewrite-brand-impact.md`
+- `research/brand/data-vs-state-philosophy.md`
 - `design/brand/brand-decisions.md`
 
 ---

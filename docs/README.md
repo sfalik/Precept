@@ -6,16 +6,16 @@ Design documents for the Precept compiler pipeline, language surface, runtime AP
 
 **[`philosophy.md`](philosophy.md)** — Precept's core commitments. Read before any design decision. Every other doc in this tree is evaluated against it.
 
-**[`language/README.md`](language/README.md)** — the language surface. Precept's design decisions are language decisions. Grammar, spec, canonical types, and catalog as source of truth all live here.
+**[`language/README.md`](language/README.md)** — the language surface. Precept's design decisions are language decisions. Grammar, spec, canonical types, and the catalog system all live here. The canonical documents in this tree — not the catalogs, and not what the compiler currently accepts — are what completeness is measured against; see [`CLAUDE.md` § Catalog System](../CLAUDE.md) for the measured gaps and what closes them.
 
-**First time in this codebase?** Read [`agent-onboarding.md`](agent-onboarding.md) once — the five organizing concepts (catalogs as language spec, the pipeline → Compilation → Precept chain, lifecycle-driven design, pointer-philosophy + doc-sync, required reads vs context-on-demand). Short orientation; everything else assumes you have it.
+**First time in this codebase?** Read [`agent-onboarding.md`](agent-onboarding.md) once — the five organizing concepts (catalogs as the intended machine-readable form of the language spec, the pipeline → Compilation → Precept chain, lifecycle-driven design, pointer-philosophy + doc-sync, required reads vs context-on-demand). Short orientation; everything else assumes you have it.
 
 ## Structure
 
 | Area | Entry point | What it covers |
 |------|-------------|----------------|
 | Philosophy | [`philosophy.md`](philosophy.md) | Core commitments — prevention, determinism, honesty about approximation, governance model |
-| **Language surface** | **[`language/README.md`](language/README.md)** | **Grammar, formal spec, canonical type system, catalog as source of truth — the primary substance** |
+| **Language surface** | **[`language/README.md`](language/README.md)** | **Grammar, formal spec, canonical type system, catalog system — the primary substance, and what completeness is measured against** |
 | Architecture overview | [`compiler-and-runtime-design.md`](compiler-and-runtime-design.md) | Full pipeline + runtime surfaces; read before any pipeline or architecture work. §1 is where *what Precept guarantees and how it's delivered end-to-end* (the prove-or-reject walk from fault-prone site to committed guarantee) is told. |
 | Compiler pipeline | [`compiler/README.md`](compiler/README.md) | Stage docs (lexer → parser → type checker → graph analyzer → proof engine), diagnostic system, literal system |
 | Runtime API | [`runtime/README.md`](runtime/README.md) | Public API, result types, fault system, Evaluator, Precept Builder |

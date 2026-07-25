@@ -8,10 +8,10 @@ Precept is a domain integrity engine for .NET — a DSL runtime that governs how
 |-----------|------|---------|
 | Core runtime | `src/Precept/` | Lexer → parser → type checker → graph analyzer → proof engine → runtime evaluator |
 | Language server | `tools/Precept.LanguageServer/` | LSP: diagnostics, completions, hover, go-to-definition, semantic tokens, preview |
-| MCP server | `tools/Precept.Mcp/` | 5 MCP tools wrapping core APIs (see below) |
+| MCP server | `tools/Precept.Mcp/` | MCP tools wrapping core APIs (see below) |
 | VS Code extension | `tools/Precept.VsCode/` | Extension host: syntax highlighting, preview webview, commands |
 | Copilot plugin | `tools/Precept.Plugin/` | Agent definition + 2 skills + MCP launcher |
-| Sample files | `samples/` | 20 `.precept` files — canonical DSL usage examples |
+| Sample files | `samples/` | `.precept` files — illustrative examples, never a measure of coverage |
 
 Key design docs: `docs/philosophy.md` (product philosophy), `docs/language/precept-language-spec.md` (DSL semantics), `docs/runtime/runtime-api.md` (C# API), `docs/language/catalog-system.md` (metadata registries). See `docs/` for the full set.
 
@@ -42,7 +42,7 @@ dotnet build
 # Build language server only (default build task — Ctrl+Shift+B)
 dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server
 
-# Run all tests (xUnit + FluentAssertions, ~2000 tests across 3 projects)
+# Run all tests (xUnit + FluentAssertions, five test projects)
 dotnet test
 
 # Run a single test project
@@ -56,7 +56,7 @@ npm run watch          # Watch mode
 npm run loop:local     # Package + install locally (also a VS Code task)
 ```
 
-**VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `plugin: sync payload`.
+**VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `agents: build`, `plugin: sync payload`, `iso4217: refresh`, `grammar: regenerate`.
 
 ## Development Workflow
 
@@ -78,7 +78,7 @@ Use `.github/agents/` and `.github/skills/` as the workspace-native customizatio
 For issue-based implementation work:
 
 - Read `CONTRIBUTING.md` before starting and treat it as the canonical workflow for issue work.
-- Open or reuse the linked **draft PR** immediately and treat it as the execution hub for the issue.
+- **This is currently a spike branch and the pull-request process is not in use.** Commits land directly on the branch and the plan document is where work is tracked. See `CONTRIBUTING.md` § Spike Workflow. The rest of this section describes the process that resumes when the spike closes out.
 - Use the exact PR-body structure required by `CONTRIBUTING.md` and the repository PR template: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, and `## Implementation Plan`.
 - Keep the `## Summary` and `## Why` sections current so reviewers can see what changed and why without reconstructing it from the diff.
 - **Design review gate:** No implementation plan is authored until the design review ceremony completes with owner sign-off. The `## Implementation Plan` section says \"Pending design review\" until the gate clears. For Track B proposals (those introducing a new canonical design doc), all inline PR review comments on the design doc must also be resolved. See `CONTRIBUTING.md` § 3. Design Review for full Track A / Track B details.
@@ -100,6 +100,8 @@ The tools cover areas including (but not limited to):
 - **Runtime execution** — inspect, fire events, update fields for step-by-step tracing (when available)
 
 Start with MCP tools for authoritative data, then read source code only for implementation details the tools don't cover.
+
+**One exception, while the compiler is being aligned to the spec: its proof results are not trustworthy.** That means `precept_proofs`, and the proof obligations in `precept_compile`'s output. The proof engine is incomplete, and in at least one confirmed case reports a proof for something false — `field Bal as decimal nonnegative max 100` compiles clean and marks its interval obligation **Proved** while reporting the declared bound as `[−∞ .. 100]`, so `nonnegative` contributes nothing and a single event drives the value to −10. Syntax, types, patterns and diagnostics are unaffected; the tools remain the right thing to ask about those.
 
 ## DSL Sample Files (.precept)
 

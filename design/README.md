@@ -41,12 +41,13 @@ Quick rule:
 
 Research belongs with the domain that owns the decision.
 
-- Brand research goes in `design/brand/research/`.
-- Brand precedent and source captures go in `design/brand/references/`.
+- Brand research goes in `research/brand/`.
 - Critiques of specific brand artifacts go in `design/brand/reviews/`.
-- Design-system and UX research goes in `design/system/research/`.
-- Design-system precedent and source captures go in `design/system/references/`.
-- Critiques of specific system artifacts or surface drafts go in `design/system/reviews/`.
+- Design-system and UX research goes in `research/design-system/`.
+- Design-system precedent and source captures go in `research/design-system/references/`.
+- Critiques of specific system artifacts or surface drafts go in `research/design-system/reviews/`.
+
+The `research` skill owns this routing for the two research folders — see `.claude/skills/research/SKILL.md` § folder discipline.
 
 Use this distinction consistently:
 
