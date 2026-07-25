@@ -349,7 +349,7 @@ public enum DiagnosticCode
     /// have empty intersection on at least one shared field; e.g.
     /// <c>rule X &gt; 10</c> + <c>rule X &lt;= 5</c>. The conjunction of the
     /// two rules governs the empty set. Emitted as a Warning on the second
-    /// rule with the first carried as the related-rule witness.
+    /// rule with the first carried as the related-rule counterexample.
     /// </summary>
     ContradictoryRule = 155,
 

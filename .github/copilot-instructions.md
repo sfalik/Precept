@@ -19,7 +19,9 @@ Key design docs: `docs/philosophy.md` (product philosophy), `docs/language/prece
 
 Precept uses a **metadata-driven architecture.** Domain knowledge is declared as structured metadata in catalogs. Pipeline stages are generic machinery that reads it. This is not the traditional compiler model — it is the inverse.
 
-In traditional compilers (Roslyn, GCC, TypeScript), domain knowledge is scattered across pipeline stage implementations and enums are internal classification axes. In Precept, **catalogs are the language specification in machine-readable form.** Pipeline stages, tooling, and consumers derive from catalog metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
+In traditional compilers (Roslyn, GCC, TypeScript), domain knowledge is scattered across pipeline stage implementations and enums are internal classification axes. In Precept the goal is the inverse: **catalogs become the language specification in machine-readable form**, with pipeline stages, tooling, and consumers deriving from catalog metadata rather than maintaining parallel copies or encoding domain knowledge in their own logic.
+
+**The catalogs are not complete yet and must not be worked as though they were.** Measured 2026-07-25: several things the specification requires have no catalog entry at all, and `precept-language-spec.md:1992` says so in the spec's own voice. Where a catalog and a canonical document disagree, the document is right and the catalog has drifted. Never cite a catalog as evidence that something is complete, and never scope work by what it happens to declare. Adding to the catalog first still stands — that is the discipline that closes the gap.
 
 When making design decisions, reason from language surface outward:
 

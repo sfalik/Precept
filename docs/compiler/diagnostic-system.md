@@ -179,7 +179,7 @@ Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is sm
 
 **Severity has two axes — fault-prevention obligations and structural soundness — and within each, provable defects block while advisory notes report.**
 
-**Fault-prevention obligations block, with a three-way verdict.** A fault-prone operation (division, overflow, non-negative, out-of-range, bounded write) carries a *containment obligation* whose verdict is one of three: *proven* (discharged, no diagnostic), *proven-violating* (`Severity.Error`, rejected, carries a concrete witness), or *unresolved* (`Severity.Error`, rejected, carries the weakest precondition that would discharge it). **Both non-proven verdicts block** — under prevention, a reachable operation the definition left with no authored disposition is a defect, not a "might be broken" warning (spec §0.6 proof philosophy #2/#5). So `DivisionByZero`, `OutOfRange`, `NumericOverflow`, `SqrtOfNegative`, `LengthBoundViolation`, and `CountBoundViolation` are `Severity.Error` and make `HasErrors == true`, so no engine is produced. This tracks the spec's own verb asymmetry (§0.6/§0.7): an *assignment-range impossibility* "is a compile-time **error**" and a divisor/overflow/non-negative obligation "**rejects the definition**."
+**Fault-prevention obligations block, with a three-way verdict.** A fault-prone operation (division, overflow, non-negative, out-of-range, bounded write) carries a *containment obligation* whose verdict is one of three: *proven* (discharged, no diagnostic), *proven-violating* (`Severity.Error`, rejected, carries a concrete counterexample), or *unresolved* (`Severity.Error`, rejected, carries the weakest precondition that would discharge it). **Both non-proven verdicts block** — under prevention, a reachable operation the definition left with no authored disposition is a defect, not a "might be broken" warning (spec §0.6 proof philosophy #2/#5). So `DivisionByZero`, `OutOfRange`, `NumericOverflow`, `SqrtOfNegative`, `LengthBoundViolation`, and `CountBoundViolation` are `Severity.Error` and make `HasErrors == true`, so no engine is produced. This tracks the spec's own verb asymmetry (§0.6/§0.7): an *assignment-range impossibility* "is a compile-time **error**" and a divisor/overflow/non-negative obligation "**rejects the definition**."
 
 **Structural-soundness diagnostics split by whether the philosophy proves the defect impossible.** Two sub-families **block** (`Severity.Error`):
 
@@ -786,7 +786,7 @@ The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarant
 
 ## Open Questions / Implementation Notes
 
-- **D5 coupling (proof attribution schema):** If proof results require richer structured output (expression trees, interval ranges, witness values), the proof stage may need a way to link diagnostics to proof-model entries. Deferred until proof engine design.
+- **D5 coupling (proof attribution schema):** If proof results require richer structured output (expression trees, interval ranges, counterexample values), the proof stage may need a way to link diagnostics to proof-model entries. Deferred until proof engine design.
 > **✅ Resolved (CC#20) — Diagnostic Related Spans**
 > `Diagnostic` carries `ImmutableArray<RelatedSpan> RelatedSpans { get; init; } = ImmutableArray<RelatedSpan>.Empty;`. The additive init-only property keeps every existing `Diagnostics.Create(...)` call site compiling unchanged while giving pipeline stages a first-class place to attach secondary source locations and per-location messages.
 > *Resolved: 2026-05-06 — CC#20*
@@ -825,7 +825,7 @@ The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarant
 | Component alignment inventory (edges E19–E23, E49) | `docs/ComponentAlignmentInventory.md` |
 | 3-tier catalog prototype context | `docs/CatalogInfrastructureDesign.md` |
 | Decisions answered | D4 (diagnostic attribution structure) |
-| Survey references | `diagnostic-and-output-design-survey`, `proof-attribution-witness-design-survey` |
+| Survey references | `diagnostic-and-output-design-survey`, `proof-attribution-counterexample-design-survey` |
 | Lexer (Lex-stage diagnostics) | `docs/compiler/lexer.md` |
 | Parser (Parse-stage diagnostics) | `docs/compiler/parser.md` |
 | Type checker (Type-stage diagnostics) | `docs/compiler/type-checker.md` |

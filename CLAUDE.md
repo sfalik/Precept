@@ -78,9 +78,7 @@ If a doc says "Implemented" but the code disagrees, that's drift — fix the doc
 
 ### Research
 
-`research/` houses evidence and precedent that grounds the design decisions in `docs/`. Always check before fresh investigation — much of the comparator and feasibility work is already done. Subfolders: `language/`, `architecture/`, `philosophy/`, `product/`, `security/`, `archive/`.
-
-Brand research lives in `design/brand/research/`; UX/design-system research in `design/system/research/`.
+`research/` houses evidence and precedent that grounds the design decisions in `docs/`. Always check before fresh investigation — much of the comparator and feasibility work is already done. Subfolders: `language/`, `architecture/`, `philosophy/`, `product/`, `security/`, `brand/`, `design-system/`, `references/`, `archive/`.
 
 **Use the `/research` skill for new investigations** — it enforces folder discipline, citation requirements, and the promote-or-cite rule. See `research/README.md` for the canonical map.
 
@@ -303,7 +301,7 @@ dotnet build
 # Build language server only (default build task — Ctrl+Shift+B)
 dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server
 
-# Run all tests (xUnit + FluentAssertions, ~3600 tests across 4 projects)
+# Run all tests (xUnit + FluentAssertions, five test projects)
 dotnet test
 
 # Run a single test project
@@ -318,7 +316,7 @@ npm run watch          # Watch mode
 npm run loop:local     # Package + install locally (also a VS Code task)
 ```
 
-**VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `plugin: sync payload`.
+**VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `agents: build`, `plugin: sync payload`, `iso4217: refresh`, `grammar: regenerate`.
 
 ## Development Workflow
 
@@ -348,12 +346,15 @@ The MCP server tools in `tools/Precept.Mcp/Tools/` are **thin wrappers** around 
 
 ## Issue Implementation Workflow
 
-Read `CONTRIBUTING.md` for the full workflow. The rules that matter most:
+**We are on a spike branch, and the pull-request process is not in use.** No pull request has been opened, no commit has carried `Closes #N`, and CI has not run on this branch since 2026-05-12. Do not open one. The `/execute` skill refuses to on a `spike/*` branch.
 
-- Open the draft PR immediately; it's the execution hub. Body structure: `## Summary`, `## Linked Issue` (`Closes #N`), `## Why`, `## Implementation Plan`.
-- **Design review gate.** `## Implementation Plan` stays "Pending design review" until the review ceremony completes with owner sign-off. Track B (introducing a new canonical design doc) also requires all inline review comments on the design doc resolved. See `CONTRIBUTING.md` § 3 for full Track A / Track B details.
-- Work in vertical slices — commit, push, and update the PR-body summary/checklist after each.
-- The PR body **is** the implementation plan. Never create a separate implementation-plan markdown file.
+What applies instead:
+
+- **Commits land directly on the branch.** The plan document is where work is tracked — not a pull-request body, and never a separate implementation-plan markdown file.
+- **Work in vertical slices**, updating the plan document's summary and checklist after each.
+- **The design review gate still applies.** A plan section stays "Pending design review" until the review completes with owner sign-off.
+
+`CONTRIBUTING.md` § Spike Workflow has the detail, and § 3 has the full pull-request process for when the spike closes out and it resumes.
 
 ## DSL Sample Files (.precept)
 

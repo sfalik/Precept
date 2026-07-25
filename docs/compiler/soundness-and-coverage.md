@@ -13,7 +13,7 @@
 > [!NOTE]
 > **This is a skeleton.** Headings and one-line intents are laid down here so each implementation
 > slice fills its own section. It is the canonical home for how the prove-or-reject guarantee is made
-> sound: the certificate format, the witness, the deferred independent re-checker, and the coverage of
+> sound: the certificate format, the counterexample, the deferred independent re-checker, and the coverage of
 > the known fail-open holes. It cross-cuts the proof engine, graph analyzer, type checker, and fault
 > correspondence.
 
@@ -30,7 +30,7 @@
 
 > **Maturity — Design (skeleton); mechanism designed, not yet implemented (filled per slice).**
 > Part A is *how a single verdict is produced and made sound*: the soundness model and its rationale
-> (§1), the three-way verdict (§2), the witness a violating verdict carries (§4), and the certificate
+> (§1), the three-way verdict (§2), the counterexample a violating verdict carries (§4), and the certificate
 > format (§5). Section numbers are stable cross-reference anchors — external docs cite them (e.g.
 > `proof-engine.md` → §5b) — so a section keeps its number even where a Part groups it out of numeric order.
 
@@ -102,19 +102,19 @@ the ratified reasoning this subsection promotes to canon.
 
 ## 2. The three-way verdict
 
-*(Intent — fill per slice.)* The `ProofVerdict` discriminated union — `Proven` / `ProvenViolating(witness)`
+*(Intent — fill per slice.)* The `ProofVerdict` discriminated union — `Proven` / `ProvenViolating(counterexample)`
 / `Unresolved(condition)` — each case carrying only its own evidence. Both non-proven cases are
 `Severity.Error` and reject. Cross-reference: `proof-engine.md` §13 (prove-or-reject MVP), and the
 severity model in `diagnostic-system.md`.
 
 ---
 
-## 4. The witness (§4a)
+## 4. The counterexample (§4a)
 
-*(Intent — fill per slice.)* A `ProvenViolating` verdict carries a **witness**: one concrete configuration
+*(Intent — fill per slice.)* A `ProvenViolating` verdict carries a **counterexample**: one concrete configuration
 that is re-evaluated against every collected fact and actually violates. The mandatory validation gate —
 an unvalidated corner demotes to `Unresolved`, never presented as a proven violation. The per-family
-witness grid (value witness / configuration witness / category-mismatch N/A) and the point-binding
+counterexample grid (value counterexample / configuration counterexample / category-mismatch N/A) and the point-binding
 limits (field leaves in the MVP; arg/element leaves demote to `Unresolved` until case-by-case narrowing
 lands).
 

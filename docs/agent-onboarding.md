@@ -22,9 +22,11 @@ Precept is a **domain integrity engine** for .NET — a DSL runtime that governs
 
 Every doc in the corpus is structured around one or more of these. If you understand these five, the rest of the corpus has a place to land.
 
-### Concept 1: Catalogs as the language spec in machine-readable form
+### Concept 1: Catalogs as the intended machine-readable form of the language spec
 
-Precept is **metadata-driven**. Every language element — tokens, types, operators, modifiers, actions, constructs, expression forms, constraints, proof requirements, diagnostics, faults, semantic-token categories — is declared as a structured catalog entry. The catalogs together ARE the language specification; they are not commentary about it.
+Precept is **metadata-driven**. Every language element — tokens, types, operators, modifiers, actions, constructs, expression forms, constraints, proof requirements, diagnostics, faults, semantic-token categories — is declared as a structured catalog entry. The goal is that the catalogs together become the language specification in machine-readable form rather than commentary about it.
+
+**They are not that yet.** Measured 2026-07-25: the `CertificateSteps` catalog that `precept-language-spec.md:225` makes a condition of a proof strategy being admissible does not exist at all; `ProofRequirementKind` has thirteen members and neither establishment nor preservation is among them; and `precept-language-spec.md:1992` states in the spec's own voice that five of the places data can change have no catalog entry. So: the canonical docs win where they disagree with a catalog, never cite a catalog as evidence that something is complete, and never scope work by what the catalogs happen to declare. See `CLAUDE.md` § Catalog System, which records what ends this.
 
 **Implication for agents:** When you add a new language feature, the catalog entry comes first. The parser, type checker, language server, MCP server, TextMate grammar generator, and docs all **derive** from catalog metadata. You never maintain parallel knowledge in pipeline code.
 

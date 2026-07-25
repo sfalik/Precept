@@ -96,7 +96,9 @@ The catalog system is the **authoritative machine-readable definition of the Pre
 
 ## Vision: Metadata for the Entire Language
 
-Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, outcome forms, diagnostics, faults, and visual classification — is defined as structured metadata in a static, compiler-enforced catalog. Fifteen catalogs cover the complete language surface (twelve language-definition + two failure-mode + one tooling-adjacent). Their union IS the language specification in machine-readable form.
+Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, outcome forms, diagnostics, faults, and visual classification — is defined as structured metadata in a static, compiler-enforced catalog. Fifteen catalogs cover the language (twelve language-definition + two failure-mode + one tooling-adjacent). The goal is that their union becomes the language specification in machine-readable form.
+
+**This section is the vision, not the current state.** As of 2026-07-25 the catalogs do not yet hold everything the specification requires — `precept-language-spec.md:1992` says so in the spec's own voice about the write list, the `CertificateSteps` catalog named at `:225` does not exist, and `ProofRequirementKind` carries no establishment or preservation member. Until that closes, the canonical documents are what completeness is measured against. See `CLAUDE.md` § Catalog System.
 
 Every consumer reads from these catalogs:
 
@@ -1276,7 +1278,7 @@ These are enabled by the catalog system but not part of the initial implementati
 
 ## Test Strategy
 
-Catalogs are the language specification in machine-readable form. Tests verify that the specification is correct, complete, and that all generated artifacts match.
+Tests verify that every member a catalog declares carries complete metadata, and that all generated artifacts match. Note what that does and does not establish: these tests quantify over the members that exist, so they cannot detect something the specification requires that was never added to a catalog at all. Completeness against the specification is measured by reading the canonical documents, not by these tests passing.
 
 ### Non-negotiable rules
 
