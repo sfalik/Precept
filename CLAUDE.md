@@ -17,7 +17,11 @@ Precept is a domain integrity engine for .NET — a DSL runtime that governs how
 
 Write plain engineering prose in every document, report and agent brief. Not simplified — plain. Expand an idea rather than compressing it into a term nobody outside this project would recognise.
 
-Do not use: *denominator, source of truth (as a noun phrase), load-bearing, lens, surface (on its own), signal (meaning evidence), anchor, witness, orthogonal, spine, harness, the ask* — or any coined phrase that would need a glossary. Say the actual thing instead. Not "the canonical docs are the denominator" but "we measure completeness against the canonical docs, and nothing else." Not "this claim is load-bearing" but "if this is wrong, everything after it is wrong."
+Do not use: *source of truth (as a noun phrase), load-bearing, lens, surface (on its own), signal (meaning evidence), orthogonal, spine, harness, the ask, arm (of a switch or procedure)* — or any coined phrase that would need a glossary. Say the actual thing instead. Not "this claim is load-bearing" but "if this is wrong, everything after it is wrong." Not "the non-linear arm" but "the case that handles multiplying two variables."
+
+**`denominator`** is correct in its arithmetic sense — the bottom of a fraction, the divisor unit in `quantity in 'kg/hour'`, the unit a price divides by. Never use it to mean the thing we measure against: write "we measure completeness against the canonical docs, and nothing else."
+
+**`witness`** is being retired. What a proof produces to demonstrate a violation is a **counterexample**. Use that everywhere, including where the spec still says witness.
 
 **This rule travels.** A writing rule that lives only in a skill binds the document being authored and nothing else. Copy it verbatim into every sub-agent and workflow prompt, or the vocabulary comes straight back in through them.
 
