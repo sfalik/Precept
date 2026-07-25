@@ -92,6 +92,24 @@ stale 07-13 snapshot with a ⚠ header; the per-fork stamps below it are current
 **Locked designs (do not build against — they carry their own status):**
 - `presence-tolerant-message-rendering-2026-07-23.md` — refuse uniformly, **Locked 2026-07-24**, promoted (`63e4faeb`).
 
+**Rework pass 1 ran 2026-07-24 — both docs substantially reworked (uncommitted), still `Draft`,
+still NOT ready to re-lock.** Genuinely closed: the quantifier moved off *handlers* onto governed
+operation occasions (state-action writes, the update patch and the editable door are now in scope —
+verified live: an entry-action write on the initial state under `max 1000` rejects with no event
+handler in the file); creation treated as governed per canon; `Restore` correctly excluded from
+preservation while kept as a writer for fact-survival; the unsettled entry-actions-at-construction
+question honoured *without* settling it (construction carries a plan set — one member with entry
+actions, one without — and the obligation must discharge over both); the collapse arithmetic
+(nine fault kinds) verified against `ProofRequirementKind.cs`.
+**Still open — the blocker:** the new `Owes` rule has no constraint-kind term, so a residency
+ensure (`in S ensure …`) would mint preservation on rows that never enter `S`. Adversarial review
+reports that over-rejects a majority of the corpus (64 of 78 sample files carry `in S ensure`)
+*and* fires the internal "compiler defect" diagnostic on them, because the completeness check is
+set equality. Plus: a spurious construction term in residency establishment; the weakest
+precondition still not total (four writer categories have no action kind); unpinned intra-firing
+order for multi-target writes; and a set of citation/bookkeeping errors that disagree across the
+pair. Pass 2 required before re-lock.
+
 **Unlocked / in rework (NOT landed — do not build against):**
 - `obligation-linkage-and-completeness-2026-07-23.md` — **UNLOCKED (Draft)**. Was locked for
   a few hours 2026-07-23, then re-opened by adversarial review. Recorded defects: the
