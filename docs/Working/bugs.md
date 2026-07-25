@@ -27,6 +27,83 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-066: A computed field may be declared over a non-configuration expression (`<- now()`), and nothing rejects it
+
+- **Discovered**: 2026-07-24, adversarial review of the establishment/preservation weakest-precondition work. **Confirmed at HEAD via a direct `Compiler.Compile` harness.**
+- **Affected**: computed-field (`<-`) declarations; determinism; any analysis keyed on a computed field's stored-field dependency set.
+- **Symptom**: compiles clean, zero errors:
+  ```precept
+  precept ComputedImpure
+  field Label as string default "x"
+  field ObservedAt as instant <- now()
+  ```
+- **Why it is a bug**: `precept-language-spec.md:1354` says a computed expression "is derived from the **final configuration**" — `now()` is not a function of the configuration. § 0.4 property 6 (`:170`) states expressions "cannot … observe anything outside their evaluation context (current field values and event arguments)". And recomputation runs in *every* operation (`:1985`), so the same data yields a different value on every operation — against the determinism commitment in `docs/philosophy.md`. Note `now()` is a legitimate function (`:1597`) in an *action* right-hand side, where it is evaluated once and stored; the defect is specific to `<-` position.
+- **Proof-engine consequence** (why this is not merely cosmetic): the field's stored-field dependency set is **empty**, so a mention-set walk that maps constraints onto their stored inputs finds no write site and mints no preservation obligation — while the value changes under every operation. Any constraint mentioning such a field is silently unguarded.
+- **Caveat / possible ruling needed**: the computed-expression scope row at `:1351` constrains *field names*, and does not explicitly say which function calls are admissible in `<-` position. So this may be a spec gap to rule rather than a pure implementation defect — but the current behaviour (silent accept) is wrong under either resolution.
+- **Fix complexity**: small if ruled disallowed (reject non-configuration calls in `<-`); design-required if the language wants clock-derived computed fields.
+- **Priority**: quality bar — raised by the proof-engine consequence above.
+
+### BUG-065: A computed field's expression may reference an event argument
+
+- **Discovered**: 2026-07-24, building witnesses for the establishment/preservation weakest-precondition work. **Confirmed at HEAD via a direct `Compiler.Compile` harness.**
+- **Affected**: computed-field (`<-`) declarations; any analysis that assumes a computed expression bottoms out in stored fields.
+- **Symptom**: compiles clean, zero errors:
+  ```precept
+  precept ComputedArgRef
+  field A as integer default 1
+  field K as integer <- Bump.NewA + A
+  event Bump(NewA as integer)
+  on Bump
+      -> set A = Bump.NewA
+  ```
+- **Why it is a bug**: `precept-language-spec.md:1351` scopes a computed expression to "All field names except those that would form a dependency cycle" — field names, not event arguments. An event argument has no value during any other operation's phase-7 recomputation (`:1985` recomputes in *every* operation, including `Restore`), so the declaration is semantically incoherent outside the one event that supplies the argument.
+- **Root cause** (not traced): no diagnostic exists for it — `DiagnosticCode` carries only `ComputedFieldNotWritable`, `ComputedFieldWithDefault`, and `CircularComputedField` for the computed-field family.
+- **Fix complexity**: small (scope check at computed-expression resolution).
+- **Priority**: quality bar — but it also falsifies "a computed expression's closure terminates in stored fields", which the weakest-precondition design relies on.
+- **Repro**: the snippet above.
+
+### BUG-064: Computed-field write protection is `set`-only — `dequeue … into` and `clear` can target a computed field
+
+- **Discovered**: 2026-07-24, same context as BUG-065. **Confirmed at HEAD via a direct `Compiler.Compile` harness.**
+- **Affected**: `dequeue` / `pop` / `dequeueBy` `into` targets; `clear` on a computed collection field.
+- **Symptom**: both compile clean, zero errors:
+  ```precept
+  field Jobs as queue of integer
+  field Doubled as integer <- Jobs.count * 2
+  on Take when Jobs.count > 0
+      -> dequeue Jobs into Doubled
+  ```
+  ```precept
+  field Source as list of string
+  field Mirror as list of string <- Source
+  on Reset when Mirror.count > 0
+      -> clear Mirror
+  ```
+  The `set` spelling is correctly refused: `-> set Derived = 99` yields `ComputedFieldNotWritable` (Error).
+- **Root cause**: `ComputedFieldNotWritable` is emitted from exactly one action-path site, `TypeChecker.Expressions.Callables.cs:128-132`, inside the assignment resolution branch. The `into`-slot and `clear` paths never reach it. Canon scopes the check the same narrow way — `precept-language-spec.md:1740` lists the trigger as "`set` action targets a computed field".
+- **Why it matters beyond the missing diagnostic**: the matrix's transport rule leans on computed fields being single-writer, citing this `set`-only check as if it closed the whole write surface. It does not.
+- **Fix complexity**: small (apply the check at every write target, driven from the action catalog's target slots rather than per-path).
+- **Priority**: quality bar.
+
+### BUG-063: The `into` slot is not type-checked against the collection's element type
+
+- **Discovered**: 2026-07-24, same context as BUG-064. **Confirmed at HEAD via a direct `Compiler.Compile` harness.**
+- **Affected**: `dequeue` / `pop` / `dequeueBy` with an `into` binding. Same family as BUG-033.
+- **Symptom**: compiles clean, zero errors, despite a `queue of integer` element landing in a `string` field:
+  ```precept
+  precept IntoTypeMismatch
+  field Jobs as queue of integer
+  field Current as string optional
+  event Take()
+  on Take when Jobs.count > 0
+      -> dequeue Jobs into Current
+  ```
+  (`FieldNeverSet` is still warned on `Current` — the BUG-033 symptom that the `into` target is not recognized as a write site.)
+- **Why it is a bug**: `precept-language-spec.md:1708` states "If `into G`, `G` must be type `T`".
+- **Root cause** (partially traced): the `into` target is parsed into `CollectionIntoAction.IntoTarget` (`ParsedAction.cs:47-50`) and name-bound (`NameBinder.cs:557-559`), but no type-compatibility check against the collection's element type was found on that path.
+- **Fix complexity**: small.
+- **Priority**: blocks shipping — this is a silent type hole, not a missing convenience.
+
 ### BUG-062: Currency lookup is case-insensitive, accepting lowercase/mixed-case codes against the uppercase-only rule (D13b)
 
 - **Discovered**: 2026-07-24, promoting the OF6 owner ruling (uppercase-only, `business-domain-types.md § D13b`). **Confirmed at HEAD via a direct `Compiler.Compile` harness.**

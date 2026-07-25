@@ -101,14 +101,56 @@ preservation while kept as a writer for fact-survival; the unsettled entry-actio
 question honoured *without* settling it (construction carries a plan set — one member with entry
 actions, one without — and the obligation must discharge over both); the collapse arithmetic
 (nine fault kinds) verified against `ProofRequirementKind.cs`.
-**Still open — the blocker:** the new `Owes` rule has no constraint-kind term, so a residency
+**Still open after pass 1 — the blocker:** the new `Owes` rule has no constraint-kind term, so a residency
 ensure (`in S ensure …`) would mint preservation on rows that never enter `S`. Adversarial review
 reports that over-rejects a majority of the corpus (64 of 78 sample files carry `in S ensure`)
 *and* fires the internal "compiler defect" diagnostic on them, because the completeness check is
 set equality. Plus: a spurious construction term in residency establishment; the weakest
 precondition still not total (four writer categories have no action kind); unpinned intra-firing
 order for multi-target writes; and a set of citation/bookkeeping errors that disagree across the
-pair. Pass 2 required before re-lock.
+pair.
+
+**Pass 2 ran 2026-07-24 — fixes proposed and adversarially reviewed twice; still NOT ready to re-lock.**
+Findings recorded in `establishment-preservation-pass2-findings-2026-07-24.md` (Draft findings; not a
+design). **Nothing was written into either design doc** — deliberately, since several proposals are
+still on their first or second round and one-pass arguments have never survived here. Summary:
+
+- The proposed fix indexes both obligations by *applicability edges* rather than a site list, which
+  reproduces every matrix constraint-kind row, supplies the transition-moment obligation both docs
+  leave undefined, and makes construction establishment-only. It removes real over-rejection —
+  `crosswalk-signal` and `restaurant-waitlist` are rejected by the current rule at occasions where the
+  constraint does not apply. But round 2 found two **fail-open holes in the occasion domain**
+  (a file with no initial event mints zero establishment; a stateless editable field has no door
+  occasion), left self-loop plan-set membership undefined where it decides a shipped sample
+  (`library-hold-request` rejects under every admissible configuration, and is in no cost table), and
+  showed the route expansion may touch the owner-reserved residency-fact question by the back door.
+- **The editable-door treatment was withdrawn** — it contradicted the ruled ingress-evaluation
+  discharge (matrix `:208`, `:442`) and E/P's own `:585`, and flipped the clean `tax-rate-configuration`
+  sample to rejected, with 35 of 78 files exposed.
+- **One proposal failed outright**: treating a computed field's defining equation as type-structural
+  context. The 2026-07-21 test is "establish *or* invalidate" and recomputation-every-operation is an
+  operation that establishes it; the matrix's own transport rule already calls the fact *earned*.
+- **Four compiler bugs filed** (BUG-063…066), all confirmed at HEAD. BUG-064 matters to the definition:
+  matrix `:355`'s single-writer premise cites a `set`-only check that `dequeue … into` and `clear`
+  both slip past.
+- **Measured**: `CountContainment` produces **zero** obligations corpus-wide (never generated — no
+  field in any sample declares `mincount`/`maxcount`), so Decision 2's held-count rationale is wrong as
+  written; the collection cluster the doc calls "the single largest unmeasured component" is **6 files**
+  while the default-materialization cluster is **54**.
+
+**Pass 2 design-loop ran again 2026-07-25 (Fable author + Opus attackers, 4 rounds, ~100 min) — did NOT converge.**
+`survived: false`. Every round, three of four adversarial angles passed the revision and exactly *one*
+rejected it — a **different corner each round**: round 2 = over-rejection cost (`library-hold-request`);
+round 3 = editable-door preservation not carved to the ruled ingress discharge; round 4 = the
+guarded-establishment corpus scan labelled instead of run; round 5 = editable-door occasion *granularity*.
+Classic enumerate-the-whole-family failure at design time — each fix exposes an un-scanned sibling. Two
+corners stay open: (1) editable-door occasion granularity is a genuine design fork, not a defect; (2) the
+guarded-constraint casualty set (revision 5's own report, **not** re-attacked so treat as unverified: ~8
+guarded rules / 3 files reject at construction, ~69 dormant-flip sites / 18 files mid-life — files clean at
+HEAD). **Recommended next: stop iterating and enumerate once** — one deterministic harness scan over all 78
+files producing the complete guarded/editable/state-anchor casualty set as ground truth, then design against
+a full picture. Nothing written to either doc (correct — design did not survive). Loop artefacts:
+workflow `wf_6d0a4cbf-4f2` journal.
 
 **Unlocked / in rework (NOT landed — do not build against):**
 - `obligation-linkage-and-completeness-2026-07-23.md` — **UNLOCKED (Draft)**. Was locked for
@@ -160,6 +202,29 @@ during Pass 2 — an editorial obligation, not a fork.**
 > of four claimed forks checked this session were already settled (boundary-report #1/#2/#3, and the
 > citation-duty question above). **Route every claimed owner decision through an independent
 > canon-check before it reaches the owner.**
+>
+> **Five of five as of 2026-07-24.** Pass 2 raised "a value fact written by an earlier operation must
+> be admissible as a premise, or `loan-application` rejects" as urgent-for-the-owner. An independent
+> canon-check closed it: the transport rule is explicitly **intra-operation** (matrix `:140`, "the same
+> operation"), premise class (d) reaches declared *constraints* only, the certificate premise vocabulary
+> is closed at eleven kinds with none for cross-operation values, and the 2026-07-21 citation duty makes
+> such a proof unstatable — there is no establishing obligation to name. The rejection is the ruled
+> behaviour of the 2026-07-20 activation-sites ruling, with a licensed two-line respelling (a guard on
+> the entering row) and an honest-absence rewrite already worked and compiled in
+> `compile-time-niche-evidence-legs-2026-06-10.md`. The residency-fact question at `:203` is untouched
+> by that witness — granting it in full still would not entail the ensure.
+
+**New genuine owner items, surfaced 2026-07-24 (both canon-checked before landing here):**
+
+| Item | Why it is genuinely open | Measured stake |
+|---|---|---|
+| **Guard-complement facts** — may a proof consume the complement of an earlier first-match row's guard? | No premise class reaches it, and the classes are owner-ruled (want `:19`). Sound to license: `:1999` evaluates earlier guards false against the same pre-state at phase 2, before any write, and survival is the existing frame-and-kill. | **2 shipped files confirmed by hand** (`crosswalk-signal`; `saas-customer-success` at three occasions); **38 of 78** structural ceiling. Until ruled, every needing file rejects. Now the largest single corpus blocker. |
+| **How to classify the computed-coherence fact** (`K = expr(fields)`) | Fits neither bucket of the 2026-07-21 ruling: as a value-fact its citation duty is unsatisfiable (no family mints an establishing obligation for it); as context it fails the ruling's iff. | Small, obvious safe shape — but it extends an owner ruling against that ruling's own tradeoff clause. |
+
+A third, **self-transition semantics for entry/exit ensures**, is canon-unpinned (`:1074` says the `omit`
+reset *does* apply to a self-transition; `:1884`/`:1885` use the same "any transition into" phrasing for
+`to S ensure` without the parenthetical; `:2202` covers state *actions* only). The design can proceed in
+the refusing direction without a ruling, and a ruling would be a deletion rather than a re-derivation.
 
 **Net: all three ranked "owner questions" are already answered — none gates the rule layer.**
 What remains is authoring work (expensive — the two arguments that held took twelve adversarial
@@ -177,7 +242,11 @@ rounds each), plus two mechanical follow-ups and one sequencing dependency:
 0. **Re-lock the two establishment/preservation designs** (the current blocker) — fix the
    Review-record defects in both, re-run adversarial review, owner sign-off. Until this
    lands, premise class (d) is not safely available and the fault arguments below cannot be
-   authored soundly.
+   authored soundly. **Pass 2 (2026-07-24) did not get there**; its proposals, amendments, refutations,
+   correction list and measurements are in `establishment-preservation-pass2-findings-2026-07-24.md`,
+   whose § What pass 3 must do is the ordered continuation. Two owner items (above) are now on the
+   critical path — the guard-complement ruling in particular, since without it the corpus run has a
+   38-file ceiling of rejections that no amount of design work removes.
 1. **Finish the rule layer** — author the four argument-less kinds (`Numeric`, `Presence`,
    `CountContainment`, `AssignmentQualifier`) + redo the five refuted, **with adversarial
    rounds**.

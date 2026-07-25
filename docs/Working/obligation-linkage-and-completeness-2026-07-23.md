@@ -38,6 +38,37 @@ sources-consulted:
 
 ## Review record
 
+### 2026-07-24 (pass 2) — corrections identified, **nothing written into this document**
+
+Recorded in `establishment-preservation-pass2-findings-2026-07-24.md`. Status stays **Draft**.
+
+Three defects in this document were confirmed at HEAD and must be fixed in pass 3:
+
+- **`:526` is wrong and its doc-update entry is harmful.** The `ProofRequirement` DU carries **thirteen**
+  sealed subtypes, not twelve: `ModifierRequirement` (`src/Precept/Language/ProofRequirement.cs:157`)
+  covers `ProofRequirementKind.Modifier` and simply breaks the `*ProofRequirement` naming convention.
+  `docs/compiler/proof-engine.md:531` is therefore **correct**, and `:834`'s doc-update entry — which
+  orders a "correction" to it — would edit a correct canonical statement into a false one. **Delete that
+  entry.** (A rename to `ModifierProofRequirement` is a legitimate separate cleanup; it is not doc drift.)
+- **`:554`** — `PRECEPT0026` does not enforce one-to-one enum↔DU correspondence; it polices switch-arm
+  completeness over `[CatalogDU]` types. The correspondence is **test**-held
+  (`ProofRequirementCatalogTests`, which asserts a count of 13). The companion carries the same false
+  claim at its `:660`.
+- **`Expected(C)` (`:469`) has no carve-out** for the `maxcount`/`mincount` desugaring exclusion the
+  companion's inventory (`:690`) requires, and the four coupling points at `:819–822` do not list it.
+  As written, the pair fires a false-positive `PRE0166` on **every** `maxcount` file.
+
+Also: § Open questions live item 1 (the admissibility-condition owner question) was independently ruled
+already-answered — `compiler-readiness-STATUS.md:145–157` assigns pass 2 an editorial sharpening, not a
+fork. Delete it rather than carrying it into a re-lock. And the "closed in the first draft" item holding
+that establishment applies to exactly two constraint kinds is what leaves the transition-moment
+obligation defined nowhere in either document; the proposed fix reverses it to four kinds, which must be
+argued rather than silently overwritten.
+
+Unchanged and still owed from the shared section: `Expected(C)` must be re-derived from whatever
+quantifier the companion settles on, not patched; the shared § 6 range should reconcile to the
+companion's "(5)–(7)"; and § 10 exists only in the companion's copy.
+
 ### 2026-07-24 — the three findings worked, and the shared write-site surface incorporated
 
 **Finding 1 is closed by demotion, not by repair.** The review was right that the admissibility condition has no rejection power, and the honest response is to stop claiming it does. § Semantic Rules now states the condition as a *serialization and inspectability contract discharged by construction*, and says in one line that all of this design's rejection power lives in the completeness check (`PRE0166`) and, for the author-facing failure, in the companion design's own verdicts (`PRE0167` / `PRE0168`). Decision 1 is re-stated on the axes where the two encodings actually differ — cross-proof consistency, output size, and replay cost — and its stakes drop from `high` to `medium`. Acceptance criterion 7, which described an unreachable state, is replaced by a serialization criterion that can actually fail.

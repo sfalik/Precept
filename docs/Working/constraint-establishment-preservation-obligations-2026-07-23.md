@@ -38,6 +38,35 @@ sources-consulted:
 
 ## Review record
 
+### 2026-07-24 (pass 2) — fixes proposed for E1/E2/E3 and adversarially reviewed twice; **nothing written into this document**
+
+Recorded in `establishment-preservation-pass2-findings-2026-07-24.md`. Status stays **Draft**. Pass 2
+deliberately left this document untouched: several proposals are still on their first or second
+adversarial round, and the project's measured base rate is that one-pass soundness arguments fall.
+
+Headlines bearing on the defects above. **E1** would be closed by indexing both obligations on
+*applicability edges* rather than a site list — which reproduces every § Constraint kinds row, supplies
+the transition-moment obligation this document leaves defined nowhere, and makes construction
+establishment-only (closing the two-obligations-one-condition defect). It is **not ready**: round 2
+found a file with no initial event mints zero establishment, a stateless editable field has no door
+occasion, and self-loop plan-set membership is undefined exactly where it decides
+`library-hold-request.precept`, which rejects under every admissible configuration and appears in no
+cost table here. **E3** would be closed by walking *firings* with simultaneous multi-target
+substitution plus a composite phase-7 boundary substitution; that pair survived round 2 with four
+soundness-bearing amendments. **E2** stands corrected by measurement rather than argument:
+`CountContainment` produces **zero** obligations corpus-wide, so Decision 2's held-count rationale
+("collapsing replaces a working narrow check with a fail-open") is wrong — a collapse would produce
+refusal, not a fail-open, and the true cost is a lost proving capability.
+
+Corrections owed to this document, all verified at HEAD, are listed in that findings file — including
+`:858` (Decision 5's precedent leg argues the opposite of what it claims), `:778`, `:762`/`:784`/`:936`,
+`:660`, `:631`, `:402`, `:240`, the missing four-leg blocks on Decisions W-2 and W-3, and the
+`soundness-and-coverage.md` doc-update duty being larger than three rows.
+
+Four compiler bugs were filed from witnesses built during this pass: **BUG-063** (`into` slot not
+type-checked), **BUG-064** (computed-field write protection is `set`-only — which is what matrix `:355`'s
+single-writer premise actually rests on), **BUG-065**, **BUG-066**.
+
 ### 2026-07-24 (later) — adversarial review of the rework: E1 **partially closed**, E2 **partially closed**, E3 **not closed**
 
 Status stays **Draft**. The rework is real work and most of its evidence chain holds — every matrix citation was re-checked at rev 11 and resolves verbatim (`:5`, `:53`, `:63`, `:117`, `:122`, `:133`, `:149`, `:172–180`, `:203`, `:217`, `:228`, `:229–232`, `:234`, `:240`, `:294`, `:355`, `:442`, `:459`, `:490`), the § 8 built-status witnesses reproduce at HEAD through the local harness, and Decision 2's denominator arithmetic closes exactly against the thirteen-member `ProofRequirementKind` (13 − {IntervalContainment, LengthContainment} − {Dimension, Modifier} = the nine named). What follows is what the rework did **not** close.
