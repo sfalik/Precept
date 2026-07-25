@@ -108,20 +108,25 @@ the Resume pointer.
 
 ## Open owner questions (the real forks that gate progress)
 
-From `…-cells/slice-3-boundary-report.md` (ranked by how much each unblocks):
+> ⚠ **`…-cells/slice-3-boundary-report.md` is dated 2026-07-21 and is STALE as a list of owner
+> questions.** The matrix moved on 07-23 and owner rulings landed on 07-21. Verified by
+> independent check 2026-07-24: its ranked #1 and #3 are **not** owner questions. **Re-check
+> every remaining item against the matrix before putting it to the owner** — do not read that
+> report's framing as live.
 
-1. **Q1 — does the matrix author a fault-family validity argument at all?** All written
-   arguments are for constraint-family weakest-preconditions; the most-cited one
-   disclaims division, and 11 of 19 fault files are division shapes. Blocks ~175 cells.
-2. **Q2 — is premise class (d) (a rule holding in the pre-state) available to the fault
-   family?** It is the exact path the known false-proof runs through; widening to (d)
-   without a preservation obligation writes that bug into the definition. Blocks ~40 cells.
-   **This hinges on the establishment/preservation re-lock** (above) — those designs supply
-   the preservation obligation (d) needs, and they are unlocked with defects. Q2 is
-   answerable *from* those designs once re-locked, not a standalone open fork.
-3. The six smaller boundary questions (temporal-deferral scope; two premise classes with
-   no vocabulary home; self-discharge inside one expression; two-sided index bounds;
-   whether `mincount 1` discharges without its own establishment; base minimality).
+| Boundary-report item | Verdict (independent check, 2026-07-24) |
+|---|---|
+| #1 — does the matrix author a fault-family validity argument at all? | **NOT a fork — authoring work.** Matrix `:260` *"Every generative rule carries a validity argument"* admits no argument-less arm; `:261`'s gate blocks ratification but assigns no disposition; `open` is defined (`:292`) as *"the model has not decided"* and the model **has** decided the fault discharge (`:207`). Already answered by action — five fault arguments were written 07-23. Granularity is settled too: one argument per generative rule, fault family indexed by requirement kind. |
+| #2 — is premise class (d) available to the fault family? | **Under independent check** (re-verifying rather than assuming). Likely answered by the 2026-07-21 citation duty (available, but only under establish-and-preserve citation) — which would make it sequencing, not a fork. |
+| #3 — is an evaluation site a syntactic position or an evaluation occasion? | **ALREADY RULED** by the owner 2026-07-21 — *"site identity as an evaluation occasion"* (matrix `:5`, rev 8). The report predates the ruling. |
+| the six smaller items | Not yet re-checked. Assume stale until verified. |
+
+**Correction to the boundary report:** its claim that *"the schema pins that list closed"* is
+false — `cell.schema.json:237` says the enum *"mirrors that section and **grows with it**."*
+
+**Net: no confirmed open owner question gates the rule layer.** What remains is authoring
+work — expensive (the two arguments that held took twelve adversarial rounds each) but not a
+decision.
 
 ## Resume pointer — ordered next steps
 
@@ -132,7 +137,10 @@ From `…-cells/slice-3-boundary-report.md` (ranked by how much each unblocks):
 1. **Finish the rule layer** — author the four argument-less kinds (`Numeric`, `Presence`,
    `CountContainment`, `AssignmentQualifier`) + redo the five refuted, **with adversarial
    rounds**.
-2. **Rule Q1** (owner); **Q2** is answered by step 0's re-lock. These govern ~215 cells.
+2. ~~Rule Q1/Q2 (owner)~~ — **struck 2026-07-24.** Q1 is authoring work, not a decision
+   (independent check; see the table above); Q3 was already ruled 07-21; Q2 is under check and
+   is most likely conditional-on-machinery, i.e. sequencing. Nothing here is known to need an
+   owner ruling.
 3. **Regenerate the denominators** — the ten-kind fault family + the type-requirement family.
 4. **Re-author + re-ratify slice 3** (owner read, per the ratification protocol).
 5. **Slice 4** — gated on a verified-complete rule layer + credit reset.
