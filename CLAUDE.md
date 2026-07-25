@@ -11,7 +11,17 @@ Precept is a domain integrity engine for .NET — a DSL runtime that governs how
 | MCP server | `tools/Precept.Mcp/` | MCP tools wrapping core APIs |
 | VS Code extension | `tools/Precept.VsCode/` | Extension host: syntax highlighting, preview webview, commands |
 | Copilot plugin | `tools/Precept.Plugin/` | Shipped agent + skills + MCP launcher for consumers |
-| Sample files | `samples/` | `.precept` files — canonical DSL usage examples |
+| Sample files | `samples/` | `.precept` files — illustrative examples, never a measure of coverage |
+
+## How to write (Non-Negotiable)
+
+Write plain engineering prose in every document, report and agent brief. Not simplified — plain. Expand an idea rather than compressing it into a term nobody outside this project would recognise.
+
+Do not use: *denominator, source of truth (as a noun phrase), load-bearing, lens, surface (on its own), signal (meaning evidence), anchor, witness, orthogonal, spine, harness, the ask* — or any coined phrase that would need a glossary. Say the actual thing instead. Not "the canonical docs are the denominator" but "we measure completeness against the canonical docs, and nothing else." Not "this claim is load-bearing" but "if this is wrong, everything after it is wrong."
+
+**This rule travels.** A writing rule that lives only in a skill binds the document being authored and nothing else. Copy it verbatim into every sub-agent and workflow prompt, or the vocabulary comes straight back in through them.
+
+The owner reads everything this project produces and has said directly that reviewing agent-written documents is exhausting because of this vocabulary. His review speed is the bottleneck for the whole project.
 
 ## Documentation Map
 
@@ -21,9 +31,9 @@ Precept is documentation-dense. Many design decisions live in `docs/` and `resea
 
 - **`docs/philosophy.md`** — Precept's core commitments. Every design and implementation decision is evaluated against these.
 - **`docs/README.md`** — the doc landscape and navigation gateway. Know what exists before deciding what to read.
-- **`docs/language/README.md`** — the language surface: spec, canonical types, grammar, catalog as source of truth. Precept's design decisions are language decisions; this is the primary substance.
+- **`docs/language/README.md`** — the language: spec, canonical types, grammar. Precept's design decisions are language decisions; this is the primary substance. **The docs here are what we measure against — not the catalogs, which are incomplete (see § Catalog System).**
 
-**First time in this codebase?** Read `docs/agent-onboarding.md` once — the five organizing concepts (catalogs as language spec, the pipeline → Compilation → Precept chain, lifecycle-driven design, pointer-philosophy + doc-sync, required reads vs context-on-demand). When a term feels ambiguous, grep `docs/glossary.md`.
+**First time in this codebase?** Read `docs/agent-onboarding.md` once — the five organizing concepts (catalogs as the intended machine-readable form of the language spec, the pipeline → Compilation → Precept chain, lifecycle-driven design, pointer-philosophy + doc-sync, required reads vs context-on-demand). Note that the first of those is a goal, not the current state — see § Catalog System. When a term feels ambiguous, grep `docs/glossary.md`.
 
 ### Entry points
 
@@ -76,7 +86,18 @@ Brand research lives in `design/brand/research/`; UX/design-system research in `
 
 ## Catalog System (Non-Negotiable)
 
-Precept uses a metadata-driven architecture. **Catalogs are the language specification in machine-readable form** — domain knowledge is declared as structured metadata, and pipeline stages, tooling, and consumers derive from it. They never maintain parallel copies or encode domain knowledge in their own logic.
+Precept uses a metadata-driven architecture. The goal is that catalogs become the language specification in machine-readable form — domain knowledge declared once as structured metadata, with pipeline stages, tooling and consumers deriving from it rather than keeping parallel copies.
+
+**They are not that yet, and must not be worked as if they were.** Measured 2026-07-25: the `CertificateSteps` catalog does not exist at all, though `precept-language-spec.md:225` makes emitting a certificate drawn from it a condition of a proof strategy being admissible. `ProofRequirementKind` declares thirteen members and neither establishment nor preservation is among them, though the induction model rests on both. Searching `src/Precept/Language/` for *premise*, *certificate*, *verdict* or *occasion* returns nothing. And `precept-language-spec.md:1992` states in canon's own voice that five of the places data can change have no catalog entry.
+
+Until further notice:
+
+- **The canonical docs win.** Where a catalog and a canonical doc disagree, the doc is right and the catalog has drifted. Fix the catalog.
+- **Never cite a catalog as evidence that something is complete.** The completeness tests prove that every member a catalog *declares* carries metadata. They cannot detect a decision that was never written into the catalog at all.
+- **Never scope work by what the catalog happens to declare.**
+- **Catalog before code still stands.** It is the discipline that gets us there.
+
+**What ends this suspension:** the catalogs become authoritative when adding a decision without teaching the catalog fails the build — every place data can change catalogued, the certificate vocabulary created, establishment and preservation declared, and the exhaustiveness analyzer applied across all of it. When that lands, delete this notice and restore the original sentence: *"Catalogs are the language specification in machine-readable form."*
 
 The canonical catalog inventory lives in [`docs/language/catalog-system.md`](docs/language/catalog-system.md). Other docs reference catalogs by name, not by count — the enumeration is the source of truth.
 
@@ -89,6 +110,16 @@ This is the inverse of traditional compilers (Roslyn, GCC, TypeScript), where do
 - **Never hand-edit `tmLanguage.json`.** It's generated from `Tokens`, `Types`, and `Constructs` by the grammar generator.
 - **Never switch on `*Kind` enum identity to dispatch per-member behavior.** The smell is `kind switch { FooKind.Bar => …, FooKind.Baz => … }` where each arm exists "because the language says so." That behavior belongs in catalog metadata. Switching on a DU **subtype** is correct (the subtype IS the metadata shape); switching on enum identity to apply per-member behavior is the violation.
 - **Use discriminated unions for varying shapes.** Don't paper over shape differences with nullable fields on a flat record — use a DU base + sealed subtypes.
+
+## The samples are examples, not a specification (Non-Negotiable)
+
+`samples/` holds hand-written `.precept` files that demonstrate the language. They were written to illustrate, not to cover. They are not a measure of anything.
+
+- **Never count sample files to establish coverage.** "64 of 78 files do X" tells you about the examples somebody happened to write. It tells you nothing about the language, and nothing about whether a rule is right. Measure against `docs/language/` and the spec.
+- **Absence in the samples is not evidence.** No sample declaring `mincount` does not mean collections have no count constraints — it means nobody wrote that example. The riskiest parts of the language are precisely the ones with no sample, because nothing has ever exercised them.
+- **Never compile a `.precept` file and treat the result as the specification.** The compiler is unfinished. What it accepts or rejects today tells you what got built, never what should be. This one feels like evidence, which is why it keeps happening.
+
+The samples are good for one thing: showing whether a proposed change would break something a person actually wrote. That is real information about cost. It is never a statement about correctness or completeness.
 
 ## Product Philosophy (Non-Negotiable)
 
@@ -156,7 +187,7 @@ When making any code, interface, test, or behavior change, keep documentation in
 **Canonical (OK to reference from code)**:
 - `docs/language/*.md`, `docs/compiler/*.md`, `docs/runtime/*.md`, `docs/tooling/*.md` — canonical specs and per-stage docs
 - `docs/philosophy.md` — locked philosophy
-- `CLAUDE.md` — load-bearing project rules
+- `CLAUDE.md` — the project rules everything else depends on
 - Catalog and source files (e.g. `Modifiers.cs`, `Tokens.cs`, `Operations.cs`)
 - Spec line numbers when stable (e.g. `precept-language-spec.md:1662`)
 
@@ -170,7 +201,7 @@ When making any code, interface, test, or behavior change, keep documentation in
 
 `BUG-NNN` cites are a deliberate exception: the bugs.md convention pairs each inline cite with a planned removal (the workaround comes out when the bug closes). Add a new `BUG-NNN` cite only when there's a matching workaround in the code or sample.
 
-**Rewriting rule**: if a comment had load-bearing WHY content mixed with transient refs, preserve the WHY in terms of the language/architecture; drop the project-task scaffolding.
+**Rewriting rule**: if a comment had WHY content worth keeping mixed with transient refs, preserve the WHY in terms of the language/architecture; drop the project-task scaffolding.
 
 - Bad: `// Slice 8 wires PRE0048 emission for action-applicability mismatches per F-LANG-COLL-08`
 - Good: `// PRE0048 emission for action-applicability mismatches`
@@ -222,7 +253,7 @@ Any proposal touching an area where the canonical doc has a locked prior decisio
 - Frame the override cost explicitly: a locked spec decision cannot be overridden inside a design pass. The owner authorizes the override (or doesn't); the design pass implements it.
 - **Same conversational framing**: pushback, "let's revisit the rejection," "the spec is right, close the finding" are all expected responses.
 
-Then wait. Locked decisions are load-bearing; overriding one requires explicit owner direction.
+Then wait. Other work rests on locked decisions; overriding one requires explicit owner direction.
 
 ### When the gate is satisfied
 
@@ -313,7 +344,7 @@ The MCP server tools in `tools/Precept.Mcp/Tools/` are **thin wrappers** around 
 
 ## Issue Implementation Workflow
 
-Read `CONTRIBUTING.md` for the full workflow. Load-bearing rules:
+Read `CONTRIBUTING.md` for the full workflow. The rules that matter most:
 
 - Open the draft PR immediately; it's the execution hub. Body structure: `## Summary`, `## Linked Issue` (`Closes #N`), `## Why`, `## Implementation Plan`.
 - **Design review gate.** `## Implementation Plan` stays "Pending design review" until the review ceremony completes with owner sign-off. Track B (introducing a new canonical design doc) also requires all inline review comments on the design doc resolved. See `CONTRIBUTING.md` § 3 for full Track A / Track B details.
@@ -321,6 +352,8 @@ Read `CONTRIBUTING.md` for the full workflow. Load-bearing rules:
 - The PR body **is** the implementation plan. Never create a separate implementation-plan markdown file.
 
 ## DSL Sample Files (.precept)
+
+**Read § The samples are examples, not a specification before using anything in `samples/` as evidence.**
 
 `.precept` files are interpreted by the runtime — **not** compiled by the C# build pipeline. Never run `dotnet build` or `dotnet run` to validate a `.precept` file.
 
