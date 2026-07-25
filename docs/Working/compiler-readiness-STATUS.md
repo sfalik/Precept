@@ -142,6 +142,25 @@ the Resume pointer.
 **Correction to the boundary report:** its claim that *"the schema pins that list closed"* is
 false — `cell.schema.json:237` says the enum *"mirrors that section and **grows with it**."*
 
+**A fifth claimed owner decision — also already answered (independent check, 2026-07-24).** The
+rework pass reported that the 2026-07-21 citation duty's *rejection power* needed an owner ruling
+(amend the rationale vs. un-defer the certificate re-checker). Neither is open: the ruling never
+claimed rejection power — matrix `:122` says an uncited consumption *"does not typecheck as a proof
+at all"*, a well-formedness claim, and `:124`'s rationale is visibility (*"the gap is visible at the
+point of consumption"*), grounded in proof-carrying code (`:126`). The demotion was already
+**owner-accepted 2026-07-23** at `:129`: *"The duty relocates where that enumeration is consumed; it
+does not remove the need for one. The ruling itself is unaffected."* And the re-checker exit is a
+closed deferral — `compiler-readiness-plan-2026-07-12-architecture.md:43` *"Decision B RETRACTED —
+the independent re-checker is not an MVP decision"*, `:192` *"there is no MVP decision to make
+here… the earlier B1/B2 fork is therefore void."* It is already a later phase, and when it lands it
+makes the condition non-vacuous with no decision required. **Disposition: sharpen `:129`'s wording
+during Pass 2 — an editorial obligation, not a fork.**
+
+> **Standing lesson: agent-authored artifacts systematically over-produce "owner decisions."** Four
+> of four claimed forks checked this session were already settled (boundary-report #1/#2/#3, and the
+> citation-duty question above). **Route every claimed owner decision through an independent
+> canon-check before it reaches the owner.**
+
 **Net: all three ranked "owner questions" are already answered — none gates the rule layer.**
 What remains is authoring work (expensive — the two arguments that held took twelve adversarial
 rounds each), plus two mechanical follow-ups and one sequencing dependency:
