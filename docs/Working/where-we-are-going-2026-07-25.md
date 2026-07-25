@@ -26,10 +26,10 @@ Product code has not changed since 2026-06-05.
 
 ## The approach
 
-**The work moves to `spike/Precept-V2-Radical-induction`**, cut from `spike/Precept-V2-Radical`.
-The lineage is in the name; the suffix names the question the branch exists to answer — can the
-induction model in the want doc actually be built. If it can, the branch becomes canon. If it
-cannot, the name still says what was being tested.
+**The work moves to `spike/Precept-V2-Radical-reset`**, cut from `spike/Precept-V2-Radical`.
+The lineage is in the name. What the branch exists to answer is whether the induction model in
+the want doc can actually be built: if it can, the branch becomes canon; if it cannot, it is
+reverted.
 
 **The canonical docs get rewritten there.** Everything the new work cites comes from that branch
 and nowhere else. If the definition turns out to be buildable it is promoted; if not, there is
