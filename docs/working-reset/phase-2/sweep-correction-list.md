@@ -146,3 +146,66 @@ Four rows are not byte-identical to what was recorded on 2026-07-19. None was fi
 4. **S15's `proof-engine.md:483` sibling** — **reworded**. Same never-reject posture, different sentence.
 
 Six sites moved without changing: `runtime-api.md` 386→388, 646→648, 889→891; `evaluator.md` 502–505→533–536, 1585→1638, 1601→1654, 1700→1753, 1789→1842; `soundness-and-coverage.md` 287→288; `fault-system.md` 247→248.
+
+---
+
+## Reconciliation against the 2026-07-26 owner rulings — read before executing any row
+
+The phase-1 walk produced rulings that change where four of these corrections should land. **The
+direction column was written on 2026-07-19 and predates them.** Executing a row as written where it is
+listed below would carry a superseded model into the canonical documents, which is the mistake this whole
+list exists to undo. Nothing has been silently edited above; the revisions are stated here.
+
+### S1, and R3 with it — where enforcement on an editable write goes
+
+The direction column says relational-rule enforcement on edits "moves to the editable-write ingress point
+(field's modifier-rules plus every rule mentioning the field)", following want:143. **That is no longer
+the target.** Two things changed on 2026-07-26:
+
+- **He ruled that a declared premise decides what the compiler proves, not where the value came from**
+  (walk item 16, answered on a worked case). A rule relating externally-supplied fields is proven by the
+  compiler, with the author supplying the condition that closes it. It is not moved to a runtime check.
+- **Writing a field a rule merely reads takes on that rule's obligation** (walk item 8), and **an
+  operation owes a state's constraints even when it writes nothing** (walk item 7). Together those make
+  an editable write an ordinary write site carrying ordinary proof obligations.
+
+**Revised direction for S1 and R3.** The sweep paragraph still goes. What replaces it is *not* a wider
+ingress check: an editable write is a write site whose obligations the compiler discharges, and runtime
+governance is left doing exactly what `precept-language-spec.md:266` already says it does — upholding
+**the field's own declared contract** as the value enters, operation-blind.
+
+**Why the wider reading has to be dropped rather than kept as harmless.** It does not work. Ingress runs
+at execution phase 1, "before the working copy derives any dependent value", and computed fields
+recalculate at phase 7. A rule reaching the edited field through a computed field would be evaluated
+against a value the operation then discards. Checked 2026-07-26 and written up in
+`compiler-readiness-plan.md` § Phase 2. Re-evaluating just the rules that depend on edited fields is the
+post-mutation sweep under another name and needs an argument against want:199 before anyone builds it.
+
+### S11, S12, S13 — removing the fault traps is not the whole correction any more
+
+These rows correct the *fault-gate classification* and remove the runtime trap clause. Since they were
+written, **he ruled that the arithmetic overflow model is deferred past the MVP** (walk item 15), with no
+compile-time guarantee in the meantime.
+
+Both halves of the guarantee for overflow therefore disappear: want:165 already removes the runtime
+guard, and the deferral means the compiler does not prove it either. **So the sentences these rows quote
+need a second correction the direction column does not mention** — `:266` and `:112` both list overflow
+among the faults a clean compile rules out, and `:110` is Principle 10. Under his ruling no document may
+state overflow as currently prevented.
+
+**How to word it is constrained by a second ruling.** At walk item 23 he ruled that `philosophy.md` and
+the specification state the target, and the code is validated against them rather than the reverse. So
+these are not corrections *down* to current behaviour. The aspiration may stand; what may not stand is a
+claim that it holds today. Phase 2 states the gap, it does not delete the goal.
+
+### `philosophy.md:53` is not on this list, and stays off it
+
+It was raised separately as an overclaim — an unqualified list of "compile-time impossibilities". **Walk
+item 23 closes it**: philosophy states the target. It is not a correction row. Do not add it.
+
+### P1 and P2 remain owner-gated, and item 23 does not release them
+
+They describe a mechanism — the engine evaluating constraints after mutation and committing only if they
+hold — which the want document replaces. That is a change of substance, not an honesty adjustment, so
+walk item 23 neither authorises nor blocks it. They still need his explicit approval, and the wording
+goes to him as a diff rather than being applied.
