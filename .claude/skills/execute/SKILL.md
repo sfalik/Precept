@@ -119,9 +119,7 @@ Each slice is a single coherent commit; the list is also the execution checklist
 Each commit / slice must be:
 
 - **Coherent** — one logical change. Catalog entry + parser dispatch + type checker update + tests + doc-touch for one feature is one slice; two unrelated features is two slices.
-- **Incremental** — a slice must not make the test suite worse. The suite is **not green at HEAD**, so "green after the slice" is the wrong bar and an agent that assumes zero failures will misread the baseline as damage it caused. The bar is: run `dotnet test` *before* touching anything, record the failing tests, and after the slice the failing set must be a subset of that baseline. A slice that adds a failure, or turns a passing test red, is a process violation. Report the before-and-after counts with the slice rather than claiming green.
-
-  There is no recorded list of which tests are expected to fail, and you must not invent one. It belongs in the plan document, alongside the slice checklist — the plan document is the execution hub in spike mode, and the known-failing set is exactly the kind of state a slice is checked against. Until somebody writes it there, take your own baseline at the start of the session and say in the slice report that you did, and that no canonical list existed to check it against.
+- **Incremental** — tests pass after each slice (`dotnet test` green). A slice that leaves the tree red is a process violation. Run `dotnet test` before touching anything so you can tell an inherited failure from one you caused; if the tree is already red when you start, that is the thing to fix or to raise, not to work around.
 - **Doc-synced** — per CLAUDE.md's routing table, the docs that describe the changed code are updated in the same commit. Stale "Implemented" claims are drift.
 - **Catalog-first** — for language-surface or pipeline changes, the catalog entry lands first (in the slice that introduces the feature). Pipeline code derives from the catalog; if the slice adds pipeline code that hardcodes what a catalog should know, that's a catalog discipline violation.
 
@@ -181,7 +179,7 @@ After each slice lands:
 A phase is complete when:
 
 - All slices in the phase's Implementation Plan are checked off
-- All phase-level exit criteria from the plan doc are satisfied (typically: `dotnet build` clean, `dotnet test` showing no failures the phase did not start with, MCP probe battery returns expected outcomes)
+- All phase-level exit criteria from the plan doc are satisfied (typically: `dotnet build` clean, `dotnet test` green, MCP probe battery returns expected outcomes)
 - All phase-level doc-touch obligations are landed
 - The plan doc's phase row is marked ✅ Complete with the commit hash
 

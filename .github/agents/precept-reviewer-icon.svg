@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <rect width="128" height="128" rx="16" fill="#1e1e1e"/>
+  <!-- Magnifying glass lens -->
+  <circle cx="54" cy="54" r="28" fill="#24262b" stroke="#FF6B6B" stroke-width="3"/>
+  <!-- Magnifying glass handle -->
+  <line x1="74" y1="74" x2="90" y2="90" stroke="#FF6B6B" stroke-width="4" stroke-linecap="round"/>
+  <!-- Check mark inside lens -->
+  <polyline points="44,54 50,60 64,46" stroke="#FF6B6B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

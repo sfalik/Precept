@@ -307,6 +307,9 @@ dotnet build
 # Build language server only (default build task — Ctrl+Shift+B)
 dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server
 
+# Check a workflow script's syntax — NOT `node --check`, see below
+node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");new Function("return (async()=>{\n"+s.replace(/^export /m,"")+"\n})()");console.log("parses")' <file>
+
 # Run all tests (xUnit + FluentAssertions, five test projects)
 dotnet test
 
@@ -324,6 +327,8 @@ npm run loop:local     # Package + install locally (also a VS Code task)
 ```
 
 **VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `agents: build`, `plugin: sync payload`, `iso4217: refresh`, `grammar: regenerate`.
+
+**`node --check` does not work on this project's workflow scripts.** Verified 2026-07-25 on Node 24.16.0: a file containing an `export` statement exits 0 on *any* syntax error. `export const a = 1` followed by unbalanced parens passes; the same error without the export line fails correctly. Every workflow script here opens with `export const meta`, so none of them has ever been syntax-checked by that command. Use the `new Function` wrapper above instead — and note that neither command catches a temporal-dead-zone error or anything else that only appears when the code runs, so a script worth trusting gets exercised against a stub, not just parsed.
 
 ## Development Workflow
 
