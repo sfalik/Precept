@@ -273,11 +273,33 @@ look like a phase that keeps not closing. The real stopping points:
 
 ## Known risks, carried
 
-**A ten-minute check nobody has run.** Editable-field edits are said to be checked as the value enters, which
-the execution order puts at phase 1. Computed fields recompute at phase 7. So a computed field derived from
-an edited field is written *after* the check that was meant to cover it. Raised 2026-07-26 by an independent
-read that did not probe it and called it worth ten minutes. If it holds, it is a soundness hole in an
-argument the matrix treats as settled, and it lands in phase 2 or 5 depending on what it turns out to be.
+**The ten-minute check, now run — 2026-07-26. It holds, and it is narrower and more tractable than it
+looked.** The claim was that a rule reaching an edited field through a computed field is checked before
+that computed field is recalculated, so it is checked against a value the operation then discards.
+
+What the spec actually says settles it. Governance at ingress "upholds **the field's declared
+contract**" and is "operation-blind" (`precept-language-spec.md:266`) — that is the constraints declared
+*on the field being written*, not every rule that happens to mention it. The wider coverage comes from
+somewhere else entirely: "Ingress governs *what enters*; the sweep governs *the result*"
+(`:1969`). The post-mutation sweep re-checks every constraint against the finished working copy, after
+computed fields recalculate at execution phase 7.
+
+**So the spec as written has no hole. The hole appears only when want:199 removes the sweep** — and the
+want document's own description of the editable check (want:143: the field's modifier-rules "*and* every
+rule that mentions the field") does not close it, because that check runs at execution phase 1 and a rule
+mentioning a computed field would be evaluated against the pre-recalculation value.
+
+**What this changes.** It is not a defect to fix in phase 2; it is a consequence of a removal the want
+document makes, and it belongs to phase 5. It also became much easier to answer on 2026-07-26, because
+three of his rulings that day point at the same resolution: a declared premise decides what the compiler
+proves, not where the value came from (walk item 16); writing a field a rule merely reads takes on that
+rule's obligation (walk item 8); and an operation owes a state's constraints even when it writes nothing
+(walk item 7). Together those make an editable write an ordinary write site carrying ordinary proof
+obligations, which leaves runtime governance responsible only for making the field's own declared
+contract true as the value enters — exactly what `:266` already says it does. **Phase 5 writes it that
+way unless it finds a reason not to; the alternative — a targeted re-evaluation of just the rules that
+depend on edited fields — is a partial sweep by another name and needs an argument against want:199
+before anyone builds it.**
 
 **The induction's base rests on a stated assumption that is not written down as one.** "Every constraint held
 before this operation" is *proven* for data that arrived through the contract, and *assumed* for restored and
@@ -813,7 +835,7 @@ is also worth knowing that it reproduces the block accounting but not a cell cor
 is handed rather than producing one — which matters if a later phase wants the cells rather than the
 numbering.
 
-**Prefer its successor.** `docs/working-reset/phase-3/enumeration.workflow.js` does the whole job in one run — it derives the block partition in the script rather than asking an agent for a count, collects escalations as typed objects so a summary cannot swallow one, writes its report before it throws, and produces the cells rather than completing a corpus it was handed. It has been fixed against three adversarial reviews and exercised against a stub harness in six failure modes, but **it has never been run for real**, which is why the 2026-07-14 workflow is kept beside it: that one ran. Its head comment names seven places it still needs a person.
+**Prefer its successor.** `docs/working-reset/phase-3/enumeration.workflow.js` does the whole job in one run — it derives the block partition in the script rather than asking an agent for a count, collects escalations as typed objects so a summary cannot swallow one, writes its report before it throws, and produces the cells rather than completing a corpus it was handed. It has been fixed against three adversarial reviews and exercised against a stub in six failure modes, but **it has never been run for real**, which is why the 2026-07-14 workflow is kept beside it: that one ran. Its head comment names seven places it still needs a person.
 
 *Still a guess.* The weeks are for the other two pieces: rewriting the canonical documents to match the
 want document, and building the drift check. For scale: `docs/language/` is 11,248 lines and
@@ -936,6 +958,40 @@ has quietly become phase 6 with the stop skipped.
 
 **Goal.** Write the discharge procedure as a walk over the expression forms the language allows, so that
 every form reaches exactly one case, nothing falls through, and the build proves it.
+
+**What the owner ruled at the phase-1 walk, 2026-07-26.** These are inputs to this phase, not questions
+for it. Each is his answer to a plainly-stated worked case, recorded with his words in
+`phase-1/the-walk.md` and in the register's `walk` section.
+
+- **A declared premise decides what the compiler proves — not where the value came from.** A rule relating
+  two fields both supplied from outside is proven, not handed to the runtime. The compiler refuses the
+  definition until the author writes the condition that makes it provable. This is the largest single
+  change to what this phase must deliver: relational rules over externally-supplied fields are in scope
+  for proof. (Walk item 16; `compiler-and-runtime-design.md:125` is deleted at phase 2.)
+- **Faults are always prevented; other rules only have to be true at the end of the handler.** His words.
+  A fault obligation is checked at the point the expression is evaluated, against the values in force
+  there — not against the committed configuration, and not against "any value that appeared anywhere in
+  the handler". He gave the pair himself: setting a divisor to zero, then to twelve, then dividing
+  **compiles**; setting it to zero, dividing, then setting twelve **does not**. Same three writes,
+  different order. That is `precept-language-spec.md:233`'s sequencing applied to fault obligations.
+  Constraint obligations are judged on the configuration the handler commits, which widens the shipped
+  compiler. (Walk items 9 and 3.)
+  - **One reading this phase confirms rather than assumes**: a rule relied on to discharge a fault
+    inherits the strict treatment, because an expression that has already run cannot be helped by a rule
+    that becomes true later. Stated as the assistant's reading, not his words.
+- **Every route into a state owes a proof of that state's constraints, including routes that write
+  nothing.** Entering the state is what activates the constraint, so arrival is the first moment it can be
+  violated. (Walk item 7.)
+- **Writing a field a rule reads only in its activation condition takes on that rule's obligation.**
+  Switching a rule on is where it can first be broken. (Walk item 8.)
+- **Each path to an expression gets its own proof.** One written line reached three ways owes three
+  proofs, against the facts true on each path. (Walk item 3.)
+- **The compiler works with the expression as written.** A spelling it cannot reason about is refused with
+  a message naming what would work. Accepting more spellings, or normalising into a standard shape first,
+  is post-MVP and is added one rewrite at a time with a written argument that the rewrite does not change
+  the answer. His scope call, with the widening path named. (Walk item 13.)
+- **Overflow is an authorized exemption for the MVP, not a hole to close here.** This phase does not carry
+  it as a fault family. No document may claim it prevented. (Walk item 15.)
 
 **Where the fragment stops — the one thing on the "Waiting on Shane" table for this phase.** The procedure
 decides sequents drawn from a *subset* of the expression grammar, and where that subset ends is a decision

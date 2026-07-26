@@ -26,7 +26,7 @@ The three verdicts:
 
 - **traced** — the want document says this, in Shane's own words.
 - **contradicted** — the want document says the opposite of this.
-- **no trace** — nothing Shane wrote settles it either way. This is not "wrong". It means the decision is unsupported, and if it is load-bearing it needs him.
+- **no trace** — nothing Shane wrote settles it either way. This is not "wrong". It means the decision is unsupported, and if anything downstream would have to change were it reversed, it needs him.
 
 A `no trace` verdict says nothing about whether a decision is good. Several of the best-reasoned decisions in the repository are `no trace`.
 

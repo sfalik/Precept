@@ -159,10 +159,14 @@ sites in the compiler's proof" (72c2e183:131; HEAD want:143) — and the four-cl
 scoped to the inductive step over handlers, never claiming no other ingress. And the claim that the
 editable-ingress discharge is a complete compile-time proof fails outright: computed fields are
 re-derived at execution phase 7 after the ingress check at phase 1, so a rule mentioning a computed
-field derived from the edited field is not covered by what the door evaluated — and with the
+field derived from the edited field is not covered by what the ingress check evaluated — and with the
 post-mutation sweep removed (want:199), nothing else evaluates it. The plan's ten-minute check at
 :223–227 holds — rests on want:19, :143 (72c2e183:131); precept-language-spec.md:1994 vs :2004.
 ☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his words: "agents wrote that, not me".
+**The check this item raised has since been run** (2026-07-26, written up at compiler-readiness-plan.md
+§ phase 2): the spec as written has no hole, because ingress upholds only the field's own declared
+contract (`precept-language-spec.md:266`) and the post-mutation sweep covers the rest (`:1969`). The hole
+appears only once want:199 removes the sweep, so it belongs to phase 5 rather than phase 2.
 The printed answer stands, recorded as derived. He confirmed separately that want:199 (no post-mutation
 re-evaluation) is his and is not in question here; the mark is on the four-class closure and the
 mechanism-not-premise framing only.
@@ -628,7 +632,7 @@ root-cause counts, the same-batch reversals (`b59cd79b`, `982cbbb8`, `631eabc4`,
 `e89496d9` and kin).
 **Answer either way:** Authorship does not matter — a record that an argument was refuted keeps its
 force from the refutation, which is re-checkable. Two things carry forward rather than file as failures:
-the withdrawal of the fresh-symbol treatment of the editable-field door restores want:143, and the
+the withdrawal of the fresh-symbol treatment of the editable-field ingress check restores want:143, and the
 refutation of treating a computed field's defining equation as typing context is already on the
 Waiting-on-you list — rests on want:143 (72c2e183:131).
 ☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his words: "agent work". Self-reported
@@ -751,10 +755,10 @@ for setting the standard.) — rests on want:22.
 (want:22, shown verbatim). Sample check holds.
 
 **35.** Preservation attaches to every governed operation occasion — construction rows, state actions,
-the editable-field door — not only event handlers.
+the editable-field ingress check — not only event handlers.
 **Check:** carries the enumeration, not the re-keying. :20 attaches a rule's obligations to every write
 site of every field it mentions — covering construction rows, state actions and editable writes whenever
-they write such a field — and :143 (72c2e183:131) names the editable door as a proof site in your own
+they write such a field — and :143 (72c2e183:131) names the editable ingress check as a proof site in your own
 words. What :20 does not reach is the shift from "write site" to "operation occasion": an occasion that
 writes nothing owes nothing under :20; that extension is item 7's claim, separately no-trace and
 answered there. One more line: :19 says "every handler", and the design reads that as granularity rather
@@ -855,7 +859,7 @@ memory; phase 2 brings you only the ones its rules cannot settle):
 - The checker cut from the MVP (architecture Decision B, proof-engine.md:2612) — already reversed by the
   reset plan; phase 2 removes the stale canon.
 - The quick-fix-counts-as-authorship rescoping of your sentence at want:179 (`5d554d59`, matrix:50).
-- The transport rule's narrowing of the editable-field door against want:143 (`c295d7b4`) — the document
+- The transport rule's narrowing of the editable-field ingress check against want:143 (`c295d7b4`) — the document
   itself flags it as open, and phase 2 settles it.
 - "Coverage rests on the catalogs" replacing your step-replay checker (`7474b3f2`) — answered inside
   item 1's split mark.
