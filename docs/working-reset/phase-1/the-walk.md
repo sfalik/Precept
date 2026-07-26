@@ -30,6 +30,41 @@ three and is re-derived on lines you wrote.
 
 ---
 
+## Result of the sitting — 2026-07-26
+
+Walked in one sitting, roughly ninety minutes, every item marked. **41 marks taken, 0 unmarked**, one
+withdrawn as mis-included (item 20's function-argument row, which claimed no owner ruling).
+
+| Mark | Count | Items |
+|---|---|---|
+| mine | 23 | 1 (both rows), 2, 3, 9, 15, 17, 18, 19, 20c, 21, 22, 23, 30–39 |
+| not mine | 16 | 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 25, 26, 27, 28, 29 |
+| don't remember | 2 | 20b, 24 |
+| withdrawn | 1 | 20a |
+
+**The sample passed. Ten of ten came back *mine*, zero *not mine*, so slice 1.1 is not redone.** Item 33
+remains the one known error, caught and corrected before the sitting: 1 in 10, as recorded.
+
+**The one finding that matters, and it is about this file.** Three items were re-asked at his request
+after he said the plain restatements were easier to follow. **All three inverted** — 3, 9 and 15 each
+drew a *not mine* or *derived* when put in the walk's own compressed vocabulary, and each came back
+*mine* when the same claim was restated in ordinary terms with a worked example. Item 15 is the
+expensive one: asked one way it read as an agent's deferral to be closed; asked plainly it is his
+ruling, and overflow is an authorized exemption rather than a hole. The compression slice 1.3 was
+judged on is what caused this. Any future sitting states the claim plainly and shows a worked case; it
+does not read the register's phrasing aloud.
+
+Two marks inverted their printed answers on his authority rather than on argument — item 1's catalog row
+("the idea to use the catalog was mine") and item 23 (philosophy is aspirational; the code is validated
+against it, not the reverse). Two more changed the record substantially: item 19 (he ruled same-basis
+periods orderable, against locked Decision 14) and item 22 (he ruled three severities to Error, and the
+code never followed). One conflict is unresolved and left the walk for the plan's "Waiting on Shane"
+table: items 16 and 24 together leave open whether the prove-versus-govern split by data origin is his.
+
+Marks are recorded inline below, each with the words he used.
+
+---
+
 ## A. The reset conversation, 2026-07-25/26
 
 These two cover the plan everything now runs under. You had this conversation yesterday; they should be
@@ -44,14 +79,19 @@ into two marks because one row answers differently from the other twelve.
 want:201–204 almost verbatim; confirm/narrow/revert and narrowing-is-legitimate are want:189; promotion
 gating nothing is a fact about `main`; the rest (thirteen phases, only phase 1 sliced, phase 11 unsized,
 the vocabulary, branch-not-folder) are process choices, either defensible — rests on want:201–206.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26; his words: "mostly mine"
 **Answer for the "Coverage rests on the catalogs" row:** Correct it rather than confirm it. The coverage
 *duty* is forced — want:204 asks the checker to refuse an unproven definition, and step-replay alone
 cannot see a missing obligation — but the catalog *arrangement* replaces the checker you described
 (walks the recorded steps, stays small and fast, want:206) with one that walks the definition, asks the
 catalog what each thing owes, and makes catalog completeness the guarantee's finish line. That mechanism
 your text does not support — rests on want:201–206 against compiler-readiness-plan.md:81, :1248–1253.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26, after being shown want:199–206 against
+plan:81 and :1248–1253; his words: "the idea to use the catalog was mine". **The mark overrides the
+printed correction**: the catalog arrangement is his
+ruling, not an agent's inference, so phase 9 keeps it. The mechanism concern the printed answer raised —
+that catalog completeness becomes the guarantee's finish line — is not settled by this mark and is
+carried to phase 9 as a concern to state, not a correction to apply.
 
 **2.** The evidence rules written into CLAUDE.md the same day — catalogs untrustworthy until phase 9,
 sample files never measure anything, compiling a file is not the specification, "Locked / ratified /
@@ -65,7 +105,9 @@ saying Proved about something false; and every commit here is under one identity
 a "ruled" label. None changes what Precept is; dropping them removes the only thing separating
 measurement from assertion — rests on CLAUDE.md:93, :100, :121, :123;
 compiler-readiness-plan.md:136–148, :250–254.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26; his words: "agents continually present me
+arguments based on an assumption the sample corpus is comprehensive, I have to keep reminding them it's
+not". The sample rule is a standing correction he has issued repeatedly, not a one-time ruling.
 
 ## B. Claimed rulings the proof-engine definition rests on (phases 4–7)
 
@@ -83,7 +125,12 @@ divides by zero. One qualification: per-route proofs are the right *default* bec
 a single proof over the facts common to all routes is also sound, just weaker, and refusing more is
 permitted under want:189 — rests on compiler-readiness-plan.md:919–921;
 precept-language-spec.md:1994–2006.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — **re-asked 2026-07-26 in plain terms** (first pass drew "not
+mine"; re-asked as "one written line, several paths in, one proof per path", he answered "yes").
+Recorded on the second answer: per-path proofs carry owner authority rather than resting only on the
+counterexample. The weaker alternative — one proof over what holds on every path — is not taken.
+He asked at the first pass whether the counterexample was `samples/Test2.precept`; it is not, that file
+is the over-rejection case (unbuilt multi-term guard match), the opposite direction.
 
 **4.** There are exactly four premise classes, and evaluating the rules at an editable-field write is a
 discharge mechanism rather than a premise — first appears `b801451b`, 2026-07-20. If not yours, phase
@@ -97,7 +144,10 @@ re-derived at execution phase 7 after the ingress check at phase 1, so a rule me
 field derived from the edited field is not covered by what the door evaluated — and with the
 post-mutation sweep removed (want:199), nothing else evaluates it. The plan's ten-minute check at
 :223–227 holds — rests on want:19, :143 (72c2e183:131); precept-language-spec.md:1994 vs :2004.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his words: "agents wrote that, not me".
+The printed answer stands, recorded as derived. He confirmed separately that want:199 (no post-mutation
+re-evaluation) is his and is not in question here; the mark is on the four-class closure and the
+mechanism-not-premise framing only.
 
 **5.** A value written earlier in an operation may be consumed as a fact later in the same operation — a
 fifth premise source beyond the four at want:19 — first appears `33707e77`, 2026-07-21.
@@ -108,7 +158,8 @@ freeze). And it is not a fifth premise class: the fact about the assigned expres
 classes and the write only carries it forward — backward substitution along the route, the mechanism
 your worked example names at want:103 ("the proof closes by substitution"). Phase 5 keeps four premise
 classes plus a substitution rule — rests on precept-language-spec.md:233; want:103.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his words: "this is derived". Printed
+answer stands: four premise classes plus a substitution rule, recorded as derived rather than ruled.
 
 **6.** A proof consuming a declared rule or modifier must name what establishes the fact and everything
 that preserves it (declaration-fixed facts exempt, citing their declaration with empty sets) — first
@@ -122,7 +173,7 @@ exemption is a tautology, not a decision: a fact no operation can change has emp
 preserving sets by construction. The 07-23 correction is simply true — the preserving set is quantified
 over the whole file, so citation cannot make the check local, which is the same argument that puts
 coverage above replay in item 1 — rests on want:19, :24, :199, :204.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands.
 
 **7.** All five constraint forms — `rule` plus the four `ensure` forms — are proof obligations, and a
 residency ensure is re-established at every entry into its state, so a transition row that writes
@@ -138,7 +189,7 @@ not it wrote anything. Your document never using `ensure` is not evidence agains
 example, not an enumeration of constructs. The one genuinely open sub-question — whether "the entity is
 resident in S" is itself usable as a premise — is on the Waiting-on-you list, not a mark — rests on
 precept-language-spec.md:1884–1887; want:171, :189.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands.
 
 **8.** A constraint "mentions" a field through three routes — its condition, its `when` guard, and
 transitively through computed fields — and that definition decides where every obligation attaches —
@@ -151,7 +202,8 @@ the configuration where it first applies is where it can first be violated
 exhaustiveness claim about the language, and phase 3 closes such lists (plan:184), so it is re-derived
 over the closed expression-form list rather than inherited — rests on want:20;
 precept-language-spec.md:1866, :1878, :2004.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands,
+including that the three-route list is re-derived at phase 3 rather than inherited as complete.
 
 **9.** Obligations are judged over a handler's whole set of writes, never per write — intermediate
 states are unobserved, so the shipped compiler, which rejects a plan whose final state is legal, must be
@@ -166,7 +218,20 @@ outside. So widening constraint checking to the whole plan is correct. But a fau
 overflow — happens when the expression is *evaluated*, not when the configuration commits, so fault
 obligations stay per-evaluation. Carried forward without that split, the ruling licenses a real hole —
 rests on precept-language-spec.md:1967 (the surviving clause); want:163.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — **re-asked 2026-07-26 in plain terms** (first pass drew
+"derived"; re-asked with a worked handler that breaks a rule mid-way and restores it by the end, and
+with the fault caveat stated, he answered "yes, end state only"). Recorded on the second answer.
+
+**This inverts the printed answer for constraints.** A handler is judged on the configuration it
+commits, not write by write, and today's compiler — which rejects a handler whose end state is legal —
+is wrong and gets widened.
+
+**One thing the mark cannot settle, flagged rather than assumed.** For a *fault* — a division by zero,
+an overflow — the failure happens when the expression is evaluated, part-way through the handler. There
+is no end state to judge, because the operation has already gone wrong at that point. "End state only"
+cannot apply there as a matter of fact, not policy. Phase 5 carries constraint obligations at end state
+and fault obligations per evaluation unless he rules otherwise; the wording of his answer did not
+distinguish them and this note records that.
 
 **10.** The fault-family membership counts — eleven kinds ruled 07-21, ten on 07-23, nine on 07-24:
 three counts in four days, each recorded as ruled.
@@ -176,7 +241,8 @@ inherited. Three values in four days is the signature of reading the list off `P
 compiler enum the evidence rules bar — and the plan names this exact churn as the measured reason the
 closed-list rule exists. Re-derive at phase 3, record the number with its hash — rests on
 compiler-readiness-plan.md:136–139, :152–158; CLAUDE.md:93, :100.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". All three counts
+discarded; phase 3 re-derives and records the number with its hash.
 
 **11.** The discharge contract is exact — a compiler that accepts a sound program the contract does not
 license is nonconforming — and every contract must name a finite procedure that decides "no derivation
@@ -190,7 +256,8 @@ cap with an explicit "couldn't prove — here is what would" fallback, and a cap
 within the cap", not "no derivation exists". The cap is part of the contract, or the claim contradicts
 spec:225. Phase 4 writes it with the cap in — rests on want:204–206, :179 (72c2e183:167);
 precept-language-spec.md:225.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands:
+exactness holds, and phase 4 writes the finite-procedure half with the cap and its fallback in.
 
 **12.** Whether an author can respell around a refusal is judged once per family against the whole
 derivation set, and a bound conjunct spelled in a guard discharges the same way an argument bound does —
@@ -202,7 +269,7 @@ modifier. "Judged against the whole derivation set" is not a decision; it is the
 sound-but-unprovable. "Once per family rather than per cell" is moot — the reset plan retired
 hand-written cells and banned the sample-corpus measurement the family verdict was to ratify against, so
 nothing is left for it to govern — rests on want:22; compiler-readiness-plan.md:88.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands.
 
 **13.** The normal-form rulings — fold literal arithmetic type-aware including division by a nonzero
 literal, run every fold through the compiler's one shared evaluator, never accept algebraic
@@ -216,7 +283,8 @@ permits for a rewrite with no written validity argument; widening later is a per
 at phase 6, not an owner fork. Modulo staying unfolded is correctly open — its sign convention is a
 phase-3 language question — rests on precept-language-spec.md:213;
 docs/Working/normal-form-draft-2026-07-19.md:35.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands,
+including that the integer-division coercion defect is fixed before anything folds division.
 
 **14.** On the approximate `number` lane, nonzero / positive / nonnegative also establish not-NaN,
 infinity is deferred under the overflow model, and underflow is left open — first appears `ce72725d`,
@@ -228,7 +296,8 @@ follows whatever overflow gets. Underflow is genuinely open and recording it ope
 prove-or-reject the open case must *reject*: two `nonzero` operands can multiply to exactly 0.0, so a
 divisor obligation may only discharge from non-zeroness established on the divisor itself — rests on
 docs/language/primitive-types.md:662, :663, :667.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands,
+including that the open underflow case rejects rather than defers.
 
 **15.** The arithmetic overflow model — integer, temporal, and number-lane infinity — is deferred past
 the MVP with no compile-time guarantee in the meantime — stamped as ruled 2026-07-14 (`dfeb52cc`,
@@ -241,7 +310,23 @@ fault class with neither is a hole. Whether overflow is a phase-5 fault family, 
 prove-or-reject versus arbitrary precision for `integer` — which is already on the Waiting-on-you list,
 not decided here — rests on docs/philosophy.md:53; precept-language-spec.md:110, :112; want:104
 (72c2e183:98), :165.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — **re-asked 2026-07-26 in plain terms** (first pass, put in the
+walk's own vocabulary, drew "derived"; re-asked with the consequence stated — compiler does not prove it,
+runtime does not guard it, a program can overflow and nothing stops it — and he answered "yes").
+Recorded on the second answer.
+
+**This inverts the printed answer.** The deferral is an owner ruling, so overflow is a deliberate,
+owner-authorized exemption from prove-or-reject for the MVP — not a hole to close in phase 5. Consequences:
+- No document may claim overflow is prevented. `philosophy.md:53` and `precept-language-spec.md:110`,
+  `:112` list it among compile-time impossibilities; phase 2 reconciles those against the ruling, and the
+  aspirational-philosophy ruling at item 23 governs how (the target may stand; a claim of *current*
+  prevention may not).
+- want:165 removes the runtime guards, so the exemption means unguarded at both ends. That is the
+  accepted cost of the ruling, recorded here rather than argued.
+- The 441 deferred temporal fault coordinates stay deferred.
+- Item 14's infinity clause, which rides on this deferral, stands with it.
+- The underlying arithmetic-model choice (fixed-width 64-bit vs arbitrary precision for `integer`) stays
+  on the waiting list; the deferral does not decide it.
 
 **16.** Where a value came from — not whether it can be proven — decides prove-versus-govern, so a
 relational rule over independently-set fields is governed at runtime rather than proven — first appears
@@ -256,7 +341,9 @@ a premise you name (want:143, 72c2e183:131); re-evaluating rules against the pos
 on every operation is not — you deny it outright (want:199, 72c2e183:192). The fight resolves against
 canon; phase 2 deletes the canon sentence and phase 5 proves relational rules — rests on want:103, :199
 against compiler-and-runtime-design.md:125.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26, after being shown the canon sentence
+verbatim; his words: "that was derived, I did not write that exactly." The claim carries no authority;
+phase 2 deletes compiler-and-runtime-design.md:125 and phase 5 proves relational rules.
 
 **17.** The obligation-discharge matrix, once populated and ratified, was to become the canonical
 exhaustive definition of the proof engine — first appears `5d554d59`, 2026-07-19.
@@ -264,7 +351,10 @@ exhaustive definition of the proof engine — first appears `5d554d59`, 2026-07-
 three of the matrix's six ways of slicing survive as inputs, one is corrected, two are dropped, and the
 structure is a walk over the language's expression forms instead. Nothing downstream reads the matrix as
 a definition, so the mark costs nothing — rests on compiler-readiness-plan.md:890–914.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26, after being shown `5d554d59`'s commit
+message verbatim ("the structure owner-ruled to become the canonical exhaustive proof-engine
+definition"); his answer: "yes". The ruling was genuine and has since been superseded by the reset plan
+(plan:890–914) — superseded by a later decision of his own, not overturned as unfounded.
 
 ## C. Claimed rulings in the language statement and canon (phases 2–3)
 
@@ -279,7 +369,9 @@ otherwise — prove-or-reject applied unchanged. "Uniformly" means the rule does
 `reject` message and a `set` right-hand side, which is the author-facing uniformity you require at
 want:173 (verbatim 72c2e183:161). The fallback idiom already exists, so no new language surface is
 involved — rests on precept-language-spec.md:1553, :1487; want:173.
-**☐ the rule stands ☐ the lock comes off ☐ don't remember**
+**☑ the rule stands** ☐ the lock comes off ☐ don't remember — marked 2026-07-26, after being shown
+spec:1553 verbatim; his word: "mine". The spec sentence stays as written; only the withdrawn locking
+argument is struck from the record. BUG-060 and BUG-061 keep their standing (item 27).
 
 **19.** Periods do not order (equality only; Decision 14 stands) — the same-day withdrawal (`e33be4b6`,
 2026-07-24) of a contrary same-basis-ordering ruling (`338ecafa`) that was *also* recorded as yours; at
@@ -291,7 +383,19 @@ honesty — and canon is now internally consistent, the one contrary row having 
 to one integer component); it is a preference, cheap either way, needs a qualifier-conditional ordering
 trait that does not exist, and D14's stated workaround (compare concrete dates) already covers it —
 rests on docs/language/temporal-type-system.md:1478; docs/language/collection-types.md:533.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine — the ordering ruling (`338ecafa`), not the withdrawal** ☐ not mine ☐ don't remember —
+marked 2026-07-26, after being shown both commit messages in full; his words: "mine, I ruled that we
+should make same-basis periods orderable, which was against canon."
+
+**This inverts the printed answer, which assumed neither was his.** Consequences, none settled here:
+- `e33be4b6`'s stated basis — "on the owner reaffirming D14" — did not happen. The withdrawal is struck.
+- Decision 14 (`temporal-type-system.md:1478`, "No ordering on period — ==/!= only") is overridden by
+  owner ruling. It is a locked four-leg decision, so the override is recorded as his, not re-argued.
+- `collection-types.md:533` is no longer drift to correct down; it matches the ruling.
+- The qualifier-conditional ordering trait this needs does not exist and is new language surface —
+  routes to `/design`, added to the plan's "Waiting on Shane" table as scheduled work, not a question.
+- BUG-047 (positive-on-period strip) stops being mechanical and is re-checked (item 27 already flags it
+  as inheriting from this item).
 
 **20.** Three fork stamps: function-argument constraints are build-work, not a fork (`4774ed43`);
 `notempty` is string-only (`c67f334e`, dated back to 06-03); currency codes are uppercase-only, D13b
@@ -308,7 +412,15 @@ uppercase-only is right on the ISO 4217 × UCUM collision — case-insensitive l
 `price in 'Zar' of 'mass'` compile clean, silently capturing a live UCUM unit as a currency — rests on
 precept-language-spec.md:1614 with src/Precept/Language/DiagnosticCode.cs:51;
 docs/language/business-domain-types.md:1806–1807.
-**☐ mine ☐ not mine ☐ don't remember**
+**Marked 2026-07-26, split three ways as asked:**
+- **Function-argument constraints (`4774ed43`)** — no mark taken. The commit claims no owner ruling; it
+  disposes of the item as build work under existing rules. Withdrawn from the walk as mis-included.
+- **`notempty` is string-only (`c67f334e`, dated back to 2026-06-03)** — ☐ mine ☐ not mine
+  **☑ don't remember**. Printed answer stands, recorded as derived: string-only is right, collection
+  cardinality stays single-sourced as `mincount`/`maxcount`.
+- **Currency codes uppercase-only, D13b (`d74740cf`)** — **☑ mine** ☐ not mine ☐ don't remember; his
+  answer: "yes", after being shown the ISO 4217 × UCUM collision reason. D13b keeps owner authority, and
+  BUG-062 (the case-insensitive `CurrencyCatalog` accepting `'usd'`) keeps its standing.
 
 **21.** philosophy.md:49 was reworded ("Business logic cannot produce an answer that violates a declared
 rule") and the edit is live at HEAD — philosophy edits require your explicit approval, and the ledger
@@ -321,7 +433,11 @@ document. The process breach is real and worth recording, but it changes the rec
 One line for phase 2, not this item's substance: the unqualified "No errors. No bugs." in front of it is
 the bigger overclaim — rests on docs/philosophy.md:49 against :43;
 docs/Working/proof-engine-decision-ledger-2026-07-12.md:63 against commit `33dde428`.
-**☐ approved ☐ not approved ☐ don't remember**
+**☑ approved** ☐ not approved ☐ don't remember — marked 2026-07-26, after being shown the old and new
+wording; his answer: "yes". No process breach to record: the edit was approved, so the ledger's
+"drafted for owner approval before applying" is a recording error, not an unapproved philosophy change.
+The separate row the printed answer raises — the unqualified "No errors. No bugs." sitting in front of
+it — is untouched by this mark and stays on phase 2's list.
 
 **22.** Three further severity flips to Error — required-state dominance, unsatisfiable rule,
 contradictory rule — recorded 2026-07-12 alongside a disclosure that a fabricated philosophy citation
@@ -334,7 +450,11 @@ philosophy.md:51 says the compiler "proves impossible at definition time", and a
 The fabricated citation damages the record, not the conclusion. All three are still Warning at
 Diagnostics.cs:747, :802, :814, so phase 10 keeps the three tests either way — rests on
 docs/philosophy.md:51; src/Precept/Language/Diagnostics.cs:879 against :747, :802, :814; want:124.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26; his words: "I ruled that these should be
+elevated to error". All three flips carry owner authority. The fabricated philosophy citation in the
+ruling's grounding is a record defect only. The code is unchanged — all three are still `Severity.Warning`
+at Diagnostics.cs:747, :802, :814 — so this is now an owner-ruled change that was never built, and
+phases 10 and 11 own the failing tests and the fix.
 
 **23.** The doc convention that a spec states the target while a status field states the gap — so
 philosophy claiming compile-time impossibility beside a "no live guarantee" note is not a contradiction.
@@ -345,7 +465,15 @@ carries no status field at all and the disclosure sits in a different document, 
 unqualified "compile-time impossibilities" is not an instance of the convention — under :23's own
 honesty commitment it stays a real row for phase 2 — rests on CLAUDE.md:63–70; docs/philosophy.md:1–12,
 :53 against docs/language/primitive-types.md:697.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26; his words: "philosophy.md is a statement
+and guiding principle for where we are going. It's aspirational, the code will be made eventually
+consistent and we need to validate the code against it, not the other way around."
+
+**This overrides the second half of the printed answer.** `philosophy.md:53`'s unqualified "compile-time
+impossibilities" is not an overclaim to soften and does **not** go on phase 2's correction list. It is
+the target; the gap is the code's, and phases 9–11 close it. The missing status field is not a defect
+either — philosophy.md is aspirational by design and needs no gap declaration. Phase 2 must not weaken
+philosophy.md to match current behaviour.
 
 ## D. Authority claims from the earlier arc
 
@@ -361,7 +489,20 @@ against by want:201–204 and already reversed by the reset plan, F5 traces to w
 the step vocabulary lives) is a real engineering call, itself grounded in the catalog-before-code rule —
 rests on docs/Working/proof-engine-boundary-ruling-2026-07-06.md:358; want:171;
 docs/Working/prove-govern-collation-index-2026-07-15.md:178.
-**☐ ratified ☐ never ratified ☐ don't remember**
+☐ ratified ☐ never ratified **☑ don't remember** — marked 2026-07-26. First answer was "yes, i did";
+corrected moments later to: "I don't remember if I ratified the document, but the summary you showed me
+matches what I asked for." Recorded on the correction. So: the ratification itself is unresolved and the
+document's "pending Shane ratification" footer is not established as stale — but the **substance** of the
+executive ruling, shown to him in plain terms, is endorsed as matching his intent.
+
+**This conflicts with item 16 and the conflict is not resolved here.** The boundary ruling's central
+line — a raw external value at its own ingress slot is governed at runtime; anything derived from it is
+proven or rejected — is the same provenance split he marked *not mine* at item 16, where the disposition
+was that phase 2 deletes `compiler-and-runtime-design.md:125`. With the substance endorsed here, phase 2
+cannot simply delete it on the strength of item 16's mark. Only he can say which stands. **Pulled out as a live question and
+added to the plan's "Waiting on Shane" table** rather than settled in this walk. The item 16 mark stands
+as recorded (he did not write that canon sentence); what is now open is whether the split it states is
+nonetheless his ruling by way of this ratification.
 
 ## E. Recorded as agent work — one mark each, to confirm none is actually yours
 
@@ -375,7 +516,8 @@ corpus measurements and their counts, restored strings, file layouts (`60ef5a11`
 are frozen with a marker saying no cell is citable, phase 5 is forbidden from citing them, and only the
 six ways of slicing survive (three as inputs, one corrected, two dropped), that survival decided by
 phase 5's own reading — rests on compiler-readiness-plan.md:553–556, :996, :890–906.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Confirmed agent work;
+the plan's disposal stands.
 
 **26.** Records of failure and reversal — the five refuted validity arguments, the four fault kinds with
 no argument, slice 3's failed ratification, the design loop that did not converge, the retracted
@@ -386,7 +528,8 @@ force from the refutation, which is re-checkable. Two things carry forward rathe
 the withdrawal of the fresh-symbol treatment of the editable-field door restores want:143, and the
 refutation of treating a computed field's defining equation as typing context is already on the
 Waiting-on-you list — rests on want:143 (72c2e183:131).
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his words: "agent work". Self-reported
+throughout; the refutations keep their force from being re-checkable.
 
 **27.** The bug filings, BUG-033 through BUG-066 — verified defects, filed not approved, owned by phases
 10 and 11.
@@ -395,7 +538,11 @@ entry recording how it was reproduced — checkable, not authorised. Worth knowi
 inherit their standing from items in this walk (BUG-062 from item 20's D13b; BUG-060 and BUG-061 from
 item 18's rule; BUG-047 from item 19's single-basis canon) — if those fall, those four get re-checked
 and the rest are untouched — rests on docs/Working/bugs.md:107–114 (BUG-062's filing against D13b).
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his words: "agents created the bugs, as we
+were walking through". Filings stand on their reproductions. Three of the four inheriting bugs keep
+their standing (BUG-062 from item 20's D13b, marked his; BUG-060 and BUG-061 from item 18's rule, which
+stands); **BUG-047 is re-checked** — item 19's mark reversed the period-ordering basis it was filed
+against.
 
 **28.** The 2026-07-12 slice designs and the certificate vocabulary counts — money, case-by-case,
 single-fact, counterexample, constant-rule, shared-core, the 21 step kinds and 11 premise kinds.
@@ -405,7 +552,9 @@ against that number is, in the plan's words, a coin toss with a figure written o
 worth keeping is not a count: want:199 (72c2e183:192) fixes what a certificate must contain — per
 obligation, the theorem, the premises used, and the derivation — rests on
 compiler-readiness-plan.md:829–831; want:199.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26, after being shown the closed-vocabulary
+claim verbatim (eleven premise kinds, twenty-one step kinds); his word: "derived". Neither count is
+inherited; phase 5 derives its own vocabulary, and want:199 fixes what a certificate must contain.
 
 **29.** The decisions inside the two unlocked establishment/preservation designs and the
 externally-grounded transport restatement — occasion keying details, the state-scoped premise
@@ -422,7 +571,11 @@ sound under either ruling, and phase 5 revisits it when that question closes. Th
 and the two-level completeness check are engineering calls, either defensible — rests on want:24;
 docs/Working/constraint-establishment-preservation-obligations-2026-07-23.md:867;
 compiler-readiness-plan.md:901.
-**☐ mine ☐ not mine ☐ don't remember**
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his words: "that's pure agent speak, so
+guessing agent work". Printed answer stands. **Note for phase 5**: the vocabulary itself is the finding
+here — "occasion keying", "kill-on-may-write / earn-on-must-run", "state-scoped premise restriction" are
+coined terms that made the group unreadable to its owner. Phase 5 re-derives these in plain terms per
+CLAUDE.md § How to write, and does not carry the names forward.
 
 ## F. The sample — ten traced rows, now a verification result
 
@@ -443,7 +596,11 @@ violate any rule"; want:18–19 make premise class (d) usable only if the rule h
 inductive step; a file that consumes a rule with neither and divides by zero is :24's direct negation.
 All three lines are in the 182 you committed — rests on want:18–19, :24;
 want-document-provenance.md:27–29.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine — on the substance, not the wording** ☐ not mine ☐ don't remember — marked 2026-07-26, after
+being shown want:18–19 and :24 verbatim; his words: "I didn't write that directly, but it reflects what
+I asked for." Read as: the derived defect claim is not his sentence, the cited lines are his and are not
+disputed, and the inference from them is endorsed. **Not counted as a sample error** — the sample tests
+whether the cited line carries the claim and whether he wrote the line; both hold.
 
 **31.** A proof may cite a fact only if something establishes and preserves that fact — the
 divide-in-one-handler, zero-in-another file breaches your promise.
@@ -452,7 +609,8 @@ check passes. :24 supplies the promise; :104 supplies the fault half (the declar
 the division safe, no runtime zero-check behind it) — :104's HEAD wording is the reword, but the claim
 is verbatim yours at 72c2e183:98, already substituted in the register — rests on want:24, :104
 (72c2e183:98).
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine — on the substance** ☐ not mine ☐ don't remember — marked 2026-07-26, after being shown
+want:24 and :104 verbatim; his words: "mine on substance". Sample check holds.
 
 **32.** A constraint modifier on a computed field is established by nothing and must not be consumable
 as a premise (BUG-048).
@@ -461,7 +619,9 @@ no-consumption-while-unestablished follows directly — but "established by *not
 whether the defining equation can establish it is precisely the open question on the Waiting-on-you
 list. BUG-048's own fix note says the same: the no-consumption rule holds "until then". Mark *mine* on
 the conditional form, not the permanent one — rests on want:18, :22; docs/Working/bugs.md:390.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine — on the conditional form** ☐ not mine ☐ don't remember — marked 2026-07-26, after being shown
+want:18 and :22 verbatim; his words: "those two lines you highlighted, those are mine." Sample check
+holds. The permanent form stays open pending the computed-field-equation question on the waiting list.
 
 **33.** A fault-prone expression inside a reject message is a compile-time obligation like any other.
 **Check:** this is the caught error. The stated basis, want:72 — a reject message containing a division
@@ -471,7 +631,11 @@ merits, on different lines: :104 (72c2e183:98) puts faults on the same footing a
 (72c2e183:153) removes every runtime fault check, so any expression the evaluator will actually run — a
 reject message included — is proven at compile time or nothing catches it — rests on
 want-document-provenance.md:103, :113; want:104, :165.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine — on the corrected basis** ☐ not mine ☐ don't remember — marked 2026-07-26, after being shown
+a worked message (`reject "need {Total / Months} per month"`) and want:104/:165 verbatim; his answer:
+"yes". The original basis (want:72, Copilot-written) stays struck; the claim holds on :104 and :165.
+**This remains the one counted sample error** — the register's original citation was wrong and was
+corrected before the sitting; the claim itself survives on lines he wrote.
 
 **34.** `nonnegative` contributing nothing to a field's declared interval is a defect by your own model,
 not a design choice.
@@ -480,7 +644,8 @@ one constraint mechanism underneath, so an interval honouring `max 100` while ig
 two spellings behaving differently under one mechanism; the −10 that results is :24's negation. (The
 failing behaviour is compiler observation — legitimate for showing a defect against the standard, never
 for setting the standard.) — rests on want:22.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26; his words: "the quoted line is mine"
+(want:22, shown verbatim). Sample check holds.
 
 **35.** Preservation attaches to every governed operation occasion — construction rows, state actions,
 the editable-field door — not only event handlers.
@@ -492,7 +657,10 @@ writes nothing owes nothing under :20; that extension is item 7's claim, separat
 answered there. One more line: :19 says "every handler", and the design reads that as granularity rather
 than quantifier — defensible, but a reading — rests on want:19, :20, :143;
 constraint-establishment-preservation-obligations-2026-07-23.md:815.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine — the enumeration** ☐ not mine ☐ don't remember — marked 2026-07-26, after being asked plainly
+whether a rule must be preserved wherever a field it mentions is written, including construction rows,
+state actions and editable-field writes; his answer: "yes". Sample check holds. The separate extension —
+that an operation writing nothing still owes a proof — is item 7's claim and is marked *not mine* there.
 
 **36.** Whether an operation owes preservation is declared per operation — Create, Fire and Update owe
 it; Restore does not.
@@ -504,13 +672,17 @@ does not speak to; that half is grounded in canon — restored state "trusted as
 persisted… reconstituted, not re-governed on load" — rests on want:141 (72c2e183:129);
 precept-language-spec.md:272, :1969;
 constraint-establishment-preservation-obligations-2026-07-23.md:315.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26, after being asked plainly whether Create,
+Fire and Update each owe a preservation proof while Restore is exempt because the data was governed when
+first written; his answer: "yes". Sample check holds. The per-operation declaration mechanism (rather
+than per writer category) remains grounded in canon, not in his writing.
 
 **37.** The same Restore-exempt duty, incorporated verbatim into the linkage design.
 **Check:** identical claim, identical verdict, same limit as item 36 — the exemption is yours, the
 per-operation declaration mechanism is not. The duplicate consistency check passes; both get the same
 mark — rests on want:141 (72c2e183:129); obligation-linkage-and-completeness-2026-07-23.md:226.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26, carried from item 36 as the walk's own
+instruction directs (identical claim, identical verdict). The duplicate consistency check passes.
 
 **38.** Every containment obligation resolves to proven / proven-violating / unresolved, and both
 non-proven verdicts block compilation.
@@ -521,7 +693,10 @@ printed condition is also yours: :179 (72c2e183:167) has the compiler "compute t
 constraint that would close the proof" and show it. Only the three verdict *names* have no counterpart —
 harmless vocabulary. A *mine* mark covers the blocking rule and the printed condition, not the taxonomy
 — rests on want:171, :110, :124, :179.
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine — the blocking rule and the printed suggestion** ☐ not mine ☐ don't remember — marked
+2026-07-26, after being asked plainly whether both non-proven outcomes stop compilation, including
+"couldn't work it out"; his answer: "yes". Sample check holds. The three verdict names remain
+vocabulary with no counterpart in his writing.
 
 **39.** There is no author-visible "trust me" escape hatch that softens prove-or-reject.
 **Check:** carries most directly of the ten. :189 names "constructs that compile without their
@@ -529,7 +704,8 @@ obligations proven, checks silently deferred, warnings where there should be err
 author-visible trust-me marker is that construct by definition — and :173's "no tiers of trustworthiness
 to reason about" reaches the same place independently (:173's HEAD wording is the reword; the claim is
 verbatim yours at 72c2e183:161) — rests on want:189; want:173 (72c2e183:161).
-**☐ mine ☐ not mine ☐ don't remember**
+**☑ mine** ☐ not mine ☐ don't remember — marked 2026-07-26, after being shown want:189 and :173
+verbatim; his answer: "yes". Sample check holds.
 
 ---
 

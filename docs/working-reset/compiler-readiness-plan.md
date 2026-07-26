@@ -62,11 +62,11 @@ stop, lands two and a half to three and a half weeks in. Recompute whenever a si
 
 | Slice | State | Blocked on |
 |---|---|---|
-| 1.1 Walk the commits and build the register | Not started | — |
-| 1.2 Pull out the decisions that live only in a document | Not started | — |
-| 1.3 Prepare the conversation | Not started | 1.1, 1.2 |
-| 1.4 The walk itself | Not started | 1.3, Shane's time |
-| 1.5 Fold the marks back | Not started | 1.4 |
+| 1.1 Walk the commits and build the register | Done | — |
+| 1.2 Pull out the decisions that live only in a document | Done | — |
+| 1.3 Prepare the conversation | Done | 1.1, 1.2 |
+| 1.4 The walk itself | Done 2026-07-26 — 41 marks, 0 unmarked; sample passed 10/10 | 1.3, Shane's time |
+| 1.5 Fold the marks back | In progress | 1.4 |
 | 1.6 Dispose (does not block the phase) | Not started | 1.5 |
 
 ## 3. Ruled — do not reopen
@@ -100,11 +100,42 @@ verbatim quotations phase 1 requires. Phase 1's walk removes any row you did not
 
 ## 4. Waiting on Shane
 
-**One item, and it blocks phase 5.**
+**Eight items. Two block phase 5 outright; the rest stall named pieces of it.** The first row predates
+the phase-1 walk. Rows two through eight were either raised by the walk of 2026-07-26 or were standing
+questions recorded in the walk file that had never been carried into this table.
 
 | What you are asked | Stalled until you answer | Reasoning |
 |---|---|---|
 | **Where the discharge fragment stops** — which formulas the compiler will decide, and therefore what the language admits. Expect the first honest fragment to be smaller than today's grammar; that gap is the price of the guarantee | **Phase 5** | Phase 5, "Where the fragment stops" |
+| **Is a rule over values supplied from outside proven by the compiler, or governed by the runtime?** The 2026-07-06 boundary ruling says governed — you endorsed that summary as matching what you asked for, while not recalling ratifying the document. Your own worked example at want:103 goes the other way: `ReduceLimit` writes one field of exactly such a rule and you say the compiler rejects the handler and then proves it once a guard is added. Both cannot hold | **Phase 5**, and phase 2's disposal of `compiler-and-runtime-design.md:125` | The walk, items 16 and 24 |
+| **May a proof use the fact that an earlier transition row's guard did *not* match?** Rows are tried in order and the first match wins, so reaching a later row means every earlier guard was false | Phase 5's fragment edge | Walk file, "Waiting on you" |
+| **Can the formula that defines a computed field count as establishing a constraint written on that field?** Treating it as typing context was refuted; routing it as an earned fact needs an argument nobody has written | Phase 5's premise set, and whether the ban in item 32 is permanent | Walk file, "Waiting on you" |
+| **May "the entity is in state S" itself be used as a premise?** | Whether a residency `ensure` can feed other proofs; the conservative state-scoped restriction stays until this closes | Walk file, "Waiting on you"; phase 5 |
+| **Does `from any` mean one row per state?** Comma-separated state lists do; the wildcard is unstated | Phase 5's route enumeration; closes at phase 3 | Walk file, "Waiting on you" |
+| **How many state actions may a state declare, and do entry actions run at construction and on a transition back into the same state?** | Phase 5's rule for which state actions must run; the current designs carry both readings at once | Walk file, "Waiting on you" |
+| **The arithmetic model for `integer`** — fixed width, or arbitrary precision, and the temporal case that follows it. Separate from the overflow deferral, which you ruled at the walk's item 15 | Overflow's place in phase 5's families, and the 441 deferred temporal coordinates | Walk file, "Waiting on you"; walk item 15 |
+
+### Work the 2026-07-26 walk created
+
+Not questions — decisions you gave that now need building. Recorded here so they are not lost between
+phases.
+
+- **Same-basis periods order** (walk item 19). You ruled it, against locked Decision 14. That overrides
+  the locked decision on your authority; `temporal-type-system.md:1478` and `collection-types.md:533`
+  reconcile to the ruling at phase 2, and BUG-047 is re-checked. The ordering itself needs a
+  qualifier-conditional trait that does not exist — **new language surface, so it goes through
+  `/design`**, not into a phase-2 doc edit.
+- **Three severities rise to Error** (walk item 22) — required-state dominance, unsatisfiable rule,
+  contradictory rule. Your ruling; the code still has all three at Warning. Phase 10 owns the failing
+  tests, phase 11 the fix.
+- **Overflow is an authorized exemption, not a hole** (walk item 15). Phase 5 does not carry it as a
+  fault family. Phase 2 reconciles `philosophy.md:53` and `precept-language-spec.md:110`, `:112`, which
+  currently name overflow among compile-time impossibilities — under walk item 23 the aspirational claim
+  may stand, but no document may state it as currently prevented.
+- **`philosophy.md` is not corrected down to current behaviour** (walk item 23). It states the target;
+  the code is validated against it. Phase 2's correction list drops the `philosophy.md:53` row.
+- **The compiler is widened to judge a handler on the configuration it commits** (walk item 9), not
+  write by write. Fault obligations stay per evaluation pending your word.
 
 Every request for your word that is not a scheduled phase sign-off belongs here. The sign-offs are the
 four **Shane** rows on the board and each phase's *What you sign off* paragraph.
