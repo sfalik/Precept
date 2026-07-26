@@ -5874,13 +5874,13 @@
   "unmarked": 0,
   "withdrawn": 1,
   "tally": {
-   "mine": 23,
-   "not mine": 16,
+   "mine": 24,
+   "not mine": 15,
    "don't remember": 2,
    "withdrawn": 1
   },
   "howItWasAsked": "Each claim was put in plain terms with the cited lines quoted verbatim. Three items were re-asked at his request after he said the plain restatements were easier to follow, and all three inverted - see finding below.",
-  "finding": "Items 3, 9 and 15 each drew 'derived' or 'not mine' when put in the register's own compressed vocabulary, and each came back 'mine' when the same claim was restated in ordinary terms with a worked case. Item 15 is the expensive one: asked one way it read as an agent's deferral to close, asked plainly it is his ruling and overflow is an authorized exemption. Any future sitting states the claim plainly and shows a worked case; it does not read the register's phrasing aloud.",
+  "finding": "He asked partway through which items should be re-asked in plain terms. Seven were, and every one came out differently from the first pass: 3, 7, 9 and 15 inverted to mine; 9's fault half was ruled after being left as the assistant's flag; 16 was ruled on a worked case, closing its conflict with 24; and 11 and 14 turned out never to have been put to him at all, so the compressed phrasing had made two open decisions look like settled agent work. Item 15 is the most expensive - phase 5 would have built a fault family his ruling exempts. The compression slice 1.3 was judged on is what caused it. Any future sitting states the claim plainly and shows a worked case.",
   "items": [
    {
     "item": "1a",
@@ -5993,10 +5993,10 @@
    {
     "item": "7",
     "claim": "All five constraint forms are obligations; a residency ensure is re-established on every entry",
-    "mark": "not mine",
-    "hisWords": "derived",
-    "printedAnswer": "stands",
-    "consequence": "Forced by want:171 and by what `in <State> ensure` means.",
+    "mark": "mine",
+    "hisWords": "it has to be one, otherwise the constraint could be violated at runtime",
+    "printedAnswer": "inverted",
+    "consequence": "Re-asked as an order moving Packed -> Shipped writing nothing, against a constraint that holds while Shipped. Every route into a state owes a proof of that state's constraints, including routes that write nothing - entering the state activates the constraint, so arrival is the first moment it can be violated. Non-fault rule, so judged on the committed configuration per item 9; what this settles is that the operation owes the obligation at all.",
     "governedRows": [
      236,
      237
@@ -6019,7 +6019,7 @@
     "mark": "mine",
     "hisWords": "yes, end state only (re-asked in plain terms; first pass drew derived)",
     "printedAnswer": "inverted",
-    "consequence": "The compiler is widened to judge a handler on the configuration it commits. Faults stay per evaluation pending his word - a fault occurs when the expression is evaluated, so there is no end state to judge. Flagged, not assumed.",
+    "consequence": "Re-asked in plain terms. Ruled: 'Faults must always be prevented by the compiler. Other rules that don't prevent faults only need to be true at the end of the handler.' The check on a fault is at the point of evaluation against the values in force there, not 'no bad value anywhere in the handler' - he supplied the pair himself: Months=0 then 12 then divide compiles; Months=0 then divide then 12 does not. Same writes, different order. That is spec:233's sequencing applied to fault obligations. A rule relied on to discharge a fault inherits the strict treatment - the assistant's reading, for phase 5 to confirm rather than assume.",
     "governedRows": [
      234,
      235
@@ -6046,7 +6046,7 @@
     "mark": "not mine",
     "hisWords": "derived",
     "printedAnswer": "stands",
-    "consequence": "Exactness holds; phase 4 writes the finite-procedure half with the cap and its fallback in.",
+    "consequence": "Re-asked in plain terms; his answer: 'I did not rule on this previously', and it had never been put to him. The mark holds. It is now its own Waiting on Shane row blocking phase 4's contract: does a refusal claim 'I searched and did not find a proof' or 'no proof exists'? The second narrows the language to constructs where that question is always answerable. spec:225 licenses the first; nothing licenses or rules out the second. It was briefly folded into the fragment row and he asked for it back out.",
     "governedRows": [
      350
     ]
@@ -6092,7 +6092,7 @@
     "mark": "not mine",
     "hisWords": "derived",
     "printedAnswer": "stands",
-    "consequence": "not-NaN forced; the open underflow case rejects rather than defers. The infinity clause rides on item 15 and now stands with it.",
+    "consequence": "Re-asked in plain terms; his answer: 'never put to me'. The not-NaN clause stands as derived and forced. The underflow half is not settled by the printed answer: reasoning from the parts is unsound and cannot be the answer, but the cost of the alternative - authors restating the constraint on the divisor - was never worked out. Now a Waiting on Shane row, to be prepared with worked examples first. Check which lanes it applies to; the underflow is not confined to number.",
     "governedRows": [
      265,
      267
@@ -6554,7 +6554,8 @@
     ]
    }
   ],
-  "conflictResolved": "Items 16 and 24 pointed opposite ways during the sitting and the conflict was pulled to Waiting on Shane. It was closed the same day, before the plan was committed, by re-asking item 16 as a worked case. The row has been removed from the plan's table. This is the fourth instance of the sitting's finding: a claim that inverts when asked plainly."
+  "conflictResolved": "Items 16 and 24 pointed opposite ways during the sitting and the conflict was pulled to Waiting on Shane. It was closed the same day, before the plan was committed, by re-asking item 16 as a worked case. The row has been removed from the plan's table. This is the fourth instance of the sitting's finding: a claim that inverts when asked plainly.",
+  "preparationRule": "Added to the plan 2026-07-26: no Waiting on Shane row is put to him as an abstract fork. The phase that is blocked prepares it first - options named plainly, cost stated as what stops compiling, at least one worked .precept example per option, and the refusal message an author would see. A question without those is not ready to ask, and the phase that owns it is not finished."
  },
  "walkUnresolved": [
   {

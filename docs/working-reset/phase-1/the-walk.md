@@ -37,29 +37,44 @@ withdrawn as mis-included (item 20's function-argument row, which claimed no own
 
 | Mark | Count | Items |
 |---|---|---|
-| mine | 23 | 1 (both rows), 2, 3, 9, 15, 17, 18, 19, 20c, 21, 22, 23, 30–39 |
-| not mine | 16 | 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 25, 26, 27, 28, 29 |
+| mine | 24 | 1 (both rows), 2, 3, 7, 9, 15, 17, 18, 19, 20c, 21, 22, 23, 30–39 |
+| not mine | 15 | 4, 5, 6, 8, 10, 11, 12, 13, 14, 16, 25, 26, 27, 28, 29 |
 | don't remember | 2 | 20b, 24 |
 | withdrawn | 1 | 20a |
 
 **The sample passed. Ten of ten came back *mine*, zero *not mine*, so slice 1.1 is not redone.** Item 33
 remains the one known error, caught and corrected before the sitting: 1 in 10, as recorded.
 
-**The one finding that matters, and it is about this file.** Three items were re-asked at his request
-after he said the plain restatements were easier to follow. **All three inverted** — 3, 9 and 15 each
-drew a *not mine* or *derived* when put in the walk's own compressed vocabulary, and each came back
-*mine* when the same claim was restated in ordinary terms with a worked example. Item 15 is the
-expensive one: asked one way it read as an agent's deferral to be closed; asked plainly it is his
-ruling, and overflow is an authorized exemption rather than a hole. The compression slice 1.3 was
-judged on is what caused this. Any future sitting states the claim plainly and shows a worked case; it
-does not read the register's phrasing aloud.
+**The finding, and it is about this file rather than about him.** He said partway through that the plain
+restatements were easier to follow, and asked which items should be re-asked that way. Seven were, and
+**every one of them came out differently from the first pass:**
 
-Two marks inverted their printed answers on his authority rather than on argument — item 1's catalog row
+| Item | Asked in the register's phrasing | Asked as a worked case |
+|---|---|---|
+| 3 — one expression, several routes | not mine | **mine** |
+| 7 — an operation that writes nothing | derived | **mine** — "it has to be one, otherwise the constraint could be violated at runtime" |
+| 9 — end state or every write | derived | **mine**, and then refined into the rule the build follows |
+| 9's fault half | (left as the assistant's flag inside his ruling) | **ruled** — faults always prevented, other rules true at the end |
+| 15 — the overflow deferral | derived | **mine** — an authorized exemption, not a hole phase 5 must close |
+| 16 — prove versus govern | not mine, and left conflicting with item 24 | **ruled** — the compiler refuses until the author supplies the premise |
+| 11 — what a refusal claims | derived | **never put to him**; now its own decision, blocking phase 4 |
+| 14 — where a divisor's non-zeroness comes from | derived | **never put to him**; now its own decision |
+
+Item 15 is the most expensive of them: asked one way it read as an agent's deferral for phase 5 to close,
+and phase 5 would have built a fault family his ruling exempts. Items 11 and 14 are the other failure
+mode — the compressed phrasing made two open decisions look like settled agent work, so they would have
+been decided by whoever wrote the code.
+
+The compression slice 1.3 was judged on ("judged on how short it makes the conversation", one line per
+item, no item may run to a second line) is what caused this. **Any future sitting states the claim
+plainly and shows a worked case; it does not read the register's phrasing aloud.** The plan's "Waiting on
+Shane" section now carries that as an obligation on the phase that owns each question.
+
+Two marks overrode their printed answers on his authority rather than on argument — item 1's catalog row
 ("the idea to use the catalog was mine") and item 23 (philosophy is aspirational; the code is validated
-against it, not the reverse). Two more changed the record substantially: item 19 (he ruled same-basis
-periods orderable, against locked Decision 14) and item 22 (he ruled three severities to Error, and the
-code never followed). One conflict is unresolved and left the walk for the plan's "Waiting on Shane"
-table: items 16 and 24 together leave open whether the prove-versus-govern split by data origin is his.
+against it, not the reverse). Two changed the record substantially: item 19 (he ruled same-basis periods
+orderable, against locked Decision 14) and item 22 (he ruled three severities to Error, and the code
+never followed).
 
 Marks are recorded inline below, each with the words he used.
 
