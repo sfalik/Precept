@@ -91,19 +91,20 @@ five claimed owner decisions checked in the week to 2026-07-25 were already answ
 
 **Provenance.** These rows come from an agent-written document dated 2026-07-25 and carry none of the
 verbatim quotations phase 1 requires. Phase 1's walk removes any row you did not say.
+| The old `docs/Working/` folder stays until phase 8 confirms, then everything moves to `Archive/` or `Superseded/` | Settled 2026-07-26 | Slice 1.6 |
+| The `nonnegative` unsoundness is fixed in phase 11 with everything else, not now | Settled 2026-07-26 — 47 tracked defects and probably hundreds untracked; fixing one does not move the needle | "Known risks", 4th |
+| The certificate step vocabulary closes at **phase 5**, not phase 4 — phase 4 produces a counted draft, frozen between the count and phase 5 opening | Settled 2026-07-26 | Phase 4; "What closes when" |
+| Phase 4 has **no numeric threshold** — it delivers the count plus, per step kind, recovered-or-invented and afternoon-or-fortnight; you record carry on or re-cut | Settled 2026-07-26 | Phase 4, "No numeric threshold" |
+| Phase 6 carries **no numeric re-cut threshold** either, and its size is answered by phase 4's afternoon-or-fortnight marks rather than picked now | Settled 2026-07-26 | Phase 6, "Size" |
+| The matrix's six ways of slicing do **not** carry as structure — the procedure walks expression forms. Three of the six survive as inputs, one is wrong as written and must be corrected, two are dropped | Settled 2026-07-26 | Phase 5, "What survives of the six" |
 
 ## 4. Waiting on Shane
 
-**Six items. Three block a phase; three do not.**
+**One item, and it blocks phase 5.**
 
 | What you are asked | Stalled until you answer | Reasoning |
 |---|---|---|
-| Phase 4's stop threshold: fix it at 30, or name a number in advance the drafters are not told | **Phase 4** | Phase 4, "The threshold" |
-| Certificate step vocabulary: closes at phase 4 (the signpost) or phase 5 (this plan) | **Phase 4** — draft or closure | "What closes when", 1st departure |
-| Do the matrix's six ways of slicing the problem carry into the new discharge procedure | **Phase 5** | "Does not answer", 2nd from last |
-| Phase 6's size: one to two days per argument (5–10 weeks) or half a day to a day (2–3 weeks) — two readings of one twelve-round measurement | Nothing; only the size | Phase 6, "Size" |
-| Is the old `docs/Working/` folder disposed of at all, or left alone | Nothing; slice 1.6 does not block phase 1 | Slice 1.6 |
-| Fix the confirmed unsound `nonnegative` discharge now, or in phase 11 with everything else | Nothing; also settles whether the eleven-week gap before product code is intended | "Known risks", 4th |
+| **Where the discharge fragment stops** — which formulas the compiler will decide, and therefore what the language admits. Expect the first honest fragment to be smaller than today's grammar; that gap is the price of the guarantee | **Phase 5** | Phase 5, "Where the fragment stops" |
 
 Every request for your word that is not a scheduled phase sign-off belongs here. The sign-offs are the
 four **Shane** rows on the board and each phase's *What you sign off* paragraph.
@@ -181,7 +182,7 @@ deliberately is not the word "locked", which has meant three different things in
 |---|---|---|
 | Phase 2 | The disagreements between canon and the want document. Nothing after re-litigates them | n/a |
 | **Phase 3** | **The language** — what you can write in a `.precept` file, including the list of write sites. The lists are machine-readable and the build checks them against the catalogs. Everything downstream assumes this | one per data file |
-| Phase 5 | The discharge procedure; the grid's axes; and **the certificate step vocabulary** | one per data file |
+| Phase 5 | The discharge procedure; the grid's axes; and **the certificate step vocabulary** — drafted and counted at phase 4, closed here | one per data file |
 | Phase 7 | The proof model. The grid is generated and reproducible from the closed lists | grid file |
 | Phase 9 | The catalogs | one per catalog data file |
 | Phase 10 | The test set, frozen at a named commit | freeze commit |
@@ -189,7 +190,7 @@ deliberately is not the word "locked", which has meant three different things in
 
 **Two departures from the settled input, stated rather than made quietly.**
 
-*The certificate step vocabulary closes at phase 5, not phase 4.* The signpost's table puts it at phase
+*The certificate step vocabulary closes at phase 5, not phase 4.* **Ruled 2026-07-26 — this is settled, not a proposal.** The signpost's table puts it at phase
 4. But step kinds are what the discharge procedure emits, and the procedure is not written until phase 5
 — so phase 5 will very likely need a step kind phase 4 did not draft, and under the closed-list rule
 that halts everything downstream on the plan's own schedule. Phase 4 keeps its whole value, which is the
@@ -218,6 +219,19 @@ look like a phase that keeps not closing. The real stopping points:
 - **Phase 8**, as a confirmation rather than a gate.
 
 ## Known risks, carried
+
+**A ten-minute check nobody has run.** Editable-field edits are said to discharge at the ingress door, which
+the execution order puts at phase 1. Computed fields recompute at phase 7. So a computed field derived from
+an edited field is written *after* the check that was meant to cover it. Raised 2026-07-26 by an independent
+read that did not probe it and called it worth ten minutes. If it holds, it is a soundness hole in an
+argument the matrix treats as settled, and it lands in phase 2 or 5 depending on what it turns out to be.
+
+**The induction's base rests on a stated assumption that is not written down as one.** "Every constraint held
+before this operation" is *proven* for data that arrived through the contract, and *assumed* for restored and
+host-injected data — the spec says restored state is trusted and not re-validated. The validity argument for
+premise class (d) is honest about this and excludes it by citing canon rather than by argument. That makes it
+an assumption of the guarantee, and phase 2 or 3 should state it in canon in those words rather than leave it
+inside a proof argument where nobody reading the promise will find it.
 
 Four things can still go wrong that no phase's finish line will catch on its own. Each is assigned.
 
@@ -507,12 +521,18 @@ count matches the number of *don't remember* marks; the sample error count is re
 phase 1 reads the register, the want document, the caveat register and the correction list, all of which
 arrive in 1.1 and 1.2. The disposal runs whenever convenient after that.
 
-**This is a departure from the settled input and it is marked as one.** The signpost says the old folder
-"is being left in place rather than cleaned", and the state-of-play document recommends fixing the
-abandoned bundle's two false status claims and leaving it. Both drafts of this plan disposed of it
-anyway. The disposal is kept here because a folder of 444 files that agents keep landing in is a standing
-cost, and it is made fully reversible so the departure costs nothing if it was wrong. If you would rather
-leave the folder alone, delete this slice; nothing else changes.
+**Ruled 2026-07-26: the folder stays until the reset is on solid footing, then everything moves into
+`docs/Working/Archive/` or `docs/Working/Superseded/`.** Not now, and not piecemeal.
+
+**Solid footing means phase 8 confirming rather than reverting.** That is not an arbitrary trigger:
+while phase 8 can still return "revert", the old folder is what would be reverted to, so archiving it
+before then destroys the fallback the whole branch strategy rests on. When phase 8 confirms, the bulk
+move becomes safe and is the first thing to do after it.
+
+Until then this slice does two things only — the deletion in step 1, because that bundle's method and
+findings are already extracted and it carries status claims that are simply false, and the marking in
+step 4, because a document that presents itself as authoritative is a live hazard to any agent that
+wanders in. **Steps 2, 3 and 5 wait for phase 8.**
 
 In this order, and nothing is deleted, moved or retired until what it holds is in the register:
 
@@ -771,9 +791,20 @@ than being settled here.
 **Goal.** Find out early whether the remaining judgement is a couple of dozen careful arguments or
 something much larger.
 
-**What it produces.** A dated list of certificate step kinds, each with a one-line description of what it
-asserts, and its count — emitted in the same machine-readable form phase 3 established, so phase 9's drift
-check compares a file that already exists rather than one it wrote itself.
+**What it produces.** A dated **draft** list of certificate step kinds, each with a one-line description
+of what it asserts, and its count — emitted in the same machine-readable form phase 3 established, so
+phase 9's drift check compares a file that already exists rather than one it wrote itself.
+
+**This list is not closed here. It closes at phase 5.** Ruled 2026-07-26. Step kinds are what the
+discharge procedure emits, and that procedure is not written until phase 5 — so closing the list now
+would guarantee the closed-list rule fires the first time phase 5 needs a step nobody thought to draft,
+halting everything downstream on a schedule this plan set for itself. Phase 4's value is the count, and
+a draft can be counted.
+
+**But the draft is frozen for counting.** Between the moment the count is recorded and the moment phase 5
+opens, the list does not change. Otherwise "we will close it at phase 5" becomes how a list stays open
+forever, and the count you ruled on stops describing the list you have. An edit in that window is a
+process violation and the count has to be retaken.
 
 **Done when.**
 
@@ -792,23 +823,27 @@ is not stable, the number is not a measurement, and the drafting is re-run befor
 anything.** This costs a few hours and it is the only thing found that turns "is the list complete" into
 something checkable at phase 4.
 
-**The threshold — contested, and you pick.** Everyone agrees "much larger than a couple of dozen" is not a
-threshold: the people drafting the list will know what number passes. Two answers were put forward and
-they are genuinely different:
+**No numeric threshold — ruled 2026-07-26.** A number here would be theatre. Thirty against thirty-one
+is not a distinction, and the twenty-one already designed were counted over the *existing* compiler's
+discharge paths rather than over the phase 5 walk, so measuring a new list against that number is a coin
+toss with a figure written on it. This stop is a judgement call and it is yours by definition — it is not
+"is the reasoning sound", it is "is this more work than I am willing to do", which nobody else can answer.
 
-- **Set it at 30, against the twenty-one already designed.** Twenty-one step kinds have been designed and
-  none built. Phase 6 says that at forty items the following phase is already unbuildable, so this stop
-  should fire below the point where the next phase is known to fail, not at it.
-- **You name the number in advance, blind, and the drafters are not told it.** The objection to the first
-  answer: the twenty-one was derived as the closure of evidence sources consulted by the *existing*
-  discharge paths — a count over the compiler's current paths, not over the phase 5 walk — and the
-  document that produced it parks an open question whose one candidate resolution grows the membership
-  past twenty-one. So measuring a list drafted by a new method against a number produced by an old one is
-  a coin toss with a number written on it.
+**What makes the judgement real is what you are handed, not a threshold.** A bare count cannot support it:
+thirty step kinds of which twenty-five are interval arithmetic, comparison and catalog lookups is an
+afternoon each and a different proposition entirely from thirty of which half are novel. So phase 4
+delivers the count **and**, per step kind, two marks:
 
-The second is more honest and costs nothing. The first is cheaper on your time. **Pick one before phase 4
-starts.**
+- **Recovered or invented** — was this step kind read off a discharge path the compiler already has, or
+  is it new? A recovered step has working code to argue against; an invented one does not.
+- **Afternoon or fortnight** — a rough read on what arguing it soundly would take. The measured rate here
+  is that arguments which held went about twelve adversarial rounds and ones written in a single pass
+  fell within hours, so this mark is the one that decides phase 6's size.
 
+You then record *carry on* or *re-cut* with the date. That is the stop.
+
+The drafters are told to make both marks and are not asked to total them or to recommend anything. Two
+independent drafters, so the list is not one person's segmentation.
 **What it may cite.** The closed language statement from phase 3; the want document; the canonical
 compiler documents on this branch; **and the phase 1 register.** The earlier step-list design is among the
 things phase 1 disposed of, but a step-list membership decision is a `## Decision` block, so slice 1.2
@@ -836,6 +871,54 @@ has quietly become phase 6 with the stop skipped.
 
 **Goal.** Write the discharge procedure as a walk over the expression forms the language allows, so that
 every form reaches exactly one case, nothing falls through, and the build proves it.
+
+**Where the fragment stops — the one thing on the "Waiting on Shane" table for this phase.** The procedure
+decides sequents drawn from a *subset* of the expression grammar, and where that subset ends is a decision
+about what the language admits, not a drafting choice. The grammar has fifteen expression forms, a fixed
+precedence table, a closed function catalog with no extension point, and a closed type vocabulary — so the
+fragment can be defined precisely and the claim becomes "the procedure decides every sequent in this
+fragment; anything outside is rejected, not skipped." That is a structural induction one person can finish.
+
+Expect the first honest fragment to be considerably smaller than today's grammar. Your own worked example
+needs linear decimal arithmetic, backward substitution, and one non-linear case closed by a guard that
+restates the post-state condition verbatim. That is a small fragment, while `contains`, quantifiers, member
+access, lookup by key, string functions, temporal arithmetic and qualifier algebra are all in the grammar
+and will all appear in real constraints. The gap between those two is the price of the guarantee, and
+`what-i-want-2026-07-16.md` already assigns the call to you — the guarantee is not negotiable, the surface
+is.
+
+**What survives of the matrix's six ways of slicing the problem.** Settled 2026-07-26 from an independent
+read that was deliberately not shown this plan. They are not the structure — the expression-form walk is.
+They are not one kind of thing either: three describe where obligations come from, three describe what the
+proof has to work on, and multiplying them together is what produced an enumeration with no bottom. Once
+an obligation exists the prover cannot see which write site made it, so most of the product means nothing.
+
+- **Obligation family** — not an axis. Establishment and preservation are the base case and the step of one
+  induction, differing only in whether the inductive hypothesis is in the premise set: one flag on the
+  obligation. Fault prevention differs in the *goal*, not the premises.
+- **Constraint kind** — five catalogue-enumerated members that compute exactly one thing, the set of
+  operations a constraint attaches to. A function, not five case shapes. Carries forward one open question:
+  whether "the entity is resident in S" is itself usable as a premise.
+- **Condition shape** — replaced by the grammar. But the four validity arguments already written under it
+  are statements about *formulas* that were mislabelled as statements about constraints; re-home each as a
+  named derivation rule keyed on the normalized goal's shape rather than discarding them.
+- **Write-site category** — **keep, and correct it.** The matrix lists five writers; `precept-language-spec.md`
+  lists eight and names three the matrix misses: the `into` target of `dequeue`/`pop`/`dequeueBy`, the `omit`
+  reset on state entry, and the update-patch group. The spec says a writer off that list produces a fact
+  surviving a write it should not, and there is a confirmed defect that is exactly that. Dropping this axis
+  costs soundness.
+- **Read-set shape** — dropped. Whether a pre-state fact is available is the *output* of backward
+  substitution, not a five-valued category, and the earlier version of this axis was already refuted by
+  counterexample.
+- **Type family** — too coarse. What the prover needs is a per-type table of algebraic properties: exact or
+  approximate arithmetic, total order, equality, which qualifier axes must agree, cardinality or length.
+
+**And the organising idea none of the six carried: the route.** All six classify declarations statically. An
+obligation attaches to a *path through an operation*, not to a piece of text — and the language already
+supplies the path, closed and ordered, as the spec's nine-phase execution order. Frame, fact survival and
+premise availability all fall out of substituting along that path. This is not abstract: the guard-match
+validity argument was found false because state exit actions run before the row's action chain, and its
+counterexample compiles clean at HEAD, reports **Proved**, and divides by zero.
 
 **What it produces.**
 
@@ -987,21 +1070,28 @@ of step kinds) × (cost per argument)*, and neither factor has a value today. Th
 illustrative number, because an illustrative number is what people remember. What is known:
 
 - **The item count is undefined until phase 5 produces the definition of what one argument covers.**
-  Twenty-one step kinds are already claimed, leaving nineteen rules before the re-cut threshold fires. If a
-  discharge rule is one per expression form (fifteen), the count is around thirty-six. If it is one per
-  obligation family crossed with form, the threshold is passed before the phase begins and it is dead on
-  arrival as written. This is why the definition is phase 5's deliverable.
-- **The per-argument cost is disputed.** The measurement everyone works from is that the two arguments
-  that held took twelve adversarial rounds each. One reading converts that to one to two days per
-  argument, giving five to ten weeks at twenty-five arguments. Another reads twenty-four items as two to
-  three weeks, implying half a day to a day each. Twelve rounds in half a day is not consistent with the
-  measurement being cited, so the higher figure is the safer planning assumption — but neither has
-  arithmetic behind it beyond the twelve rounds, and a two-to-threefold spread read off one measurement is
-  not a drafting choice. **It is on the "Waiting on Shane" table.** **Show the arithmetic when the count
-  arrives**: rounds per argument, cost per round, items.
-- **Re-cut threshold: above 40 items this phase is re-cut rather than attempted**, and if phase 4's count
-  was above forty its stop should have fired first. Compute the number and record it on the board the day
-  phase 5 closes.
+  Twenty-one step kinds are already claimed. If a discharge rule is one per expression form (fifteen), the
+  count is around thirty-six. If it is one per obligation family crossed with form, it is several times
+  that and the phase is not attemptable as written. This is why the definition is phase 5's deliverable.
+- **The per-argument cost was disputed, and the dispute is not settleable in the abstract — ruled
+  2026-07-26.** The measurement everyone works from is that the two arguments that held took twelve
+  adversarial rounds each. One reading makes that one to two days per argument, giving five to ten weeks
+  at twenty-five arguments. Another reads twenty-four items as two to three weeks, implying half a day
+  each. Twelve rounds in half a day is not consistent with the measurement being cited, so the higher
+  figure is the safer assumption — but both readings apply one number to an unknown mix, and that is
+  why neither can be right. Forty afternoon-sized arguments and forty fortnight-sized ones are different
+  projects.
+
+  **So the size is answered by phase 4's marks rather than picked now.** Phase 4 marks each step kind
+  recovered-or-invented and afternoon-or-fortnight; phase 5 carries the same two marks onto every
+  discharge rule it defines. The estimate is then arithmetic over a known mix instead of one rate over an
+  unknown one. Show it when the count arrives: items at each mark, rounds per argument, cost per round.
+
+- **No numeric re-cut threshold — same ruling as phase 4, and for the same reason.** "Above 40 items"
+  was a chosen number, and forty against forty-one is not a distinction. What decides whether this phase
+  is attempted or re-cut is the total cost implied by the marks, and that is your judgement on a figure
+  you can see rather than a row count. Compute it and record it on the board the day phase 5 closes,
+  then record *carry on* or *re-cut* with the date.
 
 **Going wrong, as distinct from slow.** Slow is many arguments. Going wrong is arguments falling to attacks
 nobody anticipated, with each repair breaking a neighbouring argument — that means the model underneath
@@ -1375,9 +1465,10 @@ of them can be answered from where we stand today.
 **The certificate step list's real length.** Twenty-one step kinds have been designed and none built. But
 the twenty-one was derived as the closure of evidence sources consulted by the *existing* discharge paths — a
 count over the compiler's current paths, not over the phase 5 walk — and the document that produced it parks
-an open question whose one candidate resolution grows the membership past twenty-one. So the number phase 4
-measures against is contested, which is why phase 4's threshold is left for you to pick between two named
-answers.
+an open question whose one candidate resolution grows the membership past twenty-one. That is why phase 4
+carries no numeric threshold: a list drafted by a new method cannot be measured against a number produced
+by an old one. Phase 4 delivers the count with each step kind marked recovered-or-invented and
+afternoon-or-fortnight, and you rule.
 
 **Whether the induction has ever been argued for a language with these features.** The promise is that the
 initial event establishes every rule and every operation preserves it. Over a simple state machine that is
