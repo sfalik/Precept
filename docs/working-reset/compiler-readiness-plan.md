@@ -312,12 +312,22 @@ co-author line. Until the register exists, every later phase builds on claims no
 
 **What it produces.**
 
-- `docs/working-reset/phase-1/decision-register.json` — one row per decision, fixed columns, one of exactly three
-  documentary verdicts each, plus your authority mark where you gave one.
-- `docs/working-reset/ruling-walk.md` — the numbered list you mark, and your marks once you have.
-- `docs/working-reset/phase-9/phase0-caveats-to-remove.md` — the caveat register, moved.
-- `docs/working-reset/what-i-want.md` — the want document, moved, unchanged in content.
-- `docs/working-reset/canon-corrections.md` — the 25-row correction list, moved in full.
+- `docs/working-reset/phase-1/decision-register.json` — one row per decision, fixed columns, one of
+  exactly three documentary verdicts each, plus your authority mark where you gave one. **Exists.**
+- `docs/working-reset/phase-1/the-walk.md` — the numbered list you mark, and your marks once you have.
+  **Exists**, with an answer already derived under every item, so a *not mine* settles it rather than
+  opening a follow-up.
+- `docs/working-reset/phase-1/want-document-provenance.md` — which lines of the want document are yours
+  and which two later commits wrote the rest. **Exists**, and it is what the register's verdicts are
+  measured against.
+- `docs/working-reset/phase-1/decision-register-FINDINGS.md` — what was corrected in the register and
+  why. **Exists.**
+- `docs/working-reset/phase-9/phase0-caveats-to-remove.md` — the caveat register, moved. **Exists.**
+- `docs/working-reset/phase-2/sweep-correction-list.md` — the 25-row correction list, copied in full and
+  re-verified against HEAD. **Exists.**
+- The want document itself is **not** copied here. It stays at `docs/Working/what-i-want-2026-07-16.md`
+  so its history stays attached to it — the provenance map above is only readable against that history,
+  and a copy would strand it.
 - Separately, and not blocking the phase: a disposal commit.
 
 **Done when.** All of the following, each recomputable:
@@ -749,6 +759,8 @@ ten agents. Two things have to be decided before it is re-run and they are named
 is also worth knowing that it reproduces the block accounting but not a cell corpus — it completes one it
 is handed rather than producing one — which matters if a later phase wants the cells rather than the
 numbering.
+
+**Prefer its successor.** `docs/working-reset/phase-3/enumeration.workflow.js` does the whole job in one run — it derives the block partition in the script rather than asking an agent for a count, collects escalations as typed objects so a summary cannot swallow one, writes its report before it throws, and produces the cells rather than completing a corpus it was handed. It has been fixed against three adversarial reviews and exercised against a stub harness in six failure modes, but **it has never been run for real**, which is why the 2026-07-14 workflow is kept beside it: that one ran. Its head comment names seven places it still needs a person.
 
 *Still a guess.* The weeks are for the other two pieces: rewriting the canonical documents to match the
 want document, and building the drift check. For scale: `docs/language/` is 11,248 lines and
