@@ -118,3 +118,35 @@ per lane, and it is the kind of machinery that is wrong quietly rather than loud
 **Not a decision for today, and it does not block anything before phase 5.** If you want it deferred,
 option one is the safe resting place and option two can be added later without invalidating anything
 built under option one.
+
+---
+
+## Prior art — added 2026-07-26
+
+He asked whether there was any external research on this before ruling. There was not, so it was
+commissioned: [`research/architecture/compiler/divisor-nonzero-under-finite-representation-survey.md`](../../../research/architecture/compiler/divisor-nonzero-under-finite-representation-survey.md).
+
+Three things came back that bear on the choice.
+
+**The question was already recorded in canon and left open.** `docs/language/primitive-types.md:667`:
+*"Two non-zero finite `number` operands can multiply to exactly `0.0` … it breaks divisor safety
+directly: `nonzero` on every operand does not yield a non-zero product. Recorded as an open question,
+not yet routed."* So this is a known gap being closed, not a new discovery.
+
+**The comparator that matters does what option one does, and names option two's machinery as the hard
+part.** SPARK/GNATprove proves a divisor non-zero and models floating-point arithmetic as rounded rather
+than real, so it cannot reason from operand non-zeroness either. Its own guide says the difficult checks
+are the ones that *"don't depend simply on computing coarse static bounds for the result of
+computations"* — which is precisely the magnitude reasoning option two needs. That is a cost signal, not
+a prohibition.
+
+**The representation choice removes the case rather than answering it.** A product of two non-zero
+arbitrary-precision rationals is never zero — there is no smallest positive value to fall below. The
+same holds for arbitrary-precision integers. So this question and the open arithmetic-model choice for
+`integer` are closer to one decision than two: settling the representation first can make this one
+vacuous, while settling this one does not constrain the representation.
+
+**What the research explicitly does not settle**: what a magnitude-bound analysis costs to build, and
+whether its diagnostic can be explained to a domain expert. Both are judgement calls it leaves to you.
+It also examined only two comparators — Astrée, Frama-C, Polyspace and KeY were not looked at, and
+Astrée is built for exactly this class of property.
