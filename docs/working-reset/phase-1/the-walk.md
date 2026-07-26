@@ -189,7 +189,16 @@ not it wrote anything. Your document never using `ensure` is not evidence agains
 example, not an enumeration of constructs. The one genuinely open sub-question — whether "the entity is
 resident in S" is itself usable as a premise — is on the Waiting-on-you list, not a mark — rests on
 precept-language-spec.md:1884–1887; want:171, :189.
-☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands.
+**☑ mine** ☐ not mine ☐ don't remember — **re-asked 2026-07-26 in plain terms** (first pass, read in the
+walk's own vocabulary, drew "derived"; re-asked as an order moving from `Packed` to `Shipped` with no
+writes, against a constraint that holds while the entity is `Shipped`, he answered "it has to be one,
+otherwise the constraint could be violated at runtime"). Recorded on the second answer.
+
+So the residency half carries owner authority: **every route into a state owes a proof of that state's
+constraints, including routes that write nothing.** His reason is the one that forces it — entering the
+state is what activates the constraint, so arrival is the first moment it can be violated. Note the
+interaction with item 9: this is a non-fault rule, so it is judged on the configuration the operation
+commits, and what this settles is that such an operation owes the obligation at all.
 
 **8.** A constraint "mentions" a field through three routes — its condition, its `when` guard, and
 transitively through computed fields — and that definition decides where every obligation attaches —
@@ -226,12 +235,33 @@ with the fault caveat stated, he answered "yes, end state only"). Recorded on th
 commits, not write by write, and today's compiler — which rejects a handler whose end state is legal —
 is wrong and gets widened.
 
-**One thing the mark cannot settle, flagged rather than assumed.** For a *fault* — a division by zero,
-an overflow — the failure happens when the expression is evaluated, part-way through the handler. There
-is no end state to judge, because the operation has already gone wrong at that point. "End state only"
-cannot apply there as a matter of fact, not policy. Phase 5 carries constraint obligations at end state
-and fault obligations per evaluation unless he rules otherwise; the wording of his answer did not
-distinguish them and this note records that.
+**The fault half, flagged first and then ruled the same day.** It was put to him as a worked handler that
+sets a divisor to zero, divides, and then restores the divisor, so the committed configuration is legal
+while the middle line divided by zero. His ruling, verbatim: **"this should not compile. rules only have
+to hold at the end of the handler, but faults must be prevented unequivocally."**
+
+He then restated it, and the restatement is the one to build against — verbatim: **"Faults must always be
+prevented by the compiler. Other rules that don't prevent faults only need to be true at the end of the
+handler."**
+
+Note the axis. It is not constraints on one side and faults on the other; it is whether a rule is doing
+fault-prevention work:
+- **Fault prevention is absolute and unconditional.** The compiler prevents every fault, always. A
+  handler that faults part-way through is refused however legal the configuration it would have
+  committed. There is no end-state credit and no exemption.
+- **The check is at the point of evaluation, against the values in force there** — not "no bad value may
+  ever appear anywhere in the handler". He supplied the contrasting pair himself. Setting `Months` to 0,
+  then to 12, then dividing by `Months` **compiles**: by the time the division runs, `Months` is 12 and
+  the fault is prevented. Setting `Months` to 0, dividing, then setting it to 12 **does not**: the
+  division ran against 0. Same three writes, different order, different answer. This is the sequencing
+  already in canon at `precept-language-spec.md:233` — each action sees the state left by the ones
+  before it — applied to fault obligations.
+- **A rule relied on to discharge a fault inherits that strictness.** If `Months positive` is what makes
+  a division safe, it has to hold at the moment the division is evaluated — end-of-handler is no use to
+  an expression that already ran. This is the reading of his sentence rather than his words, and phase 5
+  should confirm it rather than assume it.
+- **Every other rule is judged on the configuration the handler commits.** Intermediate states are
+  unobserved. The shipped compiler, which rejects a handler whose end state is legal, is widened.
 
 **10.** The fault-family membership counts — eleven kinds ruled 07-21, ten on 07-23, nine on 07-24:
 three counts in four days, each recorded as ruled.
@@ -256,8 +286,12 @@ cap with an explicit "couldn't prove — here is what would" fallback, and a cap
 within the cap", not "no derivation exists". The cap is part of the contract, or the claim contradicts
 spec:225. Phase 4 writes it with the cap in — rests on want:204–206, :179 (72c2e183:167);
 precept-language-spec.md:225.
-☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands:
-exactness holds, and phase 4 writes the finite-procedure half with the cap and its fallback in.
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". **Re-asked in plain
+terms** (a compiler that searches within a fixed budget and refuses with a teachable message, against a
+compiler that must establish no proof exists and therefore admits only constructs where that question is
+always answerable); his answer: "I did not rule on this previously." The mark holds on the plain re-ask.
+Printed answer stands as derived: exactness holds, and phase 4 writes the finite-procedure half with the
+cap and its fallback in, per `precept-language-spec.md:225`.
 
 **12.** Whether an author can respell around a refusal is judged once per family against the whole
 derivation set, and a bound conjunct spelled in a guard discharges the same way an argument bound does —
@@ -296,8 +330,12 @@ follows whatever overflow gets. Underflow is genuinely open and recording it ope
 prove-or-reject the open case must *reject*: two `nonzero` operands can multiply to exactly 0.0, so a
 divisor obligation may only discharge from non-zeroness established on the divisor itself — rests on
 docs/language/primitive-types.md:662, :663, :667.
-☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands,
-including that the open underflow case rejects rather than defers.
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". **Re-asked in plain
+terms** (a field holding the product of two non-zero values, then used as a divisor); his answer: the
+question was "never put to me". The not-NaN clause stands as derived and forced. The underflow half is
+**not settled by the printed answer** — reasoning from the parts is unsound and cannot be the answer, but
+what it costs authors to restate the constraint on the divisor was never worked out or put to him. It is
+now a "Waiting on Shane" row, to be prepared with worked examples before it is asked.
 
 **15.** The arithmetic overflow model — integer, temporal, and number-lane infinity — is deferred past
 the MVP with no compile-time guarantee in the meantime — stamped as ruled 2026-07-14 (`dfeb52cc`,

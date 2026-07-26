@@ -100,13 +100,15 @@ verbatim quotations phase 1 requires. Phase 1's walk removes any row you did not
 
 ## 4. Waiting on Shane
 
-**Seven items. One blocks phase 5 outright; the rest stall named pieces of it.** The first row predates
+**Nine items. One blocks phase 5 outright, and one blocks phase 4; the rest stall named pieces of it.** The first row predates
 the phase-1 walk. The rest were either raised by the walk of 2026-07-26 or were standing questions
 recorded in the walk file that had never been carried into this table.
 
 | What you are asked | Stalled until you answer | Reasoning |
 |---|---|---|
 | **Where the discharge fragment stops** — which formulas the compiler will decide, and therefore what the language admits. Expect the first honest fragment to be smaller than today's grammar; that gap is the price of the guarantee | **Phase 5** | Phase 5, "Where the fragment stops" |
+| **What does a refusal claim?** When the compiler will not accept a definition, is it saying *"I searched as far as I search and did not find a proof — here is the condition that would close it"*, or *"no proof exists"*? The first lets the language keep constructs whose provability cannot always be settled, and accepts that a refusal is partly about the compiler's effort. The second makes every refusal a statement about the program alone, and in exchange the language may contain only constructs where the question is always answerable — a further narrowing on top of wherever the fragment stops. `precept-language-spec.md:225` licenses the first; nothing licenses the second, and nothing rules it out. **You confirmed at the phase-1 walk that you have never ruled this and have never been asked it plainly** | **Phase 4** (the contract states which claim it makes) and **phase 5** (the fragment is drawn under it) | The walk, item 11 |
+| **Where must a divisor's non-zeroness come from?** Two values each known non-zero can multiply to exactly zero, because the product falls below the smallest value the type represents. So reasoning "non-zero times non-zero is non-zero" is unsound and cannot be the answer. What is genuinely open is the cost: if a division may only be discharged from something declared on the divisor itself — a modifier on that field, a condition testing that value, or a literal — then authors who divide by a computed product must restate the constraint on the product, and the plan owes you the count of how often that happens and what the alternative spellings would be. Check which lanes it applies to before preparing it; the underflow is not confined to `number`. **You confirmed at the phase-1 walk that this was never put to you** | **Phase 5**'s discharge procedure for the fault family | The walk, item 14 |
 | **May a proof use the fact that an earlier transition row's guard did *not* match?** Rows are tried in order and the first match wins, so reaching a later row means every earlier guard was false | Phase 5's fragment edge | Walk file, "Waiting on you" |
 | **Can the formula that defines a computed field count as establishing a constraint written on that field?** Treating it as typing context was refuted; routing it as an earned fact needs an argument nobody has written | Phase 5's premise set, and whether the ban in item 32 is permanent | Walk file, "Waiting on you" |
 | **May "the entity is in state S" itself be used as a premise?** | Whether a residency `ensure` can feed other proofs; the conservative state-scoped restriction stays until this closes | Walk file, "Waiting on you"; phase 5 |
@@ -143,6 +145,18 @@ phases.
   the code is validated against it. Phase 2's correction list drops the `philosophy.md:53` row.
 - **The compiler is widened to judge a handler on the configuration it commits** (walk item 9), not
   write by write. Fault obligations stay per evaluation pending your word.
+
+**No row here is put to you as an abstract fork.** The phase that is blocked prepares it first, and
+prepared means four things: the options named in plain terms, the cost of each stated as *what stops
+compiling*, at least one worked `.precept` example per option showing a definition that one accepts and
+the other refuses, and the refusal message an author would actually see. A question that arrives without
+those is not ready to be asked, and the phase that owns it is not finished.
+
+This was added 2026-07-26 because the phase-1 walk surfaced two questions — what a refusal claims, and
+where a divisor's non-zeroness must come from — that the plan recorded as yours to answer while nothing
+in it was tasked with working them out. The walk itself measured what happens when a decision is put
+without a worked case: five claims inverted their answer when restated plainly, one of them a whole fault
+family phase 5 would have built and did not need.
 
 Every request for your word that is not a scheduled phase sign-off belongs here. The sign-offs are the
 four **Shane** rows on the board and each phase's *What you sign off* paragraph.
