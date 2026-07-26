@@ -45,7 +45,7 @@ as the standard reference on the hazard class.
 scope: systems that trap at runtime, and the general floating-point error-bound literature except where
 it bears on reaching exactly zero. Deliberately excluded: Precept-specific recommendations.
 
-**Source-grade mix.** Two Primary external (SPARK User's Guide 27.0w, SMT-LIB FloatingPoint theory),
+**Source-grade mix.** Three Primary external (SPARK User's Guide 27.0w, the AdaCore engineering blog's worked GNATprove example, SMT-LIB FloatingPoint theory),
 one Primary external reached only in part (Goldberg, ACM Computing Surveys 1991), one Tertiary
 (search-result summary of the Flocq literature, after the primary PDF failed to parse), and internal
 sources graded separately below.
@@ -107,6 +107,47 @@ on Precept's question — that the difficulty is precisely about needing more th
 are non-zero" as discharging a divisor obligation. It reasons over the rounded result, which means the
 only route to proving a computed divisor non-zero is a bound on its magnitude — and the guide names that
 class of reasoning as the difficult one rather than the routine one.
+
+### 3b. SPARK, worked: the tool refuses a computed divisor and asks for a promise about the divisor itself
+
+[Primary; AdaCore engineering blog, *Improving SPARK Counter Examples with Fuzzing and Code Analysis*;
+accessed 2026-07-26]
+
+The clearest available demonstration, and structurally the same shape as Precept's question — a divisor
+that is a *computed expression* whose operands each carry a declared constraint:
+
+```ada
+type Foo is delta 1.0 / 128.0 range -100.0 .. 100.0;
+
+function Div_Skewed (X, Y : Foo) return Foo
+   with Pre => (Y /= 0.0);
+
+function Div_Skewed (X, Y : Foo) return Foo is
+   begin
+      return (X / (X + Y));
+   end Div_Skewed;
+```
+
+GNATprove refuses it:
+
+> "demo.adb:8:17: high: divide by zero might fail (e.g. when X = 1/128 and Y = -1/128) [possible fix: add
+> precondition ((X + Y) /= 0) to subprogram at demo.ads:37]"
+
+Three things this establishes, more directly than the guide passages above:
+
+1. **A declared non-zero fact on an operand does not discharge a divisor obligation about an expression
+   over that operand.** `Y /= 0.0` is stated in the contract and buys nothing, because the divisor is
+   `X + Y`.
+2. **The tool's own suggested fix is a promise about the whole divisor expression** — `(X + Y) /= 0` —
+   not tighter bounds on the operands. That is option one of Precept's question, printed by the
+   comparator in its own diagnostic.
+3. **It shows the counterexample**: `X = 1/128`, `Y = -1/128`, one representable step in each direction,
+   cancelling to exactly zero.
+
+**Where it differs from Precept's case, and the difference makes Precept's harder.** This is cancellation
+in a fixed-point type, not underflow in a product. With cancellation the author can see the shape of the
+failure — a sum obviously reaches zero. With `A * B` underflowing, both operands remain comfortably
+non-zero and the product silently is not, so there is no visible cue at all.
 
 ### 4. The solver layer distinguishes reals from floats, and Precept's question only exists on the float side
 
@@ -182,6 +223,7 @@ for thirty-five years.
   a solver behind it. Precept refuses without a solver and reports to a domain expert. The finding that
   transfers is what the *reasoning* requires — a magnitude bound rather than a non-zero fact — not the
   tooling around it.
+- **The worked SPARK example is cancellation, not underflow.** It demonstrates the structural rule — an operand's declared non-zeroness does not discharge an obligation about an expression over it — on a fixed-point cancellation case. No example of a *product* underflowing was found in the comparator material; that half still rests on the internal reproduction.
 - **No usability evidence.** Nothing here says what a domain expert would find tolerable to write, which
   is half of the decision.
 
@@ -237,6 +279,7 @@ does establish firmly enough to act on:
 
 ## Sources
 
+- **Improving SPARK Counter Examples with Fuzzing and Code Analysis**, AdaCore engineering blog. Primary (vendor engineering blog carrying verbatim tool output and source). Accessed 2026-07-26. https://www.adacore.com/blog/improving-spark-counter-examples-with-fuzzing-and-code-analysis
 - **Semantics of Floating Point Operations**, SPARK User's Guide 27.0w, AdaCore. Primary. Accessed
   2026-07-26. https://docs.adacore.com/spark2014-docs/html/ug/en/appendix/semantics_of_floating_point_operations.html
 - **How to View GNATprove Output**, SPARK User's Guide 27.0w, AdaCore. Primary. Accessed 2026-07-26.
