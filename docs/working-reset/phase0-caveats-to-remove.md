@@ -2,9 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft register — 2026-07-25 |
-| Owner of removal | **Phase 9.** Phase 0 added these; phase 9 takes them out. |
-| Plan | [`where-we-are-going-2026-07-25.md`](where-we-are-going-2026-07-25.md) — see § "Phase 0's caveats are temporary, and phase 9 removes them" |
+| What this is | Every temporary warning phase 0 added to the instruction files, with the file, the line, the exact wording, and what should stand there once the work that made the warning necessary has landed. |
+| Where it came from | Written 2026-07-25 as `docs/Working/phase0-caveats-to-remove-2026-07-25.md`. Moved here 2026-07-26 unchanged in substance; the only additions are the re-verification column and the notes marked **07-26**. |
+| Which phases consume it | **Phase 9** owns the catalog-incompleteness rows and takes them out. **Phase 10** and **phase 11** work from the same register — phase 10 turns the claims into criteria and failing tests, phase 11 builds until the frozen suite is green. The last section has a different owner and is listed so it is not lost. |
+| Status | Draft register — 2026-07-25, re-verified 2026-07-26 |
+| Plan | [`compiler-readiness-plan.md`](compiler-readiness-plan.md). Superseded predecessor: `docs/Working/where-we-are-going-2026-07-25.md` § "Phase 0's caveats are temporary, and phase 9 removes them". |
 
 Phase 0 added warnings to the instruction files saying the catalogs are incomplete and the canonical
 documents are what completeness is measured against. That is true today and it is not the end state.
@@ -14,6 +16,24 @@ questions.
 
 This file exists so that removal is a checklist rather than an archaeology problem. Line numbers are
 as of 2026-07-25 and will drift; the quoted text is the reliable handle.
+
+## Re-verification, 2026-07-26 — HEAD `3f69b316`
+
+Every file and line below was re-checked. Nothing was silently corrected: where a line moved, the
+07-25 number is left in place and the current one is given beside it. Summary:
+
+Twenty-eight rows across the three tables.
+
+- **23 resolve unchanged** at the recorded line, quoted text identical.
+- **4 moved** — `CLAUDE.md` 350→355 and all three `.claude/agents/precept-reviewer.md` rows
+  (16→21, 97→102, 392→397). A five-line shift from edits above them; the quoted text is identical.
+- **1 is already discharged** — `.claude/skills/execute/SKILL.md:122`. See the note on that row.
+- **3 of the 23 resolve, but the register's quote adds emphasis the file does not carry** —
+  `CLAUDE.md:38`, `CLAUDE.md:91`, `docs/README.md:11`. A grep for the quoted string with its
+  asterisks fails; a grep for the plain text succeeds. Harmless, but it will waste time later, so it
+  is recorded here rather than fixed in the quote.
+- **One material addition** — the three `precept-reviewer.md` rows are now generated output. See the
+  note under the proof-result table.
 
 ## What the guidance already says, and must keep saying
 
@@ -35,18 +55,18 @@ that contradicts that. Do not copy it into files as wording.
 
 ## Catalog-incompleteness caveats
 
-| File | Line | Quote | What it should say once the catalogs are complete |
+| File | Line (07-25 → HEAD) | Quote | What it should say once the catalogs are complete |
 |---|---|---|---|
-| `CLAUDE.md` | 38 | "The docs here are what we measure against — **not** the catalogs, which are incomplete (see § Catalog System)." | Drop the exclusion. Restore the original description of `docs/language/README.md` as the language surface — spec, canonical types, grammar, catalog. |
+| `CLAUDE.md` | 38 | "The docs here are what we measure against — **not** the catalogs, which are incomplete (see § Catalog System)." *(07-26: resolves at 38; the file has no asterisks around "not" — grep the plain text.)* | Drop the exclusion. Restore the original description of `docs/language/README.md` as the language surface — spec, canonical types, grammar, catalog. |
 | `CLAUDE.md` | 40 | "catalogs as the intended machine-readable form of the language spec … Note that the first of those is a goal, not the current state — see § Catalog System." | Drop the "goal, not the current state" note; restore "catalogs as the language spec". |
-| `CLAUDE.md` | 91 | "The **goal** is that catalogs become the language specification in machine-readable form" | Restore the flat statement: *"Catalogs are the language specification in machine-readable form."* § Catalog System line 103 names this explicitly as the sentence to restore. |
+| `CLAUDE.md` | 91 | "The **goal** is that catalogs become the language specification in machine-readable form" *(07-26: resolves at 91; the file has no asterisks around "goal".)* | Restore the flat statement: *"Catalogs are the language specification in machine-readable form."* § Catalog System line 103 names this explicitly as the sentence to restore. |
 | `CLAUDE.md` | 93–103 | "**They are not that yet, and must not be worked as if they were.**" … through "**What ends this suspension:** …" | Delete the whole block. Line 103 states its own exit condition: adding a decision without teaching the catalog fails the build — every write site catalogued, certificate vocabulary created, establishment and preservation declared, exhaustiveness analyzer applied across all of it. |
 | `CLAUDE.md` | 100 | "**Never cite a catalog as evidence that something is complete.** The completeness tests prove that every member a catalog *declares* carries metadata. They cannot detect a decision that was never written into the catalog at all." | Removable only once the exhaustiveness analyzer closes the hole this describes. Until then it is true regardless of phase. Re-check rather than delete blind. |
 | `CLAUDE.md` | 123 | "**Never compile a `.precept` file and treat the result as the specification.** The compiler is unfinished." | The first clause stays — a compiler is never the spec. Drop "The compiler is unfinished" and the "what got built" framing. |
 | `docs/agent-onboarding.md` | 25 | Heading: "Concept 1: Catalogs as the **intended machine-readable form** of the language spec" | Restore "Catalogs as the language spec". |
 | `docs/agent-onboarding.md` | 29 | "**They are not that yet.** Measured 2026-07-25: the `CertificateSteps` catalog … does not exist at all; `ProofRequirementKind` has thirteen members and neither establishment nor preservation is among them …" | Delete the paragraph. |
 | `docs/README.md` | 9 | "The canonical documents in this tree — not the catalogs, and not what the compiler currently accepts — are what completeness is measured against; see `CLAUDE.md` § Catalog System for the measured gaps and what closes them." | Drop the exclusion and the cross-reference to the (by then deleted) § Catalog System notice. The canonical docs and the catalogs agree at that point. |
-| `docs/README.md` | 11 | "catalogs as the **intended** machine-readable form of the language spec" | Restore "catalogs as the language spec" — keep in step with `docs/agent-onboarding.md:25`. |
+| `docs/README.md` | 11 | "catalogs as the **intended** machine-readable form of the language spec" *(07-26: resolves at 11; the file has no asterisks around "intended".)* | Restore "catalogs as the language spec" — keep in step with `docs/agent-onboarding.md:25`. |
 | `docs/README.md` | 18 | Routing table: "the primary substance, **and what completeness is measured against**" | The added clause can stay or go; it stops being a correction and becomes a plain description. Low priority. |
 | `docs/language/catalog-system.md` | 10 | Status row: "Partial — every catalog this document inventories exists in `src/Precept/`, but the set is **incomplete against the specification** (measured 2026-07-25 …)" | Status becomes `Implemented` (or `Full`), with the "incomplete against the specification" clause removed and the review date refreshed. |
 | `docs/language/catalog-system.md` | 97 | "**It is not that yet.** As of 2026-07-25 the catalogs do not hold everything the specification requires …" | Delete the paragraph. The sentence above it already states the intent; it becomes a statement of fact. |
@@ -54,7 +74,7 @@ that contradicts that. Do not copy it into files as wording.
 | `docs/language/catalog-system.md` | 116 | Table cell: "All catalogs — as much of the language as has been catalogued so far, **which is not yet all of it**" | Drop the trailing clause. |
 | `docs/language/catalog-system.md` | 127 | "As of 2026-07-25 the answer to that test is **no** — this is the principle the work is aimed at, not a description of where the catalogs stand." | The answer becomes yes. Rewrite as the affirmative, or delete and let the test stand on its own. |
 | `docs/language/catalog-system.md` | 1285 | "these tests quantify over the members that exist, so they cannot detect something the specification requires that was never added to a catalog at all." | Same as `CLAUDE.md:100` — this is a real property of the completeness tests, not a phase-0 hedge. It goes away only when the exhaustiveness analyzer makes an untaught decision fail the build. Re-check, do not delete blind. |
-| `.claude/agents/precept-reviewer.md` | 16 | "Language discipline findings measure against the docs here, **not** against the catalogs, which are incomplete … a catalog is never evidence that something is complete." | Drop the exclusion. A reviewer can then measure against either. |
+| `.claude/agents/precept-reviewer.md` | 16 → **21** | "Language discipline findings measure against the docs here, **not** against the catalogs, which are incomplete … a catalog is never evidence that something is complete." | Drop the exclusion. A reviewer can then measure against either. |
 | `.claude/skills/design/SKILL.md` | 52 | "The docs here are what a design is measured against — **not** the catalogs, which are incomplete … a catalog is never evidence that something is complete." | Same as the reviewer row; keep the two phrased identically. |
 | `.github/copilot-instructions.md` | 22 | "In Precept **the goal is** the inverse: catalogs become the language specification in machine-readable form" | Restore the flat statement, matching `CLAUDE.md:91`. |
 | `.github/copilot-instructions.md` | 24 | "**The catalogs are not complete yet and must not be worked as though they were.** Measured 2026-07-25 …" | Delete the paragraph, in step with `CLAUDE.md:93–103`. |
@@ -64,13 +84,23 @@ that contradicts that. Do not copy it into files as wording.
 These come out when the proof engine is aligned to the spec, not when the catalogs are filled. That
 may or may not be the same phase — check before removing.
 
-| File | Line | Quote | What it should say once proofs are trustworthy |
+| File | Line (07-25 → HEAD) | Quote | What it should say once proofs are trustworthy |
 |---|---|---|---|
-| `CLAUDE.md` | 350 | "**One exception, while the compiler is being aligned to the spec: its proof results are not trustworthy.** … reports a proof for something false — `field Bal as decimal nonnegative max 100` …" | Delete. § Use the MCP Tools First then reads as it did originally: the tools are the first place to look, source only for what they don't cover. |
-| `.claude/agents/precept-reviewer.md` | 97 | "**One exception … its proof results are not trustworthy.** … Never raise or dismiss a finding about what the compiler proves on the strength of what it currently reports." | Delete the bullet; § 8's preceding bullet already routes DSL questions to the MCP tools. |
-| `.claude/agents/precept-reviewer.md` | 392 | "a report on what the compiler and catalogs do today. Use them … never as the answer to what the language should do (§ 8)." | The "what the language should do" caution is durable — a compiler is never the spec. Keep; only the § 8 cross-reference may need repointing. |
+| `CLAUDE.md` | 350 → **355** | "**One exception, while the compiler is being aligned to the spec: its proof results are not trustworthy.** … reports a proof for something false — `field Bal as decimal nonnegative max 100` …" | Delete. § Use the MCP Tools First then reads as it did originally: the tools are the first place to look, source only for what they don't cover. |
+| `.claude/agents/precept-reviewer.md` | 97 → **102** | "**One exception … its proof results are not trustworthy.** … Never raise or dismiss a finding about what the compiler proves on the strength of what it currently reports." | Delete the bullet; § 8's preceding bullet already routes DSL questions to the MCP tools. |
+| `.claude/agents/precept-reviewer.md` | 392 → **397** | "a report on what the compiler and catalogs do today. Use them … never as the answer to what the language should do (§ 8)." | The "what the language should do" caution is durable — a compiler is never the spec. Keep; only the § 8 cross-reference may need repointing. |
 | `.github/copilot-instructions.md` | 104 | "**One exception, while the compiler is being aligned to the spec: its proof results are not trustworthy.** …" | Delete, in step with `CLAUDE.md:350`. |
 | `tools/agent-sources/precept-author/body.md` | 243 | "the compiler is unfinished, so 'it doesn't compile' means it isn't built yet, not that the language forbids it" | Drop the "unfinished" clause; keep "check `precept_syntax` or `precept_compile`" and the bug-capture routing. **Edit the source, then run `node tools/scripts/build-agents.js`** — this text is generated into `.claude/agents/precept-author.md:249` and `.github/agents/precept-author.agent.md:256`, and editing either output directly is reverted by the next build. |
+
+**07-26 — `precept-reviewer.md` is now generated, and all three of its rows above are affected.**
+When this register was written, `.claude/agents/precept-reviewer.md` was a hand-edited file. Commit
+`81d0f86d` ran the agent generator and created `tools/agent-sources/precept-reviewer/` (`body.md`,
+`claude.yaml`, `copilot.yaml`) plus a `.github` twin. All three quoted passages now live in
+`tools/agent-sources/precept-reviewer/body.md` at `:10`, `:91` and `:386`, and are generated into
+`.claude/agents/precept-reviewer.md` at `:21`, `:102`, `:397` and into
+`.github/agents/precept-reviewer.agent.md` at `:28`, `:109`, `:404`. **Edit the source, then run
+`node tools/scripts/build-agents.js`** — the same instruction the `precept-author` row above already
+carries. Editing either output directly is reverted by the next build.
 
 ## Related temporary statements phase 0 added — different owner, listed so they are not lost
 
@@ -78,7 +108,7 @@ Neither of these is about the catalogs, so phase 9 does not own them. They are h
 the same kind of thing: a truthful statement added in phase 0 that stops being true when a specific
 piece of work lands.
 
-| File | Line | Quote | What ends it |
+| File | Line (07-25 → HEAD) | Quote | What ends it |
 |---|---|---|---|
-| `.claude/skills/execute/SKILL.md` | 122 | "The suite is **not green at HEAD**, so 'green after the slice' is the wrong bar … the failing set must be a subset of that baseline." | The test suite going green. Then the bar returns to "tests pass after each slice". The same wording appears in the skill's exit criteria, refusal list, and output description — remove all of them together. |
+| ~~`.claude/skills/execute/SKILL.md`~~ | ~~122~~ | ~~"The suite is **not green at HEAD**, so 'green after the slice' is the wrong bar … the failing set must be a subset of that baseline."~~ | ~~The test suite going green.~~ **07-26: already discharged, and not by the condition this row names.** The text is gone at HEAD — grepping for "not green at HEAD" finds nothing outside this register. It was added by `89392acd` and reverted by `81d0f86d`, whose message says: "the green-suite rule restored. A pass earlier today softened it because the suite is red, which is backwards: the rule says what should be true and reality being wrong is the finding." Line 122 now reads "**Incremental** — tests pass after each slice (`dotnet test` green)…", and the phase-level exit criterion at `:179` went back to "`dotnet test` green" too. **The removal condition this row names — the suite going green — was not what removed it.** `81d0f86d` states the suite was red at the time and restored the rule anyway, on the argument that a rule states the target and a red suite is a finding rather than a reason to lower the bar. Whether the suite is green now is not established here. Phase 11 inherits the consequence: it builds until the frozen suite is green, and there is still no recorded list of which tests are expected to fail. |
 | `CONTRIBUTING.md` | 224 | "**Nothing currently checks these expectations.** … no test reads either — searching the test projects for `EXPECT` finds no code that parses them." | Building the checking test the paragraph itself describes: compile each sample, assert every `# EXPECT:` row matches an emitted diagnostic exactly, fail on any extra diagnostic or a missing header. |
