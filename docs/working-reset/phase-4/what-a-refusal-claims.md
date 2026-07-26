@@ -134,3 +134,46 @@ anyway. It may be cheaper to have phase 5 attempt the terminating design first a
 with evidence, rather than rule now and possibly have to revisit. **That would mean phase 4 states the
 contract conditionally**, which is a departure from its purpose as the cheap early stop. Say which you
 prefer.
+
+---
+
+## Ruled — 2026-07-26
+
+**Option one, and the reason is scope.** His words: *"option one — we are going with a minimal proof set
+for the MVP, but we can and will expand the compiler's proof power over time."*
+
+So a refusal reports the search. The first proof set is deliberately small, and widening it later is
+expected work rather than an admission of a defect. That matches the ruling at the phase-1 walk item 13 —
+the compiler works with the expression as written, and more spellings are accepted post-MVP one at a time
+with a written argument. Same shape of decision: ship a small honest thing, name the growth path.
+
+**With a requirement attached, and it is not a detail.** *"What I would like, ideally, is to be honest in
+our compiler errors — proven safe, proven unsafe, unproven or something like that."*
+
+That makes the three outcomes **author-visible**. It is a real addition, because a refusal that reports
+the search is only honest if the author can tell which kind of refusal they got:
+
+- **proven safe** — the obligation is discharged; nothing is reported.
+- **proven unsafe** — the compiler has a counterexample. This program breaks. The message says so, and
+  should be able to show the case.
+- **unproven** — the compiler did not get there. The program may well be fine. The message says *that*,
+  and names the condition that would close it.
+
+Both of the last two reject. What changes is that the author is told which they are looking at, rather
+than both arriving as the same flat refusal.
+
+**What this settles that was previously open.** The phase-1 walk, item 38, recorded three verdicts —
+proven, proven-violating, unresolved — and noted that the blocking rule was his while the three *names*
+had no counterpart in anything he wrote, calling them harmless internal vocabulary. They are no longer
+internal. Phase 4's contract carries the distinction and the diagnostic wording has to express it.
+
+**One thing phase 4 should check rather than assume.** want:173 asks for no author-facing tiers of
+trustworthiness — "a rule holds, period". That is about rules the compiler *accepted*, and both refusal
+kinds reject, so nothing compiles under a weaker promise. But the wording matters: "unproven" must not
+read to an author as "allowed through unproven". Phase 4 writes the messages so the distinction is about
+*why it was refused*, never about how strongly an accepted rule is held.
+
+**Today's example, worded under this ruling.** The `PRE0078` message reproduced above — "Numeric
+computation exceeded the representable range" — is exactly the failure this ruling forbids: an unproven
+case reported as though it were a proven one. It is a defect against this ruling, not only against its
+own inaccuracy.
