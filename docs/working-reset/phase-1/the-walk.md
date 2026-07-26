@@ -342,8 +342,22 @@ on every operation is not — you deny it outright (want:199, 72c2e183:192). The
 canon; phase 2 deletes the canon sentence and phase 5 proves relational rules — rests on want:103, :199
 against compiler-and-runtime-design.md:125.
 ☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26, after being shown the canon sentence
-verbatim; his words: "that was derived, I did not write that exactly." The claim carries no authority;
-phase 2 deletes compiler-and-runtime-design.md:125 and phase 5 proves relational rules.
+verbatim; his words: "that was derived, I did not write that exactly."
+
+**Ruled the same day, and this closes the conflict with item 24.** The claim was re-asked plainly, as a
+worked case: an account with `rule Balance >= -OverdraftLimit`, both values supplied from outside, and an
+event that lowers the limit while the balance stays put. Two options were put side by side — the compiler
+refuses the definition until the author writes a condition that makes it provable, or the compiler
+accepts it and the runtime evaluates the rule on every operation and discards the change if it breaks.
+**He chose the first.** So:
+- Where a value came from does not decide prove-versus-govern. A declared premise does.
+- `compiler-and-runtime-design.md:125` is deleted at phase 2 — now on his ruling, not on an inference.
+- The boundary ruling's central line is overridden. Item 24's endorsement of its summary is superseded by
+  this direct answer, which was put to him as a worked case rather than as a summary.
+- Phase 5 proves relational rules over externally-supplied fields.
+- The accepted cost: more definitions are refused, and authors write guards they did not have to write
+  before. That is the same trade want:171 and want:189 already take.
+- The "Waiting on Shane" row this opened is answered and removed.
 
 **17.** The obligation-discharge matrix, once populated and ratified, was to become the canonical
 exhaustive definition of the proof engine — first appears `5d554d59`, 2026-07-19.
@@ -499,10 +513,11 @@ executive ruling, shown to him in plain terms, is endorsed as matching his inten
 line — a raw external value at its own ingress slot is governed at runtime; anything derived from it is
 proven or rejected — is the same provenance split he marked *not mine* at item 16, where the disposition
 was that phase 2 deletes `compiler-and-runtime-design.md:125`. With the substance endorsed here, phase 2
-cannot simply delete it on the strength of item 16's mark. Only he can say which stands. **Pulled out as a live question and
-added to the plan's "Waiting on Shane" table** rather than settled in this walk. The item 16 mark stands
-as recorded (he did not write that canon sentence); what is now open is whether the split it states is
-nonetheless his ruling by way of this ratification.
+cannot simply delete it on the strength of item 16's mark alone. **Closed later the same day at item 16**,
+where the split was put to him as a worked case and he ruled that the compiler refuses the definition
+until the author supplies a premise. The worked case governs over the endorsed summary; the split does
+not survive. What this mark still records: the ratification of *this document* is unresolved, so its
+"pending Shane ratification" footer stands and its other contents carry no owner authority.
 
 ## E. Recorded as agent work — one mark each, to confirm none is actually yours
 

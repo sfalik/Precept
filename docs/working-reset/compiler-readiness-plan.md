@@ -100,14 +100,13 @@ verbatim quotations phase 1 requires. Phase 1's walk removes any row you did not
 
 ## 4. Waiting on Shane
 
-**Eight items. Two block phase 5 outright; the rest stall named pieces of it.** The first row predates
-the phase-1 walk. Rows two through eight were either raised by the walk of 2026-07-26 or were standing
-questions recorded in the walk file that had never been carried into this table.
+**Seven items. One blocks phase 5 outright; the rest stall named pieces of it.** The first row predates
+the phase-1 walk. The rest were either raised by the walk of 2026-07-26 or were standing questions
+recorded in the walk file that had never been carried into this table.
 
 | What you are asked | Stalled until you answer | Reasoning |
 |---|---|---|
 | **Where the discharge fragment stops** — which formulas the compiler will decide, and therefore what the language admits. Expect the first honest fragment to be smaller than today's grammar; that gap is the price of the guarantee | **Phase 5** | Phase 5, "Where the fragment stops" |
-| **Is a rule over values supplied from outside proven by the compiler, or governed by the runtime?** The 2026-07-06 boundary ruling says governed — you endorsed that summary as matching what you asked for, while not recalling ratifying the document. Your own worked example at want:103 goes the other way: `ReduceLimit` writes one field of exactly such a rule and you say the compiler rejects the handler and then proves it once a guard is added. Both cannot hold | **Phase 5**, and phase 2's disposal of `compiler-and-runtime-design.md:125` | The walk, items 16 and 24 |
 | **May a proof use the fact that an earlier transition row's guard did *not* match?** Rows are tried in order and the first match wins, so reaching a later row means every earlier guard was false | Phase 5's fragment edge | Walk file, "Waiting on you" |
 | **Can the formula that defines a computed field count as establishing a constraint written on that field?** Treating it as typing context was refuted; routing it as an earned fact needs an argument nobody has written | Phase 5's premise set, and whether the ban in item 32 is permanent | Walk file, "Waiting on you" |
 | **May "the entity is in state S" itself be used as a premise?** | Whether a residency `ensure` can feed other proofs; the conservative state-scoped restriction stays until this closes | Walk file, "Waiting on you"; phase 5 |
@@ -120,6 +119,14 @@ questions recorded in the walk file that had never been carried into this table.
 Not questions — decisions you gave that now need building. Recorded here so they are not lost between
 phases.
 
+- **A declared premise decides prove-versus-govern, not where the value came from** (walk item 16, ruled
+  2026-07-26 on a worked case: `rule Balance >= -OverdraftLimit` with both values supplied from outside,
+  and an event lowering the limit). The compiler refuses the definition until the author writes the
+  condition that makes it provable; it does not hand the rule to the runtime because the values arrived
+  from outside. Phase 2 deletes `compiler-and-runtime-design.md:125`, and the 2026-07-06 boundary
+  ruling's central line goes with it. Phase 5 proves relational rules over externally-supplied fields.
+  **The accepted cost**: more definitions are refused, and authors write guards they did not write
+  before — the same trade want:171 and want:189 already take.
 - **Same-basis periods order** (walk item 19). You ruled it, against locked Decision 14. That overrides
   the locked decision on your authority; `temporal-type-system.md:1478` and `collection-types.md:533`
   reconcile to the ruling at phase 2, and BUG-047 is re-checked. The ordering itself needs a

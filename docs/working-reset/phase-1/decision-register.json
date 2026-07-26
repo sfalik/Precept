@@ -6119,10 +6119,10 @@
    {
     "item": "16",
     "claim": "Where a value came from decides prove-versus-govern",
-    "mark": "not mine",
-    "hisWords": "that was derived, I did not write that exactly",
-    "printedAnswer": "conflicted",
-    "consequence": "He did not write compiler-and-runtime-design.md:125. But at item 24 he endorsed the boundary ruling's summary, which states the same split, as matching what he asked for. Phase 2 may not delete the canon sentence on the strength of this mark alone. Open as a Waiting on Shane row.",
+    "mark": "not mine (the canon sentence) — but ruled the same day on a worked case",
+    "hisWords": "that was derived, I did not write that exactly; then, re-asked as a worked case, \"one\" — the compiler refuses the definition until the author supplies the premise",
+    "printedAnswer": "stands",
+    "consequence": "Ruled 2026-07-26 on a worked case (rule Balance >= -OverdraftLimit, both values supplied from outside, an event lowering the limit): the compiler refuses the definition until the author writes the condition that makes it provable, rather than handing the rule to the runtime because the values came from outside. A declared premise decides prove-versus-govern, not provenance. Phase 2 deletes compiler-and-runtime-design.md:125 on his ruling; the 2026-07-06 boundary ruling's central line goes with it; phase 5 proves relational rules over externally-supplied fields. Accepted cost: more definitions refused, authors write guards they did not write before.",
     "governedRows": [
      315,
      316,
@@ -6264,8 +6264,8 @@
     "claim": "Ratification of the 2026-07-06 boundary ruling",
     "mark": "don't remember",
     "hisWords": "I don't remember if I ratified the document, but the summary you showed me matches what I asked for",
-    "printedAnswer": "open",
-    "consequence": "First answer was 'yes, i did'; corrected moments later and recorded on the correction. The ratification is unresolved, so the document's 'pending Shane ratification' footer is not established as stale. The substance of the executive ruling, shown in plain terms, is endorsed as matching his intent - which is what conflicts with item 16.",
+    "printedAnswer": "open — closed at item 16",
+    "consequence": "First answer was 'yes, i did'; corrected moments later and recorded on the correction. The ratification is unresolved, so the document's 'pending Shane ratification' footer stands and its other contents carry no owner authority. The substance he endorsed — the provenance split — was put to him again at item 16 as a worked case, where he ruled the other way. The worked case governs; the split does not survive.",
     "governedRows": [
      519,
      545
@@ -6553,7 +6553,8 @@
      513
     ]
    }
-  ]
+  ],
+  "conflictResolved": "Items 16 and 24 pointed opposite ways during the sitting and the conflict was pulled to Waiting on Shane. It was closed the same day, before the plan was committed, by re-asking item 16 as a worked case. The row has been removed from the plan's table. This is the fourth instance of the sitting's finding: a claim that inverts when asked plainly."
  },
  "walkUnresolved": [
   {
