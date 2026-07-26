@@ -312,10 +312,10 @@ co-author line. Until the register exists, every later phase builds on claims no
 
 **What it produces.**
 
-- `docs/working-reset/decision-register.md` — one row per decision, fixed columns, one of exactly three
+- `docs/working-reset/phase-1/decision-register.json` — one row per decision, fixed columns, one of exactly three
   documentary verdicts each, plus your authority mark where you gave one.
 - `docs/working-reset/ruling-walk.md` — the numbered list you mark, and your marks once you have.
-- `docs/working-reset/phase0-caveats-to-remove.md` — the caveat register, moved.
+- `docs/working-reset/phase-9/phase0-caveats-to-remove.md` — the caveat register, moved.
 - `docs/working-reset/what-i-want.md` — the want document, moved, unchanged in content.
 - `docs/working-reset/canon-corrections.md` — the 25-row correction list, moved in full.
 - Separately, and not blocking the phase: a disposal commit.
@@ -543,10 +543,10 @@ In this order, and nothing is deleted, moved or retired until what it holds is i
    `git cat-file -t` resolves it, so the deletion is restorable exactly.
 
    **Two things were extracted out of it first, on 2026-07-25, and they stay.** The method that produced
-   its block accounting is recovered as `docs/working-reset/enumeration/block-inventory.workflow.js` — the runnable
-   workflow, not a description of one — with `docs/working-reset/enumeration/block-inventory-method.md` alongside it.
+   its block accounting is recovered as `docs/working-reset/phase-3/block-inventory.workflow.js` — the runnable
+   workflow, not a description of one — with `docs/working-reset/phase-3/block-inventory-method.md` alongside it.
    The eleven items its nine agents flagged, five of them contradictions inside the canonical documents,
-   are in `docs/working-reset/canon-contradictions-found-2026-07-14.md`. One of those five is still live
+   are in `docs/working-reset/phase-2/canon-contradictions-found-2026-07-14.md`. One of those five is still live
    at HEAD. Nothing else in the bundle was extracted, and the recorded tree object is the only route back
    to the rest of it — including the 3,446-cell draft corpus at `evidence/recovered-corpus.json`, which
    exists nowhere else.
@@ -619,7 +619,7 @@ philosophy, runtime API document, evaluator document and architecture document a
 sweep. That list is a starting point, not the answer — this phase's own search runs and its output has to
 be a superset.
 
-**A second input**: `docs/working-reset/canon-contradictions-found-2026-07-14.md`, extracted from the cell
+**A second input**: `docs/working-reset/phase-2/canon-contradictions-found-2026-07-14.md`, extracted from the cell
 bundle before phase 1 deleted it. Eleven items flagged by nine agents that walked the canonical documents
 block by block. Five are places where a canonical document contradicts itself rather than the want
 document — a different kind of disagreement from this phase's main one, but the same repair. **Four of the
@@ -742,8 +742,8 @@ known and the rest is still a guess, so the two are separated here.
 
 *Known.* Numbering the normative statements means first walking the canonical documents and accounting
 for every one of them, and there is a recovered method that does exactly that:
-`docs/working-reset/enumeration/block-inventory.workflow.js`, with
-`docs/working-reset/enumeration/block-inventory-method.md` explaining what it does and does not establish. It ran on
+`docs/working-reset/phase-3/block-inventory.workflow.js`, with
+`docs/working-reset/phase-3/block-inventory-method.md` explaining what it does and does not establish. It ran on
 2026-07-14 across nine document regions and accounted for 888 blocks in 22 minutes of wall clock across
 ten agents. Two things have to be decided before it is re-run and they are named in the method file. It
 is also worth knowing that it reproduces the block accounting but not a cell corpus — it completes one it

@@ -15,7 +15,7 @@
  * pinned to sonnet. Pin them deliberately next time rather than inheriting.
  *
  * NEITHER THE ORIGINAL RUN NOR THIS EDIT HAS BEEN REVIEWED BY ANYONE. The 888 figure is
- * what the run reported about itself. Read docs/working-reset/enumeration/block-inventory-method.md
+ * what the run reported about itself. Read docs/working-reset/phase-3/block-inventory-method.md
  * for what the method does and does not establish, and for the two things that have to be
  * decided before this is run again.
  *

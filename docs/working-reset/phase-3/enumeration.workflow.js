@@ -25,7 +25,7 @@
  *      dispose of — collected by this script from the agents' own structured returns and
  *      republished verbatim. No synthesis stage can drop one.
  *
- * Files under `docs/working-reset/enumeration/`:
+ * Files under `docs/working-reset/phase-3/`:
  *   inventory/<unit>.md            block inventory, one row per block — written by a clerical
  *                                  agent per unit from the block table THIS script hands it,
  *                                  including the NO-BEHAVIOR reasons, which are otherwise
@@ -300,7 +300,7 @@
  * What works, and takes a second — strip the export with a line-anchored regex, not a string
  * match, because this comment contains the same words the string match would find:
  *
- *   node -e 'const s=require("fs").readFileSync("docs/working-reset/enumeration/enumeration.workflow.js","utf8")
+ *   node -e 'const s=require("fs").readFileSync("docs/working-reset/phase-3/enumeration.workflow.js","utf8")
  *     .replace(/^export /m, "");
  *     new Function("return (async()=>{\n"+s+"\n})()"); console.log("ok")'
  *
