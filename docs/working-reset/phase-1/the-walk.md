@@ -37,8 +37,8 @@ withdrawn as mis-included (item 20's function-argument row, which claimed no own
 
 | Mark | Count | Items |
 |---|---|---|
-| mine | 24 | 1 (both rows), 2, 3, 7, 9, 15, 17, 18, 19, 20c, 21, 22, 23, 30–39 |
-| not mine | 15 | 4, 5, 6, 8, 10, 11, 12, 13, 14, 16, 25, 26, 27, 28, 29 |
+| mine | 26 | 1 (both rows), 2, 3, 7, 8, 9, 13, 15, 17, 18, 19, 20c, 21, 22, 23, 30–39 |
+| not mine | 13 | 4, 5, 6, 10, 11, 12, 14, 16, 25, 26, 27, 28, 29 |
 | don't remember | 2 | 20b, 24 |
 | withdrawn | 1 | 20a |
 
@@ -46,7 +46,7 @@ withdrawn as mis-included (item 20's function-argument row, which claimed no own
 remains the one known error, caught and corrected before the sitting: 1 in 10, as recorded.
 
 **The finding, and it is about this file rather than about him.** He said partway through that the plain
-restatements were easier to follow, and asked which items should be re-asked that way. Seven were, and
+restatements were easier to follow, and asked which items should be re-asked that way. Ten were, over two rounds, and
 **every one of them came out differently from the first pass:**
 
 | Item | Asked in the register's phrasing | Asked as a worked case |
@@ -59,6 +59,9 @@ restatements were easier to follow, and asked which items should be re-asked tha
 | 16 — prove versus govern | not mine, and left conflicting with item 24 | **ruled** — the compiler refuses until the author supplies the premise |
 | 11 — what a refusal claims | derived | **never put to him**; now its own decision, blocking phase 4 |
 | 14 — where a divisor's non-zeroness comes from | derived | **never put to him**; now its own decision |
+| 13 — is `Total / 2` the same as `Total * 0.5` | derived | **mine** — and the widening path is post-MVP, his scope call |
+| 8 — writing a field only a rule's `when` reads | derived | **mine** — "one, clearly" |
+| 6 — must a proof name what establishes and preserves a fact | derived | **never put to him**, and he declined to rule without preparation |
 
 Item 15 is the most expensive of them: asked one way it read as an agent's deferral for phase 5 to close,
 and phase 5 would have built a fault family his ruling exempts. Items 11 and 14 are the other failure
@@ -188,7 +191,19 @@ exemption is a tautology, not a decision: a fact no operation can change has emp
 preserving sets by construction. The 07-23 correction is simply true — the preserving set is quantified
 over the whole file, so citation cannot make the check local, which is the same argument that puts
 coverage above replay in item 1 — rests on want:19, :24, :199, :204.
-☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands.
+☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". **Re-asked in plain
+terms** (does a proof leaning on "this rule held before the operation" have to name what establishes the
+rule at creation and every operation that preserves it, or is it enough that establishment and
+preservation are proven somewhere and tracked separately?). His answer: **"this has not been put to me
+plainly. I'm not prepared to rule right now, would need more context and/or research."**
+
+**So the printed answer does not stand as settled.** That both halves must be *proven* is forced — an
+induction without a base case and an inductive step is not an induction, and want:18–19 give both. What
+is open is whether the proof must **name** them: it decides what a certificate carries and whether a
+definition can be checked a handler at a time or only across the whole file. Now a "Waiting on Shane"
+row, to be prepared with worked examples and a cost before it is asked. The 07-23 correction — that the
+preserving set is quantified over the whole file, so citation cannot make the check local — is an
+argument *within* option one and does not decide between the two.
 
 **7.** All five constraint forms — `rule` plus the four `ensure` forms — are proof obligations, and a
 residency ensure is re-established at every entry into its state, so a transition row that writes
@@ -226,8 +241,18 @@ the configuration where it first applies is where it can first be violated
 exhaustiveness claim about the language, and phase 3 closes such lists (plan:184), so it is re-derived
 over the closed expression-form list rather than inherited — rests on want:20;
 precept-language-spec.md:1866, :1878, :2004.
-☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands,
-including that the three-route list is re-derived at phase 3 rather than inherited as complete.
+**☑ mine — the activation route** ☐ not mine ☐ don't remember — **re-asked 2026-07-26 in plain terms**
+(first pass drew "derived"; re-asked with `rule DeliveryDays <= 2 when ShippingClass == "Express"` and an
+event that writes only `ShippingClass` while `DeliveryDays` is already 5, he answered "one, clearly").
+Recorded on the second answer.
+
+So writing a field that only appears in a rule's activation condition **does** take on that rule's
+obligation: switching a rule on is where it can first be broken, and the compiler refuses the event
+unless the author adds a condition or writes the constrained field too. The condition route and the
+computed-field route were not separately re-asked; they are the easier cases of the same principle and
+stand as derived. **The completeness of the three-route list is still re-derived at phase 3** over the
+closed expression-form list — that is an exhaustiveness claim about the language, which this mark does
+not settle.
 
 **9.** Obligations are judged over a handler's whole set of writes, never per write — intermediate
 states are unobserved, so the shipped compiler, which rejects a plan whose final state is legal, must be
@@ -332,8 +357,18 @@ permits for a rewrite with no written validity argument; widening later is a per
 at phase 6, not an owner fork. Modulo staying unfolded is correctly open — its sign convention is a
 phase-3 language question — rests on precept-language-spec.md:213;
 docs/Working/normal-form-draft-2026-07-19.md:35.
-☐ mine **☑ not mine** ☐ don't remember — marked 2026-07-26; his word: "derived". Printed answer stands,
-including that the integer-division coercion defect is fixed before anything folds division.
+**☑ mine** ☐ not mine ☐ don't remember — **re-asked 2026-07-26 in plain terms** (first pass drew
+"derived"; re-asked as whether `Total / 2` and `Total * 0.5` are the same expression to the compiler, he
+answered: "this one I have answered before — one, with the justification that we can always improve it
+later beyond MVP to accept more spellings or normalization"). Recorded on the second answer.
+
+So the posture is his and so is its reasoning: **the compiler works with the expression as written.** A
+spelling that does not match a form it can reason about is refused with a message naming what would
+work. Widening — more spellings accepted, or normalising into a standard shape first — is post-MVP, and
+each rewrite is added one at a time with a written argument that it does not change the answer. This is
+not a conservative default an agent chose; it is a scope decision he made, with the widening path named.
+The rest of the printed answer stands: folding runs through the compiler's one evaluator, and the
+integer-division coercion defect is fixed before anything folds division.
 
 **14.** On the approximate `number` lane, nonzero / positive / nonnegative also establish not-NaN,
 infinity is deferred under the overflow model, and underflow is left open — first appears `ce72725d`,

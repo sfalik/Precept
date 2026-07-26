@@ -5874,13 +5874,13 @@
   "unmarked": 0,
   "withdrawn": 1,
   "tally": {
-   "mine": 24,
-   "not mine": 15,
+   "mine": 26,
+   "not mine": 13,
    "don't remember": 2,
    "withdrawn": 1
   },
   "howItWasAsked": "Each claim was put in plain terms with the cited lines quoted verbatim. Three items were re-asked at his request after he said the plain restatements were easier to follow, and all three inverted - see finding below.",
-  "finding": "He asked partway through which items should be re-asked in plain terms. Seven were, and every one came out differently from the first pass: 3, 7, 9 and 15 inverted to mine; 9's fault half was ruled after being left as the assistant's flag; 16 was ruled on a worked case, closing its conflict with 24; and 11 and 14 turned out never to have been put to him at all, so the compressed phrasing had made two open decisions look like settled agent work. Item 15 is the most expensive - phase 5 would have built a fault family his ruling exempts. The compression slice 1.3 was judged on is what caused it. Any future sitting states the claim plainly and shows a worked case.",
+  "finding": "He asked partway through which items should be re-asked in plain terms. Seven were, and every one came out differently from the first pass: 3, 7, 9 and 15 inverted to mine; 9's fault half was ruled after being left as the assistant's flag; 16 was ruled on a worked case, closing its conflict with 24; and 11 and 14 turned out never to have been put to him at all, so the compressed phrasing had made two open decisions look like settled agent work. Item 15 is the most expensive - phase 5 would have built a fault family his ruling exempts. The compression slice 1.3 was judged on is what caused it. Any future sitting states the claim plainly and shows a worked case. Three further items were re-asked afterwards at his prompting: 13 and 8 also inverted to mine, and 6 turned out never to have been put to him and he declined to rule without preparation. Ten items re-asked, ten came out differently from the first pass.",
   "items": [
    {
     "item": "1a",
@@ -5978,9 +5978,9 @@
     "item": "6",
     "claim": "A proof must name what establishes and preserves each fact it consumes",
     "mark": "not mine",
-    "hisWords": "derived",
-    "printedAnswer": "stands",
-    "consequence": "What makes the induction an induction.",
+    "hisWords": "this has not been put to me plainly. i'm not prepared to rule right now, would need more context and/or research",
+    "printedAnswer": "open - not ready to rule",
+    "consequence": "Re-asked in plain terms and declined pending preparation. That establishment and preservation must both be PROVEN is forced by want:18-19. Whether a proof must NAME them is open, and it decides what a certificate carries and whether a definition can be checked a handler at a time or only across the whole file. Now a Waiting on Shane row, to be prepared with worked examples and a cost. The 07-23 correction is an argument within the naming option, not a decision between the two.",
     "governedRows": [
      264,
      170,
@@ -6005,10 +6005,10 @@
    {
     "item": "8",
     "claim": "A constraint mentions a field through condition, when-guard, or a computed field",
-    "mark": "not mine",
-    "hisWords": "derived",
-    "printedAnswer": "stands",
-    "consequence": "All three routes forced; completeness of the list is re-derived at phase 3, not inherited.",
+    "mark": "mine - the activation route",
+    "hisWords": "one, clearly",
+    "printedAnswer": "inverted",
+    "consequence": "Re-asked with rule DeliveryDays <= 2 when ShippingClass == 'Express' and an event writing only ShippingClass while DeliveryDays is already 5. Writing a field that appears only in a rule's activation condition takes on that rule's obligation -- switching a rule on is where it can first be broken. The condition and computed-field routes stand as derived. The completeness of the three-route list is still re-derived at phase 3.",
     "governedRows": [
      238
     ]
@@ -6068,10 +6068,10 @@
    {
     "item": "13",
     "claim": "The normal-form rulings on literal folding and algebraic rearrangement",
-    "mark": "not mine",
-    "hisWords": "derived",
-    "printedAnswer": "stands",
-    "consequence": "Type-aware folding through the one evaluator is a soundness requirement; the integer-division coercion defect is fixed before anything folds division.",
+    "mark": "mine",
+    "hisWords": "this one I have answered before -- one, with the justification that we can always improve it later beyond MVP to accept more spellings or normalization",
+    "printedAnswer": "inverted",
+    "consequence": "Re-asked as whether Total / 2 and Total * 0.5 are the same expression to the compiler. The compiler works with the expression as written; a spelling it cannot reason about is refused with a message naming what would work. Widening -- more spellings, or normalising first -- is post-MVP, added one rewrite at a time with a written argument that it does not change the answer. A scope decision of his with the widening path named, not a conservative default.",
     "governedRows": [
      208,
      209,
