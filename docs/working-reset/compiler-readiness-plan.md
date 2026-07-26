@@ -66,7 +66,7 @@ stop, lands two and a half to three and a half weeks in. Recompute whenever a si
 | 1.2 Pull out the decisions that live only in a document | Done | — |
 | 1.3 Prepare the conversation | Done | 1.1, 1.2 |
 | 1.4 The walk itself | Done 2026-07-26 — 41 marks, 0 unmarked; sample passed 10/10 | 1.3, Shane's time |
-| 1.5 Fold the marks back | In progress | 1.4 |
+| 1.5 Fold the marks back | Done 2026-07-26 — 42 rows in `walk.items`, 238 register rows stamped, sample error count recorded | 1.4 |
 | 1.6 Dispose (does not block the phase) | Not started | 1.5 |
 
 ## 3. Ruled — do not reopen
