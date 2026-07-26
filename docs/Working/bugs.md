@@ -382,6 +382,24 @@ surfaced for proper fixing.
   ```
 
   → `success: true`, no errors, `Divisor must be non-zero` **Proved** by `DeclarationAttribute`. `A` and `B` have no write sites, so `D` is `0` in the only configuration that exists, and `E` divides by it.
+- **Second symptom, added 2026-07-26 — the same hole where every field is editable and the zero comes from arithmetic rather than from a file nobody can write to.** Reproduced at HEAD:
+
+  ```precept
+  precept UnderflowFix
+
+  field A as decimal nonzero default 0.0000000000000001 editable
+  field B as decimal nonzero default 0.0000000000000001 editable
+  field Product as decimal nonzero <- A * B
+  field Numerator as decimal default 100.0 editable
+  field Result as decimal optional
+
+  event Compute()
+
+  on Compute
+      -> set Result = Numerator / Product
+  ```
+
+  → `success: true`, **zero diagnostics**, `Divisor must be non-zero` **Proved** by `DeclarationAttribute`. Both operands are genuinely non-zero and both defaults are checked and pass. `1e-16 × 1e-16` is `1e-32`, below the smallest positive `decimal` (about `1e-28`), so `Product` is exactly zero and the division faults. **Why this one matters more than the `A - B` case above**: every field is `editable`, so nobody can dismiss it as an artefact of a definition with no write sites, and the author did the thing the language appears to ask of them — they declared the divisor non-zero. Removing `nonzero` from `Product` makes the same file **reject** with `PRE0083` ("Division is unsafe: 'Product' can be zero"), also reproduced. So the modifier is not decorative: it is the thing that flips the file from correctly refused to wrongly accepted.
 - **Root cause**: the obligation list contains **no** establishing obligation for `D`. A stored field declared `nonzero` with a default always produces `Default value of 'D' must satisfy 'nonzero'` — verified repeatedly today — but a computed field produces nothing. So the modifier is declared, never checked, and then read back as a premise by the divisor proof.
 - **Why the usual justification does not reach it**: every argument that consumes a declared modifier grounds it in governance at ingress — `precept-language-spec.md:268`, *"Every declared constraint is enforced on every value entering the entity from outside the definition — event arguments, construction inputs, direct field edits — at the moment it enters"*. A computed field's value never enters from outside; it is derived. Ingress governance has no purchase on it, and nothing else checks it.
 - **Wider than the divisor case**: this is a modifier on a computed field being unenforced in general. Any proof consuming any modifier on any `<-` field rests on nothing. The divisor is simply the shape that makes it visible.
