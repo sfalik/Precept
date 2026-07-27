@@ -13,7 +13,7 @@
 > [!NOTE]
 > **This is a skeleton.** Headings and one-line intents are laid down here so each implementation
 > slice fills its own section. It is the canonical home for how the prove-or-reject guarantee is made
-> sound: the certificate format, the counterexample, the deferred independent re-checker, and the coverage of
+> sound: the certificate format, the counterexample, the independent checker, and the coverage of
 > the known fail-open holes. It cross-cuts the proof engine, graph analyzer, type checker, and fault
 > correspondence.
 
@@ -45,9 +45,15 @@ check. Soundness is delivered two ways, and this doc is the home for both:
 - **A legible certificate on every verdict** — the engine shows its work in a form a reader (and, later,
   an independent checker) can replay. Authority rests in the certificate, not in trusting the engine's
   say-so.
-- **Direct engine correctness** — because the MVP ships no live re-checker (see §5b), MVP soundness comes
-  from fixing the known fail-open holes in the engine directly and from the ⊥ / single-hop rails, not
-  from an independent replay catching drift.
+- **An independent checker that replays the certificate** — one small component with two call sites: a
+  compiler stage that audits the proof engine's work at authoring time, and a gate in the runtime that
+  runs once when a definition is loaded and refuses to govern under a definition whose certificate does
+  not verify (see §5b). The guarantee is rooted in verification the engine's consumers perform, not in
+  trusting the engine's say-so.
+- **Direct engine correctness** — fixing the known fail-open holes in the engine and the ⊥ / single-hop
+  rails. This is not an alternative to the checker: a replay checks the
+  derivations the engine recorded, so an obligation the engine never created at all is a hole no replay
+  can see.
 
 *(One-line intent — fill per slice: state the prove-or-reject contract, the "search is free, authority
 is the certificate" principle, and how the two mechanisms above compose.)*
@@ -82,10 +88,16 @@ package** — over the *strengthened* engine (the new strategies plus the §6 es
 criterion. Re-assert the posture over a weaker engine and it rejects the corpus's own house style. The
 posture is locked; its *honesty* is contingent on the strengthened engine landing.
 
-**Why the boundary is proof-carrying-vs-not, never band-vs-rule.** An earlier design drew the line at
-"bounded band vs. authored rule" (old Decision D2). That distinction is **dead**: a bound *is* a rule. The
-only line that matters is whether an operand *carries a constraint the engine can discharge* — proof-
-carrying — or does not. There is no separate class of "soft" bounds that escape the obligation.
+**Why there is no band-vs-rule boundary.** An earlier design drew the line at "bounded band vs. authored
+rule" (old Decision D2). That distinction is **dead**: a bound *is* a rule, and there is one constraint
+mechanism underneath — a modifier is a compact spelling, not a separate system. Every rule, however
+spelled, is discharged the same way: the compiler proves it holds of the initial configuration and that
+every handler preserves it, from the four classes of premise the author declared — field modifiers,
+constraints on event arguments, the handler's guard, and the rules that already hold in the pre-state
+(language spec §0.7). What decides a site is whether those premises close the proof, not which syntax the
+constraint was written in. An earlier version of this paragraph made the deciding question a per-operand structural test — whether an
+operand carried a discharging constraint — which the one-mechanism model supersedes. There is no separate class of "soft"
+bounds that escape the obligation.
 
 **Why there is no author-visible escape hatch.** There is no "trust me" marker that lets an author opt a
 site out of the proof. Such a marker is directly corrosive to the guarantee: it reintroduces exactly the
@@ -131,14 +143,28 @@ own recomputable conclusion). Built during discharge from values the folds alrea
 not a second analysis pass. Every step renders to one author-readable line. This is the home for the
 `CertificateSteps` catalog vocabulary and the rendering contract that feeds hover / `precept_proofs`.
 
-### 5b. Independent re-checker (deferred)
+### 5b. The independent checker — in scope, both call sites
 
-*(Intent — fill when scheduled.)* A second, independent implementation that replays a certificate and
-fails loudly if a strategy's proof and its certificate disagree. **Deferred — not in the MVP.** Its value
-is builder-side drift defense, not author unblocking; it is a separate, larger build than the format. The
-MVP designs the certificate format to be re-checkable *in principle* so this checker is a later addition
-rather than a retrofit — there is no checker-gated mint in the MVP (a `Proven` verdict is minted by the
-discharge cascade, not by passing a replay first).
+*(Intent — fill when scheduled.)* A second, independent implementation that replays a certificate step by
+step and fails loudly if a strategy's proof and its certificate disagree. It runs at two places, and both
+are in scope:
+
+- **A compiler stage**, auditing the proof engine's work at authoring time, where an engine defect is
+  cheapest to fix.
+- **A load-time gate in the runtime**, run once when a definition is loaded. The runtime refuses to govern
+  under a definition whose certificate does not verify, so no unproven, tampered, or stale definition can
+  govern anything. This is what entitles the runtime to be lighter: it omits the checks the compiler
+  proved unnecessary because it verified the proof itself, not because it assumes the compiler's
+  provenance.
+
+The checker stays small because the hard work — finding a proof — happened at compile time. The
+certificate records the finished derivation and the checker walks it and confirms each step; every step is
+re-verified and no step is re-discovered.
+
+**Not built.** No certificate is emitted and no checker exists, so today a `Proven` verdict is minted by
+the discharge cascade rather than by passing a replay first. That is a gap against the target, not the
+target. An earlier version of this section recorded the checker as deferred out of the first release; that
+deferral is withdrawn.
 
 ---
 
@@ -285,8 +311,9 @@ prove-or-reject posture itself is §1.1 above.
 > text defect), recorded here so the separate conformance track does not re-report it as documentation
 > drift. See §3.1 (the `NumericOverflow` row is tagged *in-scope, not-yet-implemented*).
 
-*(Intent — fill per slice.)* With the independent re-checker deferred (§5b), MVP soundness comes from
-fixing the engine directly rather than from replay catching drift. The **tactical Slice-0 fail-open fix
+*(Intent — fill per slice.)* Until the checker of §5b is built, nothing replays a derivation, so soundness
+rests entirely on the engine being right — which is why the fail-open holes are fixed directly rather
+than left for a replay to catch. The **tactical Slice-0 fail-open fix
 checklist** — the specific found-hole to-dos and the systematic `bool?`/dict-write sweep — is an
 implementation to-do list whose entries close (and are removed) as the fixes land, so it lives in a
 Working slice doc rather than in canon: [`../Working/soundness-hole-slice0-fixes-2026-07-14.md`](../Working/soundness-hole-slice0-fixes-2026-07-14.md).

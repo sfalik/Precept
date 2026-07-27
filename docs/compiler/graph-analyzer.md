@@ -268,7 +268,7 @@ The `ProofForwardingFact` DU defines the interface between the graph analyzer an
 | `DominancePathFact` | `RequiredState`, `DominatedTerminals` (which terminal states this required state dominates) | The proof engine verifies the required-state guarantee: every execution path to a terminal passes through the required state. If `DominatedTerminals` is empty, the graph analyzer has already emitted `RequiredStateDoesNotDominateTerminal` (code 111); the proof engine records this as a structural violation in the proof ledger. |
 | `EventCoverageFact` | `EventName`, `UnhandledReachableStates` (reachable states that have no transition row for this event) | The proof engine uses coverage gaps to reason about guard completeness: in states where an event is handled, are the guards sufficient to cover all possible data states? Coverage gaps are structural facts; guard satisfiability is the proof engine's domain. |
 | `TerminalCompletenessFact` | `AllTerminalsReachable`, `UnreachableTerminals` (terminal states that cannot be reached from the initial state) | True when at least one terminal state exists and all terminal states are reachable from the initial state; false otherwise (including when no terminal states are declared). The proof engine uses terminal completeness to assess whether the state machine can reach completion. Unreachable terminals may indicate dead-end design or missing transitions — the proof engine records these for the proof ledger without emitting additional diagnostics (the graph analyzer already emits `UnreachableState` for each one). |
-| `DeadEndStateFact` | `DeadEndStates` (reachable non-terminal states with no path to any terminal state), `DeadEndCount` | The proof engine uses dead-end facts to annotate the proof ledger with structural completeness failures. Dead-end states represent lifecycle traps — entities that enter these states can never reach completion. The graph analyzer emits `DeadEndState` (Warning, code 108) for each dead-end state. The proof engine records these facts without emitting additional diagnostics. |
+| `DeadEndStateFact` | `DeadEndStates` (reachable non-terminal states with no path to any terminal state), `DeadEndCount` | The proof engine uses dead-end facts to annotate the proof ledger with structural completeness failures. Dead-end states represent lifecycle traps — entities that enter these states can never reach completion. The graph analyzer emits `DeadEndState` (Error, code 108 — the code still emits `Warning`; see § 6.2) for each dead-end state. The proof engine records these facts without emitting additional diagnostics. |
 
 **Emission rules:**
 
@@ -449,12 +449,14 @@ Output: DeadEndStates
       - BFS backward from t using reverse adjacency
       - Add all visited states to reverseVisited
 4. DeadEndStates = { s ∈ ReachableStates : s ∉ TerminalStates AND s ∉ reverseVisited }
-5. Emit Diagnostic(DeadEndState, Warning) for each dead-end state
+5. Emit Diagnostic(DeadEndState, Error) for each dead-end state
 ```
 
 A dead-end state is reachable from initial (it's not an unreachable state) but cannot reach any terminal (it's a lifecycle trap). This is distinct from `UnreachableState` — the state IS reachable, it just has no exit toward completion.
 
-**Severity:** Warning, not error. Dead-end states may be intentional in designs that use certain states as permanent holds (e.g., a "Suspended" state from which entities are never expected to complete). The author can suppress the warning by adding the `terminal` modifier if the state is intended as an endpoint.
+**Severity:** Error. A state an entity can enter but never leave is a structural defect: the lifecycle the author declared cannot complete from there. The `terminal` modifier is how an author says an endpoint is intended — an end on purpose is a declaration, and a state carrying `terminal` is not a dead end at all, so it never reaches this check. That is a declaration, not warning suppression; there is no way to keep an undeclared trap and silence the diagnostic.
+
+**Implementation gap.** `Diagnostics.cs` still emits `DeadEndState` at `Severity.Warning`. The severity model and the record of that drift live in [`diagnostic-system.md`](diagnostic-system.md) § severity; this section states the target the implementation is measured against, not what the code does today.
 
 ### 6.3 Dominator Computation (Phase 3)
 
@@ -774,7 +776,7 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 > *Resolved: 2026-05-07 — Wave 4, team-autonomous*
 
 > **✅ Resolved (OQ1) — DeadEndStateFact: separate fact type for dead-end state detection**
-> Dead-end states (reachable non-terminal states with no path to any terminal state) are a distinct structural concern from terminal completeness (whether terminals are reachable from initial). `TerminalCompletenessFact` answers "can each terminal be reached?" — a forward perspective from the initial state. `DeadEndStateFact` answers "can each non-terminal reach a terminal?" — a forward perspective from each reachable state. Different questions, different data shapes, different proof consumption patterns. `DeadEndStateFact` carries `DeadEndStates` (the trapped states) and `DeadEndCount`. Detection uses reverse-reachability BFS from terminal states — any reachable non-terminal state not in the reverse-reachable set is a dead-end. The graph analyzer emits `DeadEndState` (Warning, code 108) per dead-end state. Warning severity, not error: dead-end states may be intentional permanent-hold designs; the author can suppress by adding the `terminal` modifier to declare the state as an intended endpoint.
+> Dead-end states (reachable non-terminal states with no path to any terminal state) are a distinct structural concern from terminal completeness (whether terminals are reachable from initial). `TerminalCompletenessFact` answers "can each terminal be reached?" — a forward perspective from the initial state. `DeadEndStateFact` answers "can each non-terminal reach a terminal?" — a forward perspective from each reachable state. Different questions, different data shapes, different proof consumption patterns. `DeadEndStateFact` carries `DeadEndStates` (the trapped states) and `DeadEndCount`. Detection uses reverse-reachability BFS from terminal states — any reachable non-terminal state not in the reverse-reachable set is a dead-end. The graph analyzer emits `DeadEndState` (code 108) per dead-end state. Severity is Error — see § 6.2, which also records that `Diagnostics.cs` still carries Warning. (This resolution note originally read "Warning severity, not error", on the reasoning that a permanent hold may be intentional. An intentional endpoint is declared with the `terminal` modifier, which takes the state out of this check entirely; there is no case left where an undeclared trap should merely be reported.)
 > *Resolved: 2026-05-07 — OQ design session*
 
 > **✅ Resolved (OQ2) — EventHandler entries do NOT count toward event coverage**
@@ -787,7 +789,7 @@ Graph analysis facts are not consumed directly for diagnostics — they flow for
 
 | Exclusion | Rationale |
 |-----------|-----------|
-| **Guard satisfiability analysis** | Guards contain arbitrary expressions. Determining whether a guard can be satisfied requires the proof engine's SMT integration, not graph-level analysis. |
+| **Guard satisfiability analysis** | Guards contain expressions over field and argument values, which the state graph does not model. Whether a guard can ever be true is decided by the proof engine's satisfiability scan (`UnsatisfiableGuard`, `TautologicalGuard` — language spec §0.6 items 9 and 10), from the same bounded strategy set as every other obligation. It is not deferred to an external solver and there is no solver in the compiler to wait for: opaque solver proof artifacts are excluded by the authoring-audience contract (spec §0.8 item 4), and the diagnostic fires only where the guard is *provably* unsatisfiable (spec §0.6 Proof philosophy #2). |
 | **Data-flow analysis** | The graph analyzer operates on control flow (state transitions), not data flow (field values). Field analysis is the proof engine's domain. |
 | **Path enumeration** | Enumerating all paths through the state machine is exponential. The analyzer computes structural properties (reachability, dominance) that summarize path behavior without enumeration. |
 | **Cycle detection beyond irreversible** | General cycle detection is not a requirement. Only the `irreversible` modifier constrains cycles (via back-edge prevention). Other cycles are legal. |

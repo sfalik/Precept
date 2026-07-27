@@ -76,11 +76,11 @@
   - [Catalog Metadata Needed](#catalog-metadata-needed)
   - [Future Considerations](#future-considerations)
 - [14. Deliberate Exclusions](#14-deliberate-exclusions)
-  - [No SMT Solver](#no-smt-solver)
+  - [No Opaque Solver](#no-opaque-solver-excluded-by-the-certificate-criterion-not-by-category)
   - [No Runtime Obligation Checking](#no-runtime-obligation-checking)
-  - [No Constraint Evaluation](#no-constraint-evaluation)
+  - [No Evaluation of Rules Against Values](#no-evaluation-of-rules-against-values)
   - [No General Dataflow Analysis](#no-general-dataflow-analysis)
-  - [No Inductive Proof](#no-inductive-proof)
+  - [No Loop Invariants, No Recursive Definitions](#no-loop-invariants-no-recursive-definitions)
   - [No User-Defined Proof Hints](#no-user-defined-proof-hints)
 - [15. Cross-References](#15-cross-references)
 - [16. Source Files](#16-source-files)
@@ -103,7 +103,7 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 
 **Key design choices:**
 
-1. **Proof is bounded** — six strategies only, no general SMT solver. Predictable, auditable, zero external dependencies.
+1. **Proof is bounded** — a closed strategy set, enumerated in § Proof Strategies, and no general SMT solver. Predictable, auditable, zero external dependencies.
 2. **Proof ledger does NOT cross the compile-runtime boundary** — only `FaultSiteDescriptor` residue (defense-in-depth backstops) crosses into runtime. The proof engine is purely a compile-time analysis stage.
 3. **Catalog-driven obligations** — the proof engine reads `ProofRequirement` records stamped by the type checker from catalog metadata. It does NOT maintain its own list of what needs to be proved.
 
@@ -118,7 +118,7 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 | Responsibility | Description |
 |---|---|
 | **Obligation instantiation** | Create `ProofObligation` records from `ProofRequirement` attachments on typed expressions and actions |
-| **Obligation discharge** | Apply six proof strategies in order to resolve each obligation |
+| **Obligation discharge** | Apply the proof strategies in order to resolve each obligation |
 | **Diagnostic emission** | Emit diagnostics for unresolved obligations with semantic site attribution |
 | **FaultSiteLink production** | Link unresolved obligations to their corresponding `FaultCode` for Precept Builder backstops |
 | **Constraint influence analysis** | Traverse constraint expressions to record field/arg dependencies for causal reasoning |
@@ -132,27 +132,29 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 | **Semantic resolution** | Names, types, and overloads are already resolved by the type checker. The proof engine consumes resolved `TypedExpression` nodes. |
 | **Graph topology** | Reachability, dominance, and edge sets are the graph analyzer's responsibility. The proof engine receives structural facts, not the topology itself. |
 | **Expression evaluation** | The evaluator handles runtime values. The proof engine performs static analysis only. |
-| **Constraint enforcement** | Runtime constraint checking is the evaluator's responsibility. The proof engine verifies satisfiability statically. |
+| **Constraint enforcement** | Holding an incoming value to the constraints declared on the slot it enters — event arguments and editable-field writes — is the evaluator's responsibility at ingress. The proof engine verifies satisfiability statically. Nothing evaluates a rule against the configuration an operation commits (language spec §0.7). |
 | **Runtime fault handling** | The proof engine identifies what *could* fault; the evaluator and `FaultSiteDescriptor` backstops handle actual runtime failures. |
 
 ---
 
 ## 4. Right-Sizing
 
-The proof engine is **intentionally bounded** — six strategies only, no external solver. This is a deliberate scope limit, not a capability gap.
+The proof engine is **intentionally bounded** — a closed strategy set, no external solver. This is a deliberate scope limit, not a capability gap.
 
 | Metric | Value | Rationale |
 |---|---|---|
 | Estimated LOC | 400–600 | ~150 obligation instantiation + ~200 strategy dispatch + ~100 influence analysis + ~50 satisfiability |
-| Strategy count | 6 | Bounded set covers the DSL's constrained expression language |
+| Strategy count | Closed — see § Proof Strategies | Bounded set covers the DSL's constrained expression language |
 | External dependencies | 0 | No SMT solver, no SAT solver, no external libraries |
 | Determinism | 100% | Same input always produces same output — no solver timeouts or resource limits |
 
-**Why six strategies, not a general solver:**
+> **The number of strategies is stated inconsistently across the documentation and is not settled here.** This document has said "six" in some sections and "five" in others, while § Proof Strategies enumerates eleven numbered strategies plus two requirement-dispatched paths that reuse another strategy's reporting tag; `compiler-and-runtime-design.md` says four. Every bare numeral in this document has been replaced by a pointer to § Proof Strategies, which is the enumeration and the only place a count can honestly be read off. No new number was chosen, because choosing one is a decision about whether the two tag-sharing paths are strategies — which no document answers.
 
-General SMT solving (Z3, CVC4/5) would add non-deterministic verification times, external dependencies, and implementation complexity. The surveyed verification systems (SPARK Ada/GNATprove, Dafny, Liquid Haskell, CBMC) all depend on external solvers for general proof discharge. Precept's DSL is intentionally constrained — the expression language is finite, the obligation space is bounded, and the six-strategy set covers realistic programs.
+**Why a closed strategy set, not a general solver:**
 
-**Boundary condition:** If the six strategies prove insufficient for real programs, a seventh bounded strategy would be added — not a general solver. The strategy set is bounded, not extensible by users.
+General SMT solving (Z3, CVC4/5) would add non-deterministic verification times, external dependencies, and implementation complexity. The surveyed verification systems (SPARK Ada/GNATprove, Dafny, Liquid Haskell, CBMC) all depend on external solvers for general proof discharge. Precept's DSL is intentionally constrained — the expression language is finite, the obligation space is bounded, and the enumerated strategies cover realistic programs.
+
+**Boundary condition:** If the enumerated strategies prove insufficient for real programs, one further bounded strategy would be added — not a general solver. The strategy set is bounded, not extensible by users.
 
 ---
 
@@ -480,7 +482,7 @@ The proof engine operates in two sequential passes:
 
 **Satisfiability scan (Pass 1.5).** A lateral pass between forwarding-fact incorporation and per-obligation discharge that detects whole-construct verdicts the per-obligation strategies can't express: provably-empty guards, tautological guards, vacuous rule predicates, self-unsatisfiable rules, contradictory rule pairs, and global rules provably violated by the field default values. Lives in `ProofEngine.Satisfiability.cs`. The verdict shape is whole-construct (no obligation site), so the scan emits diagnostics directly into the diagnostic stream rather than flowing through the obligation channel.
 
-**Rule-vs-default fold (`DefaultViolatesRule`, PRE0164).** A global, unguarded `rule` is an invariant the entity must hold at creation (it holds in every state). `ScanRulesAgainstDefaults` folds each such rule's condition against the field default environment using the *same* `ConstantFold`/`FoldValue` evaluator the initial-state ensure path uses, and the *same* `BuildDefaultEnvironment` helper — extracted from `CheckInitialStateSatisfiability` so the two paths share one default environment and one evaluator (no fork). This implements spec §0.1 Principle 11 for global rules; the ensure half (`UnsatisfiableInitialState`/PRE0115) was already in place. Prove-or-reject (§0.6 #1 and #11): the fold carries a three-way verdict, not a two-way one. A fold that proves `false` rejects, and so does a fold that cannot be resolved — a computed (`<-`) field, a non-constant default, an `UnknownSentinel`. A default that forms part of the initial configuration and cannot be shown to satisfy the rules leaves the base case of the induction open, and prevention does not admit a reachable configuration with no authored disposition. This is the same three-way verdict the bounded-write obligations carry (Proof philosophy #2 and #5). **Implementation gap:** `ScanRulesAgainstDefaults` currently emits only on a proven-`false` fold and treats an unresolvable one as `null`, so it under-emits against this target. Guarded rules are skipped: a `when`-guarded rule holds only under its guard, so it is not an unconditional invariant of the defaults (mirroring the guarded-ensure skip in `CheckInitialStateSatisfiability`). A precept with a construction (`initial`) event suppresses the rule-vs-default fold entirely (`ScanRulesAgainstDefaults` early-returns on `HasConstructionHandler`), mirroring the ensure path's identical early-return: when a construction handler exists the field defaults are placeholders it overwrites with the real initial values, so folding rules against the placeholders would over-reject. This is a whole-precept suppression — the residual coarseness is a rule over a field the construction event does not assign (whose default *is* still the initial value); that case is shared verbatim with the ensure path's existing behavior and errs in the safe under-emit direction. Per-field precision (suppress only for rules over construction-assigned fields) is a future refinement, deliberately not built here for parity with the ensure path. The `DefaultViolatesRule` message renders the rule condition through the proof engine's shared `DescribeExpression` renderer (the same readable form other proof diagnostics use), not a raw AST dump.
+**Rule-vs-default fold (`DefaultViolatesRule`, PRE0164).** A global, unguarded `rule` is an invariant the entity must hold at creation (it holds in every state). `ScanRulesAgainstDefaults` folds each such rule's condition against the field default environment using the *same* `ConstantFold`/`FoldValue` evaluator the initial-state ensure path uses, and the *same* `BuildDefaultEnvironment` helper — extracted from `CheckInitialStateSatisfiability` so the two paths share one default environment and one evaluator (no fork). This implements spec §0.1 Principle 11 for global rules; the ensure half (`UnsatisfiableInitialState`/PRE0115) was already in place. Prove-or-reject (§0.6 #1 and #11): the fold carries a three-way verdict, not a two-way one. A fold that proves `false` rejects, and so does a fold that cannot be resolved — a computed (`<-`) field, a non-constant default, an `UnknownSentinel`. A default that forms part of the initial configuration and cannot be shown to satisfy the rules leaves the base case of the induction open, and prevention does not admit a reachable configuration with no authored disposition. This is the same three-way verdict the bounded-write obligations carry (Proof philosophy #2 and #5). **Implementation gap:** `ScanRulesAgainstDefaults` currently emits only on a proven-`false` fold and treats an unresolvable one as `null`, so it under-emits against this target. Guarded rules are skipped: a `when`-guarded rule holds only under its guard, so it is not an unconditional invariant of the defaults (mirroring the guarded-ensure skip in `CheckInitialStateSatisfiability`). A precept with a construction (`initial`) event currently suppresses the rule-vs-default fold for every field (`ScanRulesAgainstDefaults` early-returns on `HasConstructionHandler`), mirroring the ensure path's identical early-return: when a construction handler exists the field defaults are placeholders it overwrites with the real initial values, so folding rules against the placeholders would over-reject. This is a whole-precept suppression, and it is **wider than the exception the language allows**. Spec §0.6 item 11 designs the exception per field: a default the construction event *provably overwrites* is a placeholder that never reaches a committed configuration, so no rule has to hold of it. A default the construction event does not assign is still the initial value, and a rule over such a field is part of the base case — suppressing it leaves the base case of the induction open for that field, which is a prevention hole rather than a conservative under-emit. Per-field precision (suppress only where the construction event provably assigns the field) is the target; the current whole-precept early-return is an **implementation gap**, shared verbatim with the ensure path, not a settled design. The `DefaultViolatesRule` message renders the rule condition through the proof engine's shared `DescribeExpression` renderer (the same readable form other proof diagnostics use), not a raw AST dump.
 
 Rule-level scans run in two phases. First, `UnsatisfiableRule (PRE0159)` classification: each rule's predicate is composed with the field-declared bounds and the rule's own `when` guard via the `ComposeRulePredicateWithFieldBounds` helper; if any field's resulting interval is empty (and non-Unbounded — the soundness gate), the rule is impossible on its own and PRE0159 fires. Self-unsat rules are excluded from subsequent passes. Second, the existing `VacuousRule (PRE0154)` provably-true check and `ContradictoryRule (PRE0155)` pair sweep run over the remaining (non-self-unsat) rules. The two-phase design ensures attribution: a singleton self-impossibility is never blamed on an innocent paired rule.
 
@@ -1728,9 +1730,9 @@ When in any doubt the domain returns unbounded (emit) — it never under-estimat
 
 **When it applies:** An obligation of kind `CountContainmentProofRequirement` — produced on every count-changing mutation (`add`/`append`/`enqueue`/`push`/`put`/`insert`, `remove`/`removeAt`/`pop`/`dequeue`, `clear`) of a collection field that declares `mincount` / `maxcount` bounds, plus the field's `default [...]` literal. (A `set` to a collection is not a literal-count site: a list-literal RHS is type-rejected — list literals are legal only in `default` — so a valid `set` is always a non-literal whose count is unknown.)
 
-**How it works:** A **prove-or-reject** per-mutation discharge, mirroring the length sibling `TryLengthContainmentProof`. The obligation carries the post-mutation count interval `[lo, hi]` (`hi = ∞` when there is no `maxcount`), and discharges clean **iff** that interval is provably within the band — `lo ≥ (mincount ?? 0)` **and** `hi ≤ (maxcount ?? ∞)`. Otherwise — a provable violation **or** a merely-unprovable case (e.g. an unguarded grow whose `hi` was `∞`-seeded, giving post-`hi = maxcount+1`) — the obligation is unresolved and `CountBoundViolation` (PRE0136) emits, naming the guard that would make it provable. There is no deferral to a runtime check (§0.7 prove-or-reject); the runtime count-fault trap is a defense-in-depth backstop, unreachable for contract data.
+**How it works:** A **prove-or-reject** per-mutation discharge, mirroring the length sibling `TryLengthContainmentProof`. The obligation carries the post-mutation count interval `[lo, hi]` (`hi = ∞` when there is no `maxcount`), and discharges clean **iff** that interval is provably within the band — `lo ≥ (mincount ?? 0)` **and** `hi ≤ (maxcount ?? ∞)`. Otherwise — a provable violation **or** a merely-unprovable case (e.g. an unguarded grow whose `hi` was `∞`-seeded, giving post-`hi = maxcount+1`) — the obligation is unresolved and `CountBoundViolation` (PRE0136) emits, naming the guard that would make it provable. There is no deferral to a runtime check (§0.7 prove-or-reject), and nothing catches an over-count later: the runtime evaluates no constraint against the finished working copy and carries no fault trap at evaluation time (spec §0.7 *The boundary of the guarantee*). Either this obligation discharges here or the definition is refused.
 
-The post-mutation interval is computed by the sequential count-interval walk in `WalkActions` (reusing the `ActionEffectClass` machinery that drives the boolean non-empty model — see *Sequential proof flow*). It is seeded once on first touch of a count-bounded field from the governed band `[mincount ?? 0, maxcount ?? ∞]` (the field already satisfies its band entering the chain — §3A.4 swept prior state), narrowed by any same-context `count`-comparison guard (`when C.count < N ⇒ hi := min(hi, N−1)`; `when C.count > M ⇒ lo := max(lo, M+1)`) and by routed reject-row siblings (a `when C.count >= N -> reject` row above the current row caps the seed `hi` at `N−1`). Each subsequent mutation advances the interval by a **sound per-kind/per-action delta** — a mutation that *might be a no-op* must not move the bound that tightens toward the cap, so the post-mutation interval contains every possible true count:
+The post-mutation interval is computed by the sequential count-interval walk in `WalkActions` (reusing the `ActionEffectClass` machinery that drives the boolean non-empty model — see *Sequential proof flow*). It is seeded once on first touch of a count-bounded field from the governed band `[mincount ?? 0, maxcount ?? ∞]` (the field already satisfies its band entering the chain — a `mincount`/`maxcount` bound is rule shorthand, and every rule holding in the pre-state is a premise the induction supplies, spec §0.7; nothing re-checked the band at the end of the previous operation), narrowed by any same-context `count`-comparison guard (`when C.count < N ⇒ hi := min(hi, N−1)`; `when C.count > M ⇒ lo := max(lo, M+1)`) and by routed reject-row siblings (a `when C.count >= N -> reject` row above the current row caps the seed `hi` at `N−1`). Each subsequent mutation advances the interval by a **sound per-kind/per-action delta** — a mutation that *might be a no-op* must not move the bound that tightens toward the cap, so the post-mutation interval contains every possible true count:
 
 | Mutation | Lower delta | Upper delta | Why | Derived from |
 |---|---|---|---|---|
@@ -2147,7 +2149,7 @@ The proof engine consumes `ProofForwardingFact` entries from the `StateGraph` du
 | `DominancePathFact` | Records in the proof ledger for structural completeness. No additional diagnostic — the graph analyzer emits `RequiredStateDoesNotDominateTerminal` (111). Redundant diagnostics are suppressed. |
 | `EventCoverageFact` | Records structural coverage facts for downstream consumption. The proof engine does NOT analyze guard completeness (value-space partitioning). Guard completeness would require solver-grade analysis; coverage facts are structural metadata only. |
 | `TerminalCompletenessFact` | Records terminal completeness in the proof ledger for structural completeness reasoning. No additional diagnostics — the graph analyzer emits `UnreachableState` for each unreachable terminal. |
-| `DeadEndStateFact` | Records dead-end states in the proof ledger as structural completeness failures. Dead-end states represent lifecycle traps — entities entering these states can never reach completion. The proof engine suppresses proof obligations on transitions originating FROM dead-end states to other dead-end states (those paths are already structurally broken). Transitions INTO dead-end states retain their obligations — those transitions are the ones the author likely needs to fix. No additional diagnostics — the graph analyzer emits `DeadEndState` (Warning, code 108) for each dead-end state. |
+| `DeadEndStateFact` | Records dead-end states in the proof ledger as structural completeness failures. Dead-end states represent lifecycle traps — entities entering these states can never reach completion. The proof engine suppresses proof obligations on transitions originating FROM dead-end states to other dead-end states (those paths are already structurally broken). Transitions INTO dead-end states retain their obligations — those transitions are the ones the author likely needs to fix. No additional diagnostics — the graph analyzer emits `DeadEndState` (code 108, Error) for each dead-end state. |
 
 ### Stateless Precept Handling (PE-G15)
 
@@ -2393,9 +2395,9 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 ### Disposition Exhaustiveness
 
-**Contract:** Every `ProofObligation` has a disposition: `Proved` (one of six strategies succeeded) or `Unresolved`.
+**Contract:** Every `ProofObligation` has a disposition: `Proved` (one of the enumerated strategies succeeded) or `Unresolved`.
 
-**Enforcement:** The strategy dispatch loop is exhaustive — after trying all six strategies, the obligation is marked `Unresolved`; non-error-tainted obligations emit diagnostics, while error-tainted obligations are suppressed per PE-G13.
+**Enforcement:** The strategy dispatch loop is exhaustive — after trying every enumerated strategy, the obligation is marked `Unresolved`; non-error-tainted obligations emit diagnostics, while error-tainted obligations are suppressed per PE-G13.
 
 ### Fault Chain Integrity
 
@@ -2410,7 +2412,7 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 **Contract:** Same input (`SemanticIndex` + `StateGraph`) always produces same output (`ProofLedger`).
 
-**Enforcement:** No external solver, no non-deterministic algorithms, no timeouts. The six strategies are pure predicate functions.
+**Enforcement:** No external solver, no non-deterministic algorithms, no timeouts. Every strategy is a pure predicate function.
 
 ### Catalog Correspondence
 
@@ -2537,7 +2539,7 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 
 **Invariant 2 — consumer isolation.** The relational narrowing reaches only the discharge-time `narrowed` dictionary and the trusted-fact stream; the satisfiability scans read the bare `ExtractFieldInterval` and are structurally isolated (see § Satisfiability above). This is preferred over a default-safe flag on the shared interval reader because a soundness *boundary* (no false rejection) is better protected by structural unreachability than by every present and future call-site remembering a flag value. *(Tradeoff accepted: the discharge-side readers that previously took a bare interval read must be explicitly threaded to the narrowed read — a missed thread is a sound false-negative, test-caught, whereas a missed flag would be an unsound false rejection.)*
 
-**Invariant 3 — contradiction guard.** An empty intersection of the narrowing against the subject's own declared bounds is a proven contradiction, not a vacuous truth: the rule contributes no discharge fact and the dependent fault-prone operation rejects at its own existing Error (see § Strategy 4 contradiction guard). The block is sourced from the dependent fault-prevention obligation's Error (which the spec already classifies as a hard error, §0.6 item 6 / §0.7), not by re-severitying a structural-soundness diagnostic (the contradictory/vacuous/unsatisfiable-rule family stay `Warning` per §0.6 items 7/8 "reports") and not by a new diagnostic code.
+**Invariant 3 — contradiction guard.** An empty intersection of the narrowing against the subject's own declared bounds is a proven contradiction, not a vacuous truth: the rule contributes no discharge fact and the dependent fault-prone operation rejects at its own existing Error (see § Strategy 4 contradiction guard). The block is sourced from the dependent fault-prevention obligation's Error (which the spec already classifies as a hard error, §0.6 item 6 / §0.7), not by re-severitying a structural-soundness diagnostic and not by a new diagnostic code. The severities of that family are settled elsewhere and this invariant does not depend on them: a contradictory rule and an unsatisfiable rule are rejections, because §0.6 item 7 says an uninhabitable rule set makes the compiler reject the definition, while a vacuous rule stays a report under item 8 (`diagnostic-system.md` § severity holds the ruled model and records where `Diagnostics.cs` has not caught up). An earlier version of this sentence cited items 7 and 8 together for a single `Warning` disposition, which item 7 does not say.
 
 **No public-surface change.** Both fact records are private to the proof engine and never serialized; the relational mechanism adds no `ProofRequirement`, `ProofRequirementKind`, `ProofStrategy`, or DTO. Relational discharge is attributed via the existing `ProofStrategy.FlowNarrowing`, preserving the named-rule counterexample.
 
@@ -2580,12 +2582,12 @@ The attribute is also the **single source of truth for the `DiagnosticCode → F
 
 ### Bounded, Non-Extensible Strategy Set
 
-Five strategies only, each a simple predicate — not a solver framework. This makes proof:
+A closed strategy set (§ Proof Strategies), each strategy a simple predicate — not a solver framework. This makes proof:
 - **Predictable:** Same input → same output, every time
 - **Auditable:** Strategy logic is inspectable, not hidden in solver internals
 - **Implementable:** No external dependencies, no complex algorithm implementations
 
-New strategies are language changes, not tooling extensions. Adding a sixth strategy requires design review and documentation, not just implementation.
+New strategies are language changes, not tooling extensions. Adding one requires design review and documentation, not just implementation.
 
 ### Compile-Time Satisfiability
 
@@ -2605,14 +2607,14 @@ The proof engine produces a `ConstraintInfluenceMap` that enables AI agents to r
 
 ### Implementation Status
 
-Items 1 and 2 are resolved — the full ProofEngine body is implemented with all six strategies, obligation collection, diagnostic emission, constraint influence analysis, initial-state satisfiability, and ProofForwardingFact consumption.
+Items 1 and 2 are resolved — the full ProofEngine body is implemented with the enumerated strategies, obligation collection, diagnostic emission, constraint influence analysis, initial-state satisfiability, and ProofForwardingFact consumption.
 
 ### Prove-or-reject MVP — designed, not yet implemented
 
 The base engine above is implemented. A further **prove-or-reject MVP** is designed but not yet built — under prove-or-reject, when the compiler cannot prove a computed value stays inside its declared limit, it **rejects the definition** rather than deferring the check to runtime. The designed-not-built layer comprises:
 
 - **Three-way verdict as a discriminated union.** The obligation verdict becomes a `ProofVerdict` DU with three cases — `Proven` (carries its certificate), `ProvenViolating(counterexample)` (rejected, `Severity.Error`, carries a certificate plus a validated counterexample configuration), and `Unresolved(condition)` (rejected, carries a certificate plus the printed weakest precondition). Each case carries only its own evidence, so an illegal combination (a counterexample on a clean proof) is structurally unrepresentable. This replaces today's binary `ProofDisposition { Proved, Unresolved }` plus nullable evidence siblings.
-- **Certificate format only — no live re-checker in the MVP.** The MVP ships the certificate *format*: every step carries a recomputable conclusion from a spec-enumerated `CertificateSteps` catalog, and every premise cites the author declaration it used by source span, so the derivation is **re-checkable in principle** — by hand now, or by a future independent checker. The MVP builds **no live re-checker** and **no checker-gated mint**: a `Proven` verdict is minted by the discharge cascade, not by passing an independent replay first. The independent re-checker is a separate, later item (deferred; tracked as §5b in `soundness-and-coverage.md`), so MVP soundness comes from fixing the engine directly (the Slice-0 fail-open fixes), not from replay.
+- **Certificate format, and the checker that replays it.** The certificate *format* comes first: every step carries a recomputable conclusion from a spec-enumerated `CertificateSteps` catalog, and every premise cites the author declaration it used by source span, so the derivation can be re-checked step by step. The checker that does the replaying is in scope with it, at both of its call sites — a compiler stage that audits the engine at authoring time, and a load-time gate in the runtime that refuses to govern under a definition whose certificate does not verify (`soundness-and-coverage.md` §5b). Neither is built: today a `Proven` verdict is minted by the discharge cascade rather than by passing a replay, so until the checker lands, soundness rests on the engine being right and on the Slice-0 fail-open fixes. That is a gap against the target, not a deferral of it.
 - **New strategies:** §1a (multi-term single-fact + guard-sum matching), §2 (case-by-case: conditional arms + event-input narrowing), §3 (money through × and ÷ via catalog `IntervalTransfer` wiring), §6 (field-vs-constant rules honored in bound checks).
 
 ### Deferred (open) — multi-fact combination (§1b)
@@ -2623,7 +2625,7 @@ The base engine above is implemented. A further **prove-or-reject MVP** is desig
 
 ### Validation Required
 
-3. **Five-strategy coverage validation** — validate five-strategy coverage against all 20 sample files in `samples/` before committing to no sixth strategy. Qualifier-compatibility obligations are now an explicit Strategy 5 case; cross-field comparison obligations remain the highest-risk residual category.
+3. **Strategy coverage validation** — validate the strategy set's coverage before committing to adding no further strategy. (Counting sample files establishes nothing about coverage; the measure is the language documented in `docs/language/`.) Qualifier-compatibility obligations are now an explicit Strategy 5 case; cross-field comparison obligations remain the highest-risk residual category.
 
 4. **Roslyn analyzer scope confirmation** — confirm PRECEPT0001/PRECEPT0002 run on the Precept source itself (not on host-application code consuming Precept).
 
@@ -2641,9 +2643,9 @@ The base engine above is implemented. A further **prove-or-reject MVP** is desig
 
 ### Future Considerations
 
-8. **Precision propagation awareness** — MEDIUM PRIORITY. The exact decimal arithmetic survey documents precision behaviors (division rounding, scale accumulation, mantissa overflow). If `ProofRequirement.PrecisionWarning` is added to `BinaryOperationMeta` for division/multiplication operations, consider whether this warrants a sixth proof strategy or fits within the existing five-strategy framework.
+8. **Precision propagation awareness** — MEDIUM PRIORITY. The exact decimal arithmetic survey documents precision behaviors (division rounding, scale accumulation, mantissa overflow). If `ProofRequirement.PrecisionWarning` is added to `BinaryOperationMeta` for division/multiplication operations, consider whether this warrants a further proof strategy or fits within the existing set.
 
-9. **Justification mechanism** — SPARK GNATprove provides a `Justified` disposition for checks that cannot be proved but have been manually annotated as acceptable. If the five-strategy boundary proves too restrictive, a justification mechanism would be the precedented response. Currently not planned.
+9. **Justification mechanism** — SPARK GNATprove provides a `Justified` disposition for checks that cannot be proved but have been manually annotated as acceptable. If the bounded strategy set proves too restrictive, a justification mechanism would be the precedented response. Currently not planned.
 
 10. **OperatorKind enum names verified (PE-G17)** — all `OperatorKind` member names used in spec pseudocode (`NotEquals`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`) match `src/Precept/Language/OperatorKind.cs` exactly.
 
@@ -2670,15 +2672,15 @@ The `ProofLedger` does NOT cross the compile-runtime boundary. Only `FaultSiteAn
 - Defense-in-depth backstops already provide runtime safety
 - Proof is a compile-time activity — mixing it with runtime would blur responsibilities
 
-### No Constraint Evaluation
+### No Evaluation of Rules Against Values
 
-Constraint evaluation is the evaluator's domain. The proof engine checks satisfiability statically; the evaluator enforces dynamically. These are separate concerns:
-- **Proof engine:** "Can this constraint ever be satisfied given the structure?"
-- **Evaluator:** "Is this constraint satisfied right now given these values?"
+The proof engine never evaluates a rule against concrete values. Neither does anything else: no phase of an operation re-checks a rule against the configuration the operation commits (language spec §0.7; `../runtime/evaluator.md` § Ingress Validation). The division of work is:
+- **Proof engine:** "Can any reachable operation violate this rule, given the structure and the premises the author declared?"
+- **Evaluator:** "Does this incoming value satisfy the constraints declared on the slot it enters, and does this guard hold?" — the two checks the proofs rest on, and nothing beyond them.
 
 ### No General Dataflow Analysis
 
-The six strategies are local and shallow:
+The strategies are local and shallow — for example:
 - Literal proof: single expression
 - Declaration attribute proof: single subject's declaration metadata
 - Guard-in-path: enclosing guard in same transition row
@@ -2687,13 +2689,17 @@ The six strategies are local and shallow:
 
 General dataflow (tracking values across multiple transitions, interprocedural analysis) is out of scope. The DSL's event-driven model makes general dataflow less meaningful than in imperative languages.
 
-### No Inductive Proof
+### No Loop Invariants, No Recursive Definitions
 
-The proof engine does not handle loop invariants, recursive definitions, or inductive properties. Precept does not have loops or recursion — the DSL is finite and event-driven.
+The proof engine infers no loop invariants and reasons about no recursive definitions. Precept has neither loops nor recursion — the language is finite and event-driven — so there is no fixed point to iterate toward and no recursive unfolding to bound.
+
+**This is not an exclusion of inductive proof.** Proof over the reachable configurations *is* an induction, and it is the model this engine serves (language spec §0.7). The base case is that the default configuration and every initial event establish every rule. The inductive step is that every handler preserves every rule, from the four classes of premise the author declared: field modifiers, constraints on event arguments, the handler's guard, and the rules that already hold in the pre-state. The absence of loops and recursion is what makes that induction finite rather than what rules it out — the step is one handler applied once, discharged by the strategies in § Proof Strategies, with no iteration to a fixed point anywhere in it. An earlier version of this section listed inductive reasoning among the exclusions, which read as a denial of the proof model itself.
+
+**Two things the engine does not do today, stated so the model above is not read as a description of the build.** The pre-state premise is available only where a declared rule contributes an unconditional fact (§ *Relational reasoning*, spec §0.6 item 2); there is no general carrying of "every rule held before this operation" into a handler's discharge. And the induction quantifies over every write site of every field a rule mentions, while the write-site enumeration the compiler works from is asserted by spec §3A.4 rather than kept closed by the build — the spec's *Open Questions / Implementation Notes* records that as a soundness dependency, not a documentation nicety. Both are gaps against the target, not revisions of it.
 
 ### No User-Defined Proof Hints
 
-Unlike SPARK Ada's `pragma Annotate` or Dafny's `assert`/`assume`, Precept does not support author-provided proof hints. The five-strategy set is sufficient for the DSL's constrained expression language. If hints become necessary, they would be a language addition, not a proof engine extension.
+Unlike SPARK Ada's `pragma Annotate` or Dafny's `assert`/`assume`, Precept does not support author-provided proof hints. The bounded strategy set is sufficient for the DSL's constrained expression language. If hints become necessary, they would be a language addition, not a proof engine extension.
 
 ---
 
