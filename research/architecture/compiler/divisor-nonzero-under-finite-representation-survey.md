@@ -208,9 +208,17 @@ for thirty-five years.
 ## Threats to Validity
 
 - **The external evidence is thin, and thinner than the internal evidence.** Six external calls. Two
-  comparator systems reached in a useful way (SPARK, SMT-LIB). Frama-C/ACSL, Astrée, Polyspace, KeY and
-  CompCert/Verasco were not examined at all, and any of them could hold a materially better answer —
-  particularly Astrée, which is built for exactly this class of numerical property.
+  comparator systems reached in a useful way (SPARK, SMT-LIB). Polyspace, KeY, Fluctuat and
+  CompCert/Verasco were not examined at all, and any of them could hold a materially better answer.
+  **Correction, 2026-07-26.** This paragraph originally also listed Frama-C and Astrée as unexamined and
+  named Astrée as the most likely to hold a better answer. That was wrong twice over. Both were already
+  covered in `research/architecture/compiler/proof-engine-interval-arithmetic-survey.md` (Frama-C EVA at
+  § line 105, Astrée at § line 193), at the level of what they detect. And the follow-up survey
+  `research/architecture/compiler/underflow-in-solver-free-interval-domains.md` has since examined both
+  for this specific question and found they hold the *same* answer as SPARK, not a better one: the
+  interval domain models the smallest representable magnitude explicitly, so an underflowing product's
+  interval contains zero, and the divisor check refuses on it. Reached without a solver, which makes the
+  finding more transferable to Precept rather than stronger.
 - **One source failed to parse.** Melquiond's *Some Formal Tools for Computer Arithmetic: Flocq and
   Gappa* returned an unreadable PDF. The claim that verification tools model gradual underflow exactly
   (rather than idealising it away) therefore rests on a search-result summary — **Tertiary** — and is
@@ -262,8 +270,10 @@ does establish firmly enough to act on:
 
 ## What would change this conclusion
 
-- If Astrée, Frama-C or Polyspace turn out to discharge divisor obligations from operand non-zeroness
+- If Polyspace, Fluctuat or KeY turn out to discharge divisor obligations from operand non-zeroness
   under a documented soundness argument, the claim that no comparable system does this is wrong.
+  (Astrée and Frama-C were the two strongest candidates for this and have now been checked — see the
+  follow-up survey named in Threats to Validity. Neither does it.)
 - If Precept adopts an exact rational or arbitrary-precision representation for the affected lanes, the
   case stops existing and the conclusion becomes vacuous rather than wrong.
 - If a magnitude-lower-bound analysis turns out to be cheap to build and easy to explain in a
@@ -273,8 +283,13 @@ does establish firmly enough to act on:
 ## Open Questions
 
 - What a magnitude lower bound costs to build in Precept's prover, and whether it can be explained in a
-  diagnostic a domain expert can act on.
-- Whether the four unexamined comparators (Astrée, Frama-C/ACSL, Polyspace, KeY) hold a better answer.
+  diagnostic a domain expert can act on. The follow-up survey found the technique has a name and a
+  solver-free implementation (the absolute-value octagon domain), but that it carries such a bound past a
+  guard rather than deriving one from arithmetic — so the composition step this question needs is still
+  unbuilt anywhere.
+- Whether the remaining unexamined comparators (Polyspace, KeY, Fluctuat, CompCert/Verasco) hold a better
+  answer. Fluctuat is the strongest remaining candidate, because it tracks the exact value and the
+  accumulated rounding error as separate quantities.
 - Whether the `money` and `quantity` lanes inherit `decimal`'s floor exactly or have their own.
 
 ## Sources

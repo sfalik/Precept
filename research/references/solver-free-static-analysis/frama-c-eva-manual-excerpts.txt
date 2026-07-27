@@ -1,0 +1,107 @@
+Source: Frama-C EVA User Manual (Evolved Value Analysis), https://frama-c.com/download/frama-c-eva-manual.pdf
+Extracted 2026-07-26 with pdftotext -layout. Line numbers are of the full extracted text.
+Excerpts only; the full manual is ~5600 lines and is not mirrored in full.
+
+===== [lines 297-305] Alarm-on-divisor-contains-zero =====
+There is in fact an out-of-bounds access at this line in the program. It can also happen that, because
+of approximations during its computations, Frama-C emits warnings for constructs that do not cause
+any run-time errors. These are called “false alarms”. On the other hand, the fact that Eva computes
+correct, over-approximated sets of possible values prevents it from remaining silent on a program that
+contains a run-time error. For instance, a particular division in the analyzed program is the object of a
+warning as soon as the set of possible values for the divisor contains zero. Only if the set of possible
+values computed by Eva does not contain zero is the warning omitted, and that means that the divisor
+really cannot be null at run-time.
+
+
+===== [lines 1381-1400] Division by zero, divisor = a product =====
+Division by zero
+When dividing by an expression that the analysis is not able to guarantee non-null, a proof obligation is
+emitted. This obligation expresses that the divisor is different from zero at this point of the code.
+     In the particular case where zero is the only possible value for the divisor, the analysis stops the
+propagation of this execution path. If the divisor seems to be able to take non-null values, the analyzer
+is allowed to take into account the property that the divisor is different from zero when it continues the
+analysis after this point. The property expressed by an alarm may also not be taken into account when
+it is not easy to do so.
+    int A, B;
+    void main(int x, int y)
+    {
+      A = 100 / (x * y);
+      B = 333 % x;
+    }
+
+    div.c:4: ... division by zero. assert (int)(x*y) ̸≡ 0;
+    div.c:5: ... division by zero. assert x ̸≡ 0;
+
+In the above example, there is no way for the analyzer to guarantee that x*y is not null, so it emits an
+alarm at line 4. In theory, it could avoid emitting the alarm x ̸≡ 0 at line 5 because this property is a
+
+===== [lines 1487-1528] Floating-point alarms: NaN and infinite only =====
+By default, Eva emits an alarm whenever a floating-point operation can result in a NaN or infinite
+value, and continues the analysis with a finite interval representing the result obtained if excluding these
+possibilities. This interval, like any other result, may be over-approximated. An example of this first
+kind of alarm can be seen in the following example.
+    double sum(double a, double b)
+    {
+      return a+b;
+    }
+
+    frama-c -eva -main sum double_op_res.c
+
+    [eva:alarm] double_op_res.c:3: Warning: non-finite double value.
+        assert \is_finite((double)(a+b));
+    An alarm is also emitted when the program uses as argument to a floating-point operation a value
+from memory that does not ostensibly represent a floating-point number. This can happen with a union
+type with both int and float fields, or in the case of a conversion from int* to float*. The emitted
+alarm excludes the possibility of the bit sequence used as a the argument representing NaN, an infinite,
+or an address. See the example below.
+    union { int i ; float f ; } bits;
+
+    float r;
+
+    int main () {
+      bits.i = unknown_fun();
+      r = 1.0 + bits.f;
+      return r > 0.;
+    }
+
+    frama-c -eva double_op_arg.c
+
+    [eva:alarm] double_op_arg.c:7: Warning: non-finite float value.
+        assert \is_finite(bits.f);
+
+   These floating-point alarms can be disabled — thus allowing NaN and infinite values for the analysis
+— by setting the -warn-special-float option:
+    – -warn-special-float non-finite: NaN and infinite values are forbidden. This is the default
+       mode of Eva.
+    – -warn-special-float nan: only NaN are forbidden; infinite values are allowed, and do not
+       raise alarms.
+    – -warn-special-float none: both NaN and infinite values are allowed: they are simply
+       propagated during the analysis, without leading to special alarms.
+
+
+===== [lines 2899-2916] Which floating-point programs can be soundly analyzed =====
+    By default, obtaining an infinite or NaN as result of a floating-point operation is treated as an
+unwanted error. Consequently, FPU modes related to arithmetic exceptions are irrelevant for the analysis.
+For non-default values of option -warn-special-float, the behavior of changing the floating-point
+environment is currently unspecified.
+    The compilation of, and the set of floating-point operations used, define roughly three categories of
+programs:
+   1. The program uses only double and float floating-point types, does not change the default
+      (nearest-even) floating-point rounding mode and is compiled with a compiler that neither generates
+      fmadd instructions nor generates extended precision computations (historical x87 instruction set).
+   2. The compiler transforms floating-point computations as if floating-point addition or multiplication
+      were associative, or transforms divisions into a multiplication by the inverse even when the inverse
+      cannot be represented exactly as a floating-point number.
+   3. The program uses only double and float floating-point types, but either does not stay during
+      the whole execution in the “nearest” floating-point rounding mode, or is compiled with a compiler
+      that may silently insert fmadd instructions when only multiplications and additions appear in the
+      source code, or are compiled for the x87 FPU.
+Currently, only programs of the first category can be soundly analyzed by Eva.
+
+
+===== [lines 5504-5508] ACSL logic reals have no rounding =====
+In ACSL, there is a “higher level of abstraction” that sits above the level of C constructs: the logic level.
+In many cases, it can be abstracted away, but it is important to remember that it exists.
+    For instance, numbers (integers and reals) are almost always at the logic level, where there are no
+overflows and no rounding errors. Conversely, there are neither floating-point infinities nor NaNs. Take
+this into account when specifying mathematical functions.

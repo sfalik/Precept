@@ -1,0 +1,752 @@
+     Donut Domains: Efficient Non-convex Domains for Abstract
+                           Interpretation
+      Khalil Ghorbal, Franjo Ivancic, Gogul Balakrishnan, Naoto Maeda, Aarti Gupta
+
+
+
+      To cite this version:
+     Khalil Ghorbal, Franjo Ivancic, Gogul Balakrishnan, Naoto Maeda, Aarti Gupta. Donut Domains: Efficient
+     Non-convex Domains for Abstract Interpretation. VMCAI 2012 - Verification, Model Checking, and Ab-
+     stract Interpretation - 13th International Conference, Jan 2012, Philadelphia, United States. pp.235–250,
+     ⟨10.1007/978-3-642-27940-9_16⟩. ⟨hal-01660908⟩
+
+
+
+
+                                        HAL Id: hal-01660908
+                              https://hal.science/hal-01660908v1
+                                           Submitted on 12 Dec 2017
+
+
+
+
+    HAL is a multi-disciplinary open access archive             L’archive ouverte pluridisciplinaire HAL, est des-
+for the deposit and dissemination of scientific re-        tinée au dépôt et à la diffusion de documents scien-
+search documents, whether they are published or not.       tifiques de niveau recherche, publiés ou non, émanant
+The documents may come from teaching and research          des établissements d’enseignement et de recherche
+institutions in France or abroad, or from public or pri-   français ou étrangers, des laboratoires publics ou
+vate research centers.                                     privés.
+
+
+                                              HAL Authorization
+Donut Domains: Efficient Non-Convex Domains
+        for Abstract Interpretation
+
+    Khalil Ghorbal1 , Franjo Ivančić1 , Gogul Balakrishnan1 , Naoto Maeda2 , and
+                                     Aarti Gupta1
+                            1
+                             NEC Laboratories America, Inc.
+                    2
+                        NEC Corporation, Kanagawa 211-8666, Japan
+
+
+
+        Abstract. Program analysis using abstract interpretation has been suc-
+        cessfully applied in practice to find runtime bugs or prove software cor-
+        rect. Most abstract domains that are used widely rely on convexity for
+        their scalability. However, the ability to express non-convex properties is
+        sometimes required in order to achieve a precise analysis of some numer-
+        ical properties. This work combines already known abstract domains in
+        a novel way in order to design new abstract domains that tackle some
+        non-convex invariants. The abstract objects of interest are encoded as a
+        pair of two convex abstract objects: the first abstract object defines an
+        over-approximation of the possible reached values, as is done customar-
+        ily. The second abstract object under-approximates the set of impossible
+        values within the state-space of the first abstract object. Therefore, the
+        geometrical concretization of our objects is defined by a convex set minus
+        another convex set (or hole). We thus call these domains donut domains.
+
+
+1     Introduction
+Efficient program analysis using abstract interpretation [11] typically uses convex
+domains such as intervals, octagons, zonotopes or polyhedra [10, 12, 14, 17, 26].
+However, certain properties of interest require reasoning about non-convex struc-
+tures. One approach to non-convex reasoning is to utilize powerset domains of
+elementary convex domains [4, 20, 21]. In general, it has proved to be difficult to
+provide satisfactory improvements over elementary convex domains with pow-
+erset domains while maintaining small enough performance degradation. Fur-
+thermore, it would be difficult to maintain enough disjunctions in the powerset
+depending on the particular non-convex shape being approximated. Note, how-
+ever, that the recently proposed Boxes domain by Gurfinkel and Chaki [20]
+can potentially represent exponentially many interval constraints compactly. It
+utilizes a BDD-like extension to elementary range constraints called LDD [8].
+However, we are considering relational domains such as octagons, zonotopes or
+polyhedra as well.
+    Additional non-convex domains based on congruence (either linear [19] or
+trapezoid [25]) analysis have been developed. Such domains catch a congruence
+relation that variables satisfy and are suitable for the analysis of indexes of arrays
+for instance. Recent work by Chen et al. considered a polyhedral abstract domain
+with interval coefficients [9]. This abstract domain has the ability to express
+certain non-convex invariants. For example, in this domain some multiplications
+can be evaluated precisely (see Figure 6 for instance). Other interesting non-
+convex abstract domains were introduced to capture specific invariants such as
+min-max invariants [2] and quadratic templates [1].
+    We address a different type of non-convexity commonly occurring in soft-
+ware, which relates to small sub-regions of instability within a normal operating
+(convex) region of interest. The non-convex region of values that may cause the
+bug is (under-)approximated using a convex inner region (or hole) that is sub-
+tracted from a convex outer region. We call this representation donut domains.
+Our approach relies on the usual operations defined on (convex) sub-domains,
+except for the need to compute under-approximations in domain A2 . The donut
+domains can be considered extensions to the work on signed types domain in-
+troduced by the authors in [27]. There, we start with a finite set of types, and
+allow a set-minus operation only from the universal set.
+
+
+Under-Approximations of Polyhedra. Under-approximations have been
+utilized for applications such as test vector generation and counterexample gen-
+eration, by providing must-reach sets.
+    Bemporad et al. introduced the notion of inner approximations of polyhe-
+dra using intervals in [6]. In [23], polyhedra are under-approximated for test
+vector generation of Simulink/Stateflow models using bounded vertex represen-
+tation (BVR). Goubault and Putot describe a method to compute an under-
+approximating zonotope [18] using modal intervals [16] for non-linear operations.
+    In this work, we propose a novel technique to find under-approximations
+of polyhedra based on a fixed template. We first re-formulate the problem by
+introducing an auxiliary matrix. This matrix represents the fact that we are
+looking for an inner polyhedral object of a particular shape. Using this auxiliary
+matrix re-formulation, we can then use classical convex analysis techniques to
+characterize an under-approximations of polyhedra.
+
+
+Motivating Example. Figure 1 highlights a code snippet taken from XTide 3 .
+The XTide package provides accurate tide and current predictions in a number
+of formats based on algorithms. Similar patterns may exist in controller-related
+software to avoid regions of controller or numerical instability.
+    After the step marked initializations, (dx, dy) could be any point in
+R2 except the origin (0, 0), this particular point is kept and propagated for-
+ward as a “hole”. After the if-statement, the set of reachable values is: (dy >
+dx ∧ dy > −dx) ∨ (−dy > dx ∧ −dy > −dx). The above region is non-convex;
+therefore, any classical abstract domain will end up at this control point with
+> for both variables. Moreover, here, the interpretation of the strict inequality
+of the test is required to prove that dx 6= 0. The else case is even harder: in
+3
+    see www.flaterco.com/xtide
+static void p_line16_primary (...) {
+  double dx , dy , x , y , slope ;
+  ...                                    /* initializations                   */
+  if ( dx == 0.0 && dy == 0.0) /* full - zero - test                          */
+     return ;
+  if ( fabs ( dy ) > fabs ( dx )) {      /* fabs - based test                 */
+     slope = dx / dy ;                   /* division - by - dy                */
+     ...
+  } else {
+     slope = dy / dx ;                   /* division - by - dx                */
+     ...
+  }}
+                    Fig. 1. Motivating example from XTide.
+
+
+addition to the non-convexity of the set of possible values, one needs to con-
+sider the full-zero-test together with the negation of |dy| > |dx|, to prove
+that the division by dy is safe. All known non-convex domains fail to prove
+the safety of such example. Typically, the powerset domain cannot encode the
+full-zero-test which is mandatory here (for the else branch).
+
+Content. The rest of this paper is organized as follows: we define, Section 2, a
+new set of domains called donut domains. Section 3 proposes a novel method
+to compute polyhedral under-approximations for arbitrary linear templates. Fi-
+nally, in Section 4, first experiments and promising results are discussed.
+
+
+2     Donut Abstract Domains
+
+In this section we introduce donut domains, and define the operation on donut
+domains based on operations in the component domains.
+
+
+2.1    Lattice Structure
+
+Let (A1 , ≤1 , ∪1 , ∩1 , ⊥1 , >1 , γ1 ) and (A2 , ≤2 , ∪2 , ∩2 , ⊥2 , >2 , γ2 ) denote two clas-
+sical numerical abstract domains, where ≤? , ∪? ,∩? ,⊥? ,>? ,γ? denote the partial
+order, the join and meet operations, the bottom and top elements and the con-
+cretization function of the classical abstract domain for ? ∈ {1, 2}, respectively.
+    In this work, we extend a given abstract domain with an under-approximation
+operator ᾰ, such that for any concrete object X, we have γ ◦ ᾰ(X) ⊆ X. An
+                      ]
+abstract object X1\2       of the domain A1 \ A2 is defined by a pair of objects
+(X1] , X2] ), such that X1] ∈ A1 and X2] ∈ A2 . The object X1\2
+                                                            ]
+                                                                abstracts the set of
+possible values reached by the variables as follows:
+
+ – The object X1] ∈ A1 represents an over-approximation of the set of reachable
+   values.
+ – The object X2] ∈ A2 represents an under-approximation of the set of un-
+   reachable values (usually within γ1 (X1] )).
+   The concretisation function is defined as follows.
+                          def                         def
+                    γ1\2 = γ1\2 (X1] , X2] ) = γ1 (X1] ) \ γ2 (X2] ) .
+
+   Figure 2 depicts a concretization of a typical donut object where the domain
+A1 is the Affine Sets domain [15] and A2 is the octagons domain.
+
+
+              x2                                 x2                   x2
+     γ1 (X1] )                          γ2 (X2] )
+
+                         x1                                 x1                     x1
+                              (minus)                            =
+
+
+
+
+           Fig. 2. The concretization of a typical non-convex abstract object
+
+
+    One should keep in mind the implicit set of unreachable values implied by
+γ1 (X1] ) – namely Rp \ γ1 (X1] ) denoted in the sequel by γ̄1 (X1] ). Indeed, the set
+of unreachable values is actually γ̄1 (X1] ) ∪ γ2 (X2] ). As said earlier, γ2 (X2] ) is a
+(convex) under-approximation of the set of unreachable values. The fact that
+the intersection γ1 (X1] ) ∩ γ2 (X2] ) is not empty permits to encode a hole inside
+γ1 (X1] ) (see Figure 2).
+
+Interval Concretisation. The interval concretization of the variable xk , 1 ≤
+k ≤ p, denoted by [xk ], is defined by πk (γ1 (X1] ) \ γ2 (X2] )), where πk denotes
+the orthogonal projection of a given set onto dimension k. Note that [xk ] ⊇
+πk (γ1 (X1] )) \ πk (γ2 (X2] )). For instance in ([−2, 2] × [−2, 2], [−1, 1] × [−∞, +∞]),
+we have [x2 ] = [−2, 2], whereas [−2, 2] \ [−∞, +∞] = ∅.
+    We embed A1 \ A2 with a binary relation and prove that it is a pre-order.
+Definition 1. Given X1] , Y1] ∈ A1 and X2] , Y2] ∈ A2 , we say that (X1] , X2] ) is
+less than or equal to (Y1] , Y2] ) denoted by (X1] , X2] ) ≤1\2 (Y1] , Y2] ) if and only if
+X1] ≤1 Y1] and
+                      γ̄1 (X1] ) ∪ γ2 (X2] ) ⊇ γ̄1 (Y1] ) ∪ γ2 (Y2] ) .                (1)
+
+Proposition 1. The binary relation ≤1\2 is a pre-order over A1 \ A2 . It defines
+an equivalence relation ∼ defined by (X1] , X2] ) ≤1\2 (Y1] , Y2] ) and (Y1] , Y2] ) ≤1\2
+(X1] , X2] ) and characterized by X1] = Y1] (X1] ≤1 Y1] and Y1] ≤1 X1] ), γ2 (X2] ) ⊆
+γ2 (Y2] ) ∪ γ̄1 (Y1] ) and γ2 (Y2] ) ⊆ γ2 (X2] ) ∪ γ̄1 (X1] ). We reuse the symbol ≤1\2 to
+also denote the partial order quotiented by the equivalence relation ∼.
+      With respect to ≤1\2 , we have
+
+                 (⊥1 , ⊥2 ) ∼ (⊥1 , >2 ) ≤1\2 (>1 , >2 ) ≤1\2 (>1 , ⊥2 );
+
+therefore, we define the bottom and top elements of A1 \ A2 by
+
+                       def                                  def
+                 ⊥1\2 = (⊥1 , −)                     >1\2 = (>1 , ⊥2 ) .
+
+
+2.2     Decidability of the Order
+
+Despite the non-convexity of γ̄, the equivalence class introduced in Proposition 1
+suggests particular representatives of objects (X1] , X2] ) which are easily compa-
+rable. Indeed, γ̄ is no longer involved when the concretization of the hole X2]
+is included in the concretization of X1] . Observe moreover, that the definition
+of the order relation ≤1\2 allows comparing two abstract objects having their
+holes in two different abstract domains, since only the concretization functions
+are involved in (1).
+
+Proposition 2. Let (X1] , X2] ) and (Y1] , Y2] ) be two elements of A1 \ A2 such that
+γ2 (X2] ) ⊆ γ1 (X1] ), and γ2 (Y2] ) ⊆ γ1 (Y1] ). Therefore, (X1] , X2] ) ≤1\2 (Y1] , Y2] ) if
+and only if X1] ≤1 Y1] and γ1 (X1] ) ∩ γ2 (Y2] ) ⊆ γ2 (X2] ).
+
+    The condition γ1 (X1] ) ∩ γ2 (Y2] ) ⊆ γ2 (X2] ), can be checked in the abstract
+world rather than in the concrete domain up to the use of an expressive enough
+domain for both A2 and A1 : for instance a box and an octagon can be seen as
+special polyhedra and the meet operation of Polyhedra abstract domain can be
+used.
+    Let X1P denote the abstract representation in Polyhedra domain of the ab-
+stract object X1] , that is αP (γ1 (X1] )). The general procedure to decide whether
+(X1] , X2] ) is less than or equal to (Y1] , Y2] ), is as follows:
+
+ 1. First, we “upgrade” X2] and Y2] to Polyhedra domain, which gives (X1] , X2P )
+    and (Y1] , Y2P ).
+ 2. Then, we derive our particular representatives, namely (X1] , X1P ∩P X2P ) for
+    (X1] , X2P ) and (Y1] , Y1P ∩P Y2P ) for (Y1] , Y2P ) (∩P being the meet operation
+    in Polyhedra domain).
+ 3. Finally, we use Proposition 2 by checking for the inequalities X1] ≤1 Y1] and
+
+                             X1P ∩P Y1P ∩P Y2P ≤P X1P ∩P X2P .
+
+
+2.3     Meet and join operations
+
+We start with a simple example to clarify the intuition behind the formal defi-
+nition given later.
+Example 1. Consider a one-dimensional donut domain where A1 and A2 are
+Intervals domain. Assume we are interested in computing
+
+                                  ([0, 3], [1, 2]) ∪ ([1, 6], [2, 5]) .
+
+The above join yields the following union of four intervals: [0, 1) ∪ (2, 3] ∪ [1, 2) ∪
+(5, 6], which can be combined without loss of precision into [0, 2) ∪ (2, 3] ∪ (5, 6],
+or equivalently
+                               [0, 6] \ ([2] ∪ (3, 5]) .
+
+
+What the example suggests is that when computing a join of two elements
+(X1] , X2] ) and (Y1] , Y2] ), we often end up with multiple (not necessarily convex
+nor connex) holes defined by (γ2 (X2] ) ∪ γ̄1 (X1] )) ∩ (γ2 (Y2] ) ∪ γ̄1 (Y1] )), which gives
+by distributing the meet over the join:
+
+(γ2 (X2] ) ∩ γ2 (Y2] )) ∪ (γ2 (X2] ) ∩ γ̄1 (Y1] )) ∪ (γ2 (Y2] ) ∩ γ̄1 (X1] )) ∪ (γ̄1 (X1] ) ∩ γ̄1 (Y1] )) .
+
+An under-approximation of the final element γ̄1 (X1] ) ∩ γ̄1 (Y1] ) is implicit since
+the over-approximation of reachable values is given by X1] ∪1 Y1] . Thus, only the
+intersection of the first three sets will be considered (which is sound). In our
+example, γ̄([1, 6]) = [−∞, 1) ∪ (6, +∞], and γ̄([0, 3]) = [−∞, 0) ∪ (3, +∞], this
+gives [1, 2] ∩ [2, 5] = [2, 2] and
+
+                            [1, 2] ∩ ([−∞, 1) ∪ (6, +∞]) = ∅
+                            [2, 5] ∩ ([−∞, 0) ∪ (3, +∞]) = (3, 5] .
+
+As said earlier, the intersection ([−∞, 1) ∪ (6, +∞]) ∩ ([−∞, 0) ∪ (3, +∞]) is
+implicit since it is covered by γ̄1 ([0, 3] ∪ [1, 6]).
+   We now formalize the join operator:
+                                              def
+              (X1] , X2] ) ∪1\2 (Y1] , Y2] ) = (X1] ∪1 Y1] , (X1] , X2] )∩
+                                                                         ˘ (Y1] , Y2] )),
+
+      ˘ is defined by:
+where ∩
+
+            ˘ (Y1] , Y2] ) def
+(X1] , X2] )∩              = ᾰ((γ2 (X2] )∩γ2 (Y2] ))∪(γ2 (X2] )∩γ̄1 (Y1] ))∪(γ2 (Y2] )∩γ̄1 (X1] ))).
+
+We may perform heuristic checks to prioritize which hole (if many) to keep,
+which may also depend on the under-approximation abstraction function ᾰ. For
+instance we may choose an inner approximation (if working with closed domains)
+of the hole (3, 5] instead of choosing the hole [2, 2].
+    Notice also that we have a straightforward fallback operator ∩  ˘ fb , that involves
+only X2] and Y2] :
+                             ˘ fb Y2] def
+                         X2] ∩        = ᾰ(γ2 (X2] ) ∩ γ2 (Y2] )) .
+The operator is sound with respect to under-approximation. It focuses only on a
+particular hole, namely γ2 (X2] ) ∩ γ2 (Y2] ), instead of considering all possibilities.
+In our current implementation, we use this fallback operator in a smart manner:
+before computing the meet of both holes, we relax, whenever possible, in a convex
+way, these holes. This relaxation is performed by removing all constraints that
+could be removed while preserving γ1 (X1] ). For instance, if the hole is the point
+(0, 0), and the abstraction of X1] is given by the conjunction y ≥ x ∧ −y ≥ x,
+then the hole (0, 0) is relaxed to x ≥ 0 (see Figure 3).
+
+
+                           y                                    y
+
+
+
+                                    x                                    x
+                                           becomes
+
+
+
+
+   Fig. 3. Relaxing the hole (0, 0) (red circle in the left hand side figure) to x ≥ 0
+
+
+
+    For the meet operation, we proceed in a similar manner. If the domain A2
+is closed under the meet operation (almost all polyhedra-like abstract domains),
+                                       ˘ fb by ∩2 . In our example, the fallback
+it is possible to replace ᾰ by α, and ∩
+operator gives the box [2, 2].
+    The meet operator ∩1\2 is defined in a similar manner:
+
+                                               def
+                  (X1] , X2] ) ∩1\2 (Y1] , Y2] ) = (X1] ∩1 Y1] , X2] ∪
+                                                                     ˘ Y2] )
+                                     def
+                   where X2] ∪
+                             ˘ Y2] = ᾰ2 (γ2 (X2] ) ∪ γ2 (Y2] )) .
+
+We deliberately omit γ̄1 (X1] ) ∪ γ̄1 (Y1] ) in the above definition of ∪
+                                                                        ˘ because it
+is implicit from X1] ∩1 Y1] . If the domain A2 is closed under the join operation,
+then ∪˘ is exactly equal to ∪2 . Very often, however, the join operation leads to
+an over-approximation. Therefore the detection of an exact join as in [7, 5] is
+of particular interest. In our current implementation, if X2] and Y2] overlap, we
+soundly extend, in a convex way, the non empty intersection. For instance, if
+X2] = [−2, 1] × [−1, 1] and Y2] = [−1, 2] × [−2, 0], the intersection gives the box
+[−1, 1] × [−1, 0], and the extension we compute gives the box [−2, 2] × [−1, 0].
+If, however, the holes are disjoint, we randomly pick up one of them.
+
+Example 2. Consider a 2-dim simple abstract objects. Figure 4 shows a graphical
+representation of two overlapping objects. The remaining sub-figures highlight
+some of the pertinent steps with respect to the computation of ∪1\2 and ∩1\2
+for such overlapping objects.
+       (a)                       (b)                  (c)                  (d)        (e)
+
+Fig. 4. Illustrating the join and meet operators using interval component domains.
+The donut holes are highlighted using dashed lines. (a) Two initial abstract objects.
+(b) The concrete union of the objects. (c) The abstract object representing ∪1\2 . (d)
+The concrete intersection of the objects. (e) The abstract object representing ∩1\2 .
+
+
+2.4   Loop widening
+
+When processing loop elements in abstract interpretation, we may require widen-
+ing to guarantee termination of the analysis. For donut domains, we extend the
+widening operations defined on the component abstract domains. We use the
+pair-wise definition of widening operators ∇. We thus define widening of donut
+domains as:
+
+                     (X1] , X2] )∇1\2 (Y1] , Y2] ) = (X1] ∇1 Y1] , X2] ∩2 Y2] ) .
+
+   We use the standard widening operator ∇1 for abstract domain A1 . Similarly,
+we use standard meet operator ∩2 of abstract domain A2 for the inner region,
+which ensures the soundness of ∇1\2 . The convergence of the first component is
+guaranteed by the widening operator ∇1 . The convergence of the second com-
+ponent needs however more attention. Note that the simple use of narrowing
+operator of A2 is unsound as it may give a donut object which is not an upper
+bound. To ensure the termination we add a parameter k which will encode the
+maximal number of allowed iterations. If the donut object does not converge
+within those k iterations, the hole component is reduced to ⊥2 . Note that the
+use of the narrowing operator of A2 instead of ∩2 does not give in general an
+upper bound of (X1] , X2] ) and (Y1] , Y2] ).
+
+
+2.5   Interpretation of Tests
+
+The ability to express holes allows us to better handle a wide range of non-convex
+tests such as the 6= test or the strict inequality test. We start with classical tests.
+For  ∈ {=, ≤} :
+                                         def
+                   Jxk  0K] (X1] , X2] ) = (Jxk  0K]1 (X1] ), Jxk  0K\1 (X2] )),
+             def
+where J·K\2 = ᾰ2 ◦ J·K2 . Such under-approximation is required so that the newly
+computed (exact) hole can be encoded in A2 . Therefore, if the exact hole fits
+naturally in A2 (say we have a linear constraint and A2 is Polyhedra domain),
+there is no need to under-approximate (J·K\2 = J·K]2 ). In Section 3, we detail how
+we compute such an under-approximation, whenever needed. If no algorithm is
+available for the under-approximation, we keep the object X2] unchanged, which
+is sound.
+    The non-equality test 6= is defined as follows:
+                                 def
+        Jxk 6= 0K] (X1] , X2] ) = (Jxk 6= 0K] (X1] ), ᾰ(γ2 (X2] ) ∪ Jxk = 0K>2 )) .
+Although Jxk 6= 0K] (X1] ) is interpreted as the identity function in standard im-
+plementations, nothing prevents the use of any available enhancement proposed
+by the used analyzer. For the hole, we compute the join of the new hole im-
+plied by the constraint xk 6= 0 together with the already existing hole X2] . If
+holes γ2 (X2] ) and Jxk = 0K>2 do not overlap, we discard X2] . In fact, very often
+(as will be seen in experiments), the hole induced by the constraint xk 6= 0 is
+mandatory in order to prove the safety of subsequent computations.
+    Finally, our approach offers, for free, an interesting abstraction of the strict in-
+equality tests. A comparison with Not Necessarily Closed domains [3] is planned
+as future work.
+                                       def
+              Jxk < 0K] (X1] , X2] ) = Jxk 6= 0K] ◦ Jxk ≤ 0K] (X1] , X2] ) .
+
+2.6   Abstract Assignment
+We define in this section the abstraction of the assignment transfer function
+in A1 \ A2 . We first give an abstraction of the forget transfer function (non-
+deterministic assignment) :
+                               def
+   Jxk ←?K]1\2 (X1] , X2] ) = (Y1] , Y2] ),
+                 def
+      where Y1] = Jxk ←?K]1 (X1] )
+                      Jxk ←?K]2 (X2] ) if γ1 (X1] ) ∩ γ2 (Jxk ←?K]2 (X2] )) ⊆ γ2 (X2] )
+                    
+              ] def
+            Y2 =
+                      ⊥2               otherwise .
+
+For Y2] , we basically check whether applying the forget operator to X2] inter-
+sects γ1\2 (X1] , X2] ), by checking if this newly computed hole is included on
+the original hole, that is γ2 (X2] ). If yes, Y2] is set to ⊥2 . For instance, forget-
+                         def
+ting x2 in (X1] , X2] ) = ([−2, 2] × [−2, 2], [−1, 1] × [−∞, +∞]) gives ([−2, 2] ×
+[−∞, +∞], [−1, 1] × [−∞, +∞]): since Jx2 ←?K]2 (X2] ) = [−1, 1] × [−∞, +∞],
+γ1 (X1] ) ∩ γ2 (Jx2 ←?K]2 (X2] )) = [−1, 1] × [−2, 2] which is included in γ2 (X2] ). For-
+getting x1 , however, makes Y2] = ⊥2 .
+    The assignment could be seen as a sequence of multiple basic, already de-
+fined, operations. We distinguish two kind of assignments x ← e, where e is an
+arithmetic expression: (ı) non-invertible assignments, where the old values of x
+are lost, such as x ← c, c ∈ R, and (ıı) invertible assignments, such as x ← x + y.
+For non-invertible assignment, we have:
+                                       def
+                       Jxk ← eK]1\2 = Jxk = eK]1\2 ◦ Jxk ←?K]1\2 .
+Invertible assignments are defined in a similar manner. It augments first the set
+of variables by a new fresh variable, say v, then enforces the test v = e, and
+finally forgets x and (syntactically) renames v to x. Notice that augmenting the
+set of variables in A1 \ A2 makes the newly added variable, v, unconstrained in
+both components, X1] and X2] . We can suppose that such a variable v already
+exists, and used whenever we have an invertible assignment; hence, we obtain:
+                          def
+            Jxk ← eK]1\2 = swap(xk , v) in Jxk ←?K]1\2 ◦ Jv = eK]1\2 .
+
+
+3    Template-based Under-Approximations of Polyhedra
+
+In this section we develop a new technique to under-approximate holes obtained
+after linear tests. Holes obtained after non-linear tests are so far reduced to ⊥2 ,
+which is sound. We plan to improve this as a future work. Consider for instance
+the object ([−2, 3] × [−2, 2], [−1, 1] × [0, 1]). Figure 5 depicts the exact evaluation
+of a linear assignment. If we use boxes to encode holes, we need to compute a
+box inside the white polytope. In Figure 6, an under-approximation is needed for
+all convex domains, whereas a non-convex domain such as Interval Polyhedra [9]
+can express exactly this kind of pattern.
+
+
+                                                             x2
+                x2
+
+
+                                                                          x1
+                                x1
+
+
+
+
+Fig. 5. Evaluation of a linear expression   Fig. 6. Evaluation of a non-linear expres-
+Jx2 ← x1 + x2 K]1\2                         sion Jx2 ← x1 × x2 K]1\2
+
+
+
+   The problem can be seen as follows: given a polyhedron P, we seek to compute
+a maximal (in a sense to define) inner polyhedron T (could be boxes, zones,
+octagons, linear-templates, etc. depending on A2 ), which obeys the template
+pattern matrix T .
+   Let P = {x ∈ Rp |Ax ≤ b} be a non-empty polyhedron, where A is a known
+m×p matrix, b a known vector of Rm , and x a vector of Rp . The inner polyhedron
+T is expressed in a similar manner: T = {x ∈ Rp |T x ≤ c}, where T is a known
+n × p matrix, and c and x are unknown vectors within Rn and Rp , respectively.
+The inclusion T ⊆ P holds if and only if
+
+    ∃c ∈ Rn , such that T is consistent, and ∀x ∈ Rp : T x ≤ c =⇒ Ax ≤ b .
+The consistency of T (that is the system admits a solution in Rp ) discards the
+trivial (and unwanted) cases where the polyhedron T is empty. For the non
+trivial cases, the existence of the vector c and the characterization of the set of
+its possible values are given by Proposition 3.
+Proposition 3. Let C be the set of c such that T is consistent. There exists a
+vector c ∈ C such that T ⊆ P if and only if there exists an n × m matrix Λ,
+such that λi,j , the elements of the matrix Λ, are non-negative and ΛT = A. For
+a given possible Λ, the set cΛ ⊆ C is characterized by
+                                 {c ∈ Rn | Λc ≤ b} .
+Proof. Let x denote a vector of Rp , and b denote a known vector of Rm . Let A
+and T be two known matrices with p columns and m and n lines, respectively.
+Suppose that c is such that T is consistent. Therefore, we can assume that
+                                hti , xi ≤ ci , 1 ≤ i ≤ n,
+where ti denotes the ith line of the matrix T , is consistent. For a fixed j, 1 ≤
+j ≤ m, the inequality haj , xi ≤ bj , is then a consequence of the system T x ≤ c
+if and only if there exist non-negative real numbers λi,j , 1 ≤ i ≤ n, such that
+                       n
+                       X                        n
+                                                X
+                             λi,j ti = aj and         λi,j ci ≤ bj .
+                       i=1                      i=1
+
+The previous claim of the existence of the non-negative λi,j is a generalization
+of the classical Farkas’ Lemma (see for instance [28, Section 22, Theorem 22.3]
+for a detailed proof). The matrix Λ is then constructed column by column using
+the elements λi,j , 1 ≤ i ≤ n for the jth column. Of course, by construction, such
+a Λ has non-negative elements, and satisfies ΛT = A, and Λc ≤ b.
+    On the other hand, if such a matrix exists, and the set {c ∈ Rn | Λc ≤ b} is
+not empty, we have by the fact that Λ has non-negative elements
+                              T x ≤ c =⇒ ΛT x ≤ Λc .
+Therefore, ΛT = A and Λc ≤ b, gives Ax ≤ b.                                      t
+                                                                                 u
+
+On the Consistency of T x ≤ c. It not obvious in general, given a matrix T , to
+characterize the set of c such that T is consistent. However, given a vector c, we
+can efficiently check whether the system is consistent or not using its dual form
+and a LP solver. Indeed, the system T x ≤ c is inconsistent if and only if there
+exists a non negative vector λ ∈ Rn such that T t λ = 0 and hλ, ci < 0, where T t
+denotes the transpose of T . Therefore, given a vector c, if the objective value of
+the following problem
+                                   min hλ, ci
+                                                                               (2)
+                                    s.t.   T tλ = 0 .
+is non negative, the system is consistent. Observe that, for simple patterns such
+as boxes, the characterization of the set of c that makes the system consistent is
+immediate.
+Computing Λ. The matrix Λ is built column by column. Let us denote by λ−,j ∈
+Rn the jth column of Λ, by aj ∈ Rp , 1 ≤ j ≤ m, the jth line of A, by bj ∈ R
+                                        p
+              Pn of b, and by ti ∈ R , 1 ≤ i ≤ m, the ith line of T . The vector
+the jth component
+λ−,j satisfies i=1 λi,j ti = aj . To each feasible λ−,j corresponds a pattern
+                             def
+                                              ^
+                      Pλ−,j = {x ∈ Rp |            hti , xi ≤ 0},
+                                            λi,j >0
+
+                                                  def
+which is included in the affine subspace Pj = {x ∈ Rp | haj , xi ≤ 0}. The
+maximal pattern (with respect to set inclusion) corresponds to λ̄ defined as the
+solution of the following linear program.
+                                   n
+                                   X
+                           min         λi,j kti k
+                                   i=1                                          (3)
+                                   Pn
+                            s.t.     i=1 λi,j ti = aj     .
+                                   ∀0 ≤ i ≤ n, λi,j ≥ 0
+
+Therefore, computing Λ needs solving p instances of the LP (3).
+
+Computing c. We have already established (Proposition 3) that the vector c
+verifies Λc ≤ b. Since Λ is known, any feasible c (that is such that Λc ≤ b) that
+makes the system T x ≤ c consistent (the objective value of the LP (2) is non
+negative) gives an under-approximation of P that respects our initial template
+T . Of course, it is immediate to see that the set of c that lies on the boundaries
+of the feasible region (that is by making Λc = b) gives, in general, a “better”
+under-approximation than the strict feasible solutions since the saturation makes
+some of the facets of the inner pattern (T ) included in those of the under-
+approximated polyhedron P. Moreover, in some cases, the saturation gives a
+unique consistent solution for c. For instance, when we under-approximate a
+shape P which respects already the pattern T , c is uniquely determined and
+gives actually b using our technique. In other words, under-approximating an
+octagon (for instance) with an octagonal pattern gives exactly the first octagon.
+
+
+4   Implementation
+We have implemented donut domains on the top of Apron library [22]. The
+domains A1 and A2 are parameters of the analysis and can be specified by
+the user among already existing Apron domains. The current version uses an
+enhanced implementation of the set-theoretic operators, mainly based on already
+existing routines of the underlying abstract domains, as described earlier and
+          ˘ f b and ∩
+relies on ∪         ˘ f b as fallback operators. This very simple approach allows to
+build the donut domain without an additional effort on the top of already existing
+domains. As Table 1 shows, our approach permits to catch almost all division-by-
+zero false positives that classical domains (even non-convex) fail to prove. The
+WCfS column indicates the weakest condition that we need to infer to prove the
+                                 WCfS       boxes (hole) false alarms
+                   motiv(if)     dy 6= 0       dy = 0          0
+                  motiv(else)   dx 6= 0        dx = 0          0
+                     gpc        den 6= 0 den ∈ [−0.1, 0.1]     0
+                     goc          d 6= 0  d ∈ [−0.09, 0.09]    0
+                      x2        Dx 6= 0        Dx = 0          0
+                     xcor     usemax 6= 0 usemax ∈ [1, 10]     1
+
+                        Table 1. Division-by-zero analysis results
+
+
+safety of the program. Whenever the negation of this condition is verified by
+(included in) the donut hole, the program is proved to be safe. The third column
+shows the inferred donut holes when using a non-relational domain (boxes) to
+encode holes. The analyzed examples 4 use mainly the absolute value function
+to avoid the division by zero (widely used technique).The motiv example is the
+motivating example with its two branches. The gpc code is extracted from the
+Generic Polygon Clipper project. The examples xcor, goc and x2 are extracted
+from a geometric object contact detection library. Observe that the use of boxes
+is sufficient to eliminate almost all false alarms here. In the last example, among
+the two possible holes, namely usemax ∈ [1, 10] and usemax ∈ {0}, we choose by
+default the one created immediately after the test (usemax > 10 or usemax <
+1). Here the safety property can not be proved with this hole and relies on an
+earlier (disjoint) hole created by a former test, namely usemax ∈ {0}. We could
+also choose systematically (as a heuristic) the hole that contains “zero”, which
+is sufficient here to discard the remaining false alarm. Such a property-driven
+hole behaviour would be an interesting direction for future research.
+    The proof of the motivating example is really challenging as it requires to
+handle both the hole that comes from the full-zero-test, together with strict
+inequalities tests and the over-approximation that comes from the join operation.
+Our technique that consists of relaxing the hole in a convex way before using
+the fallback operator works here and is able to prove that in both branches the
+division is safe. In goc example, we can see one interesting ability of donuts
+domain: when we compute a convex join of two non-overlapping objects, the
+hole in between is directly captured which permits a better precision. Finally,
+example x2 needs a precise interpretation of strict inequalities.
+
+Under-Approximation. We have implemented our technique of Section 3 using
+GLPK [24] solver. Some experiments, obtained for randomly generated polyhe-
+dra with octagonal template, are shown in Figure 7. Although all shown poly-
+hedra are bounded, our technique works perfectly well for unbounded shapes.
+The rate of volume, volT
+                     volP , is used as a metric for the quality of the under-
+approximation (shown near each pattern in Figure 7). All obtained octagons are
+maximal with respect to set inclusion. It is not clear which choice among many
+4
+    www.nec-labs.com/research/system/systems SAV-website/benchmarks.php. The C
+    files are the real source code, while the SPL files extracts the hard piece of code that
+    leads to false alarms, and with which we feed our proof of concept implementation.
+(see the left graph), is the best. Indeed, such a choice depends on the future
+computations and the properties one would like to prove.
+
+
+
+           9.72%      y              y               y
+                                                                       y
+                   14.4%                                                   16.66%
+                                                                                    x
+                                           50%           83.33%
+                           24.45%
+                              x                  x            x
+
+
+    Fig. 7. Under-approximation of randomly generated polyhedra with octagons
+
+
+5   Conclusions and Future Work
+The donut domains can be viewed as an effort to make some Boolean structure
+in the underlying concrete space visible at the level of abstract domains as a ”set-
+minus” operator. This allows optimization of the related abstract operators (such
+as meet and join) to take full advantage of its semantics in terms of excluded
+states. While the powerset domains allow an arbitrary Boolean combination,
+and automata-based abstractions [13] using may- and must-transitions offer full
+generality in verification, this comes at significant cost. In practice, the full
+expressiveness may not be needed. We exploit the set-minus operator, which
+is quite versatile in capturing many problems of interest - division by zero,
+instability regions in numeric computations, sets excluded by contracts in a
+modular setting, etc.
+    In the future, we wish to expand the experiments performed using donut
+domains. Furthermore, other non-convexity issues may be addressed by trying
+to combine the work on LDDs with insights gained here to allow handling many
+holes in an efficient manner.
+
+Acknowledgment. The authors would like to thank Sriram Sankaranarayanan,
+Enea Zaffanella and anonymous reviewers for their valuable comments on an
+earlier draft of this work.
+
+References
+
+ 1. A. Adjé, S. Gaubert, and E. Goubault. Coupling policy iteration with semi-definite
+    relaxation to compute accurate numerical invariants in static analysis. In ESOP,
+    pages 23–42, 2010.
+ 2. X. Allamigeon, S. Gaubert, and E. Goubault. Inferring Min and Max Invariants
+    Using Max-plus Polyhedra. In SAS’08, LNCS, pages 189–204, 2008.
+ 3. R. Bagnara, P. M. Hill, and E. Zaffanella. Not necessarily closed convex polyhedra
+    and the double description method. Form. Asp. Comput., pages 222–257, 2005.
+ 4. R. Bagnara, P. M. Hill, and E. Zaffanella. Widening operators for powerset do-
+    mains. STTT, 8(4-5):449–466, 2006.
+ 5. R. Bagnara, P. M. Hill, and E. Zaffanella. Exact join detection for convex polyhedra
+    and other numerical abstractions. Comput. Geom., 43(5):453–473, 2010.
+ 6. A. Bemporad, C. Filippi, and F. D. Torrisi. Inner and outer approximations of
+    polytopes using boxes. Comput. Geom., 27(2):151–178, 2004.
+ 7. A. Bemporad, K. Fukuda, and F. D. Torrisi. Convexity recognition of the union
+    of polyhedra. Comput. Geom., 18(3):141–154, 2001.
+ 8. S. Chaki, A. Gurfinkel, and O. Strichman. Decision diagrams for linear arithmetic.
+    In FMCAD, pages 53–60. IEEE, 2009.
+ 9. L. Chen, A. Miné, J. Wang, and P. Cousot. Interval polyhedra: An abstract domain
+    to infer interval linear relationships. In SAS’09, LNCS, pages 309–325, 2009.
+10. P. Cousot and R. Cousot. Static determination of dynamic properties of programs.
+    In 2nd Intl. Symp. on Programming, pages 106–130. Dunod, France, 1976.
+11. P. Cousot and R. Cousot. Abstract Interpretation: A unified lattice model for static
+    analysis of programs by construction or approximation of fixpoints. In POPL, pages
+    238–252. ACM, 1977.
+12. P. Cousot and N. Halbwachs. Automatic discovery of linear restraints among the
+    variables of a program. In POPL, pages 84–97. ACM, Jan. 1978.
+13. D. Dams and K. S. Namjoshi. Automata as abstractions. In VMCAI, pages 216–
+    232, 2005.
+14. K. Ghorbal, E. Goubault, and S. Putot. The zonotope abstract domain taylor1+.
+    In CAV, volume 5643 of LNCS, pages 627–633. Springer, 2009.
+15. K. Ghorbal, E. Goubault, and S. Putot. A logical product approach to zonotope
+    intersection. In CAV’10, LNCS, Edinburgh, UK, 2010. Springer.
+16. A. Goldsztejn, D. Daney, M. Rueher, and P. Taillibert. Modal intervals revisited:
+    a mean-value extension to generalized intervals. In QCP, 2005.
+17. E. Goubault and S. Putot. Static analysis of numerical algorithms. In SAS, volume
+    4134 of LNCS, pages 18–34. Springer, 2006.
+18. E. Goubault and S. Putot. Under-approximations of computations in real numbers
+    based on generalized affine arithmetic. In SAS, pages 137–152, 2007.
+19. P. Granger. Static analysis of linear congruence equalities among variables of a
+    program. In TAPSOFT, Vol.1, pages 169–192, 1991.
+20. A. Gurfinkel and S. Chaki. Boxes: A symbolic abstract domain of boxes. In SAS,
+    volume 6337 of LNCS, pages 287–303. Springer, 2010.
+21. N. Halbwachs, Y.-E. Proy, and P. Raymond. Verification of linear hybrid systems
+    by means of convex approximations. In SAS, pages 223–237, 1994.
+22. B. Jeannet and A. Miné. Apron: A library of numerical abstract domains for static
+    analysis. In CAV, volume 5643 of LNCS, pages 661–667. Springer, 2009.
+23. A. Kanade, R. Alur, F. Ivančić, S. Ramesh, S. Sankaranarayanan, and K. Shashid-
+    har. Generating and analyzing symbolic traces of Simulink/Stateflow models. In
+    CAV, volume 5643 of LNCS, pages 430–445. Springer, 2009.
+24. A. Makhorin. The GNU Linear Programming Kit (GLPK), 2000. Available online
+    from http://www.gnu.org/software/glpk/glpk.html.
+25. F. Masdupuy. Array abstractions using semantic analysis of trapezoid congruences.
+    In ICS, pages 226–235, 1992.
+26. A. Miné. The octagon abstract domain. In AST 2001 in WCRE 2001, IEEE, pages
+    310–319. IEEE CS Press, October 2001.
+27. P. Prabhu, N. Maeda, G. Balakrishnan, F. Ivančić, and A. Gupta. Interprocedural
+    exception analysis for C++. In ECOOP’11, 2011.
+28. R. T. Rockafellar. Convex Analysis. Princeton University Press, 1970.
+
