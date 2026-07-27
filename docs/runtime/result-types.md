@@ -98,7 +98,6 @@ public abstract record EventOutcome
     public sealed record Applied(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;
     public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;
     public sealed record InvalidArgs(string Reason) : EventOutcome;
-    public sealed record ConstraintsFailed(ImmutableArray<ConstraintViolation> Violations) : EventOutcome;
     public sealed record Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows) : EventOutcome;
     public sealed record UndefinedEvent() : EventOutcome;
     public sealed record Faulted(Fault Fault) : EventOutcome;
@@ -107,18 +106,21 @@ public abstract record EventOutcome
 
 | Variant | Meaning | Pipeline stage | Stateless reachable? |
 |---------|---------|----------------|---------------------|
-| `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit/discard (§3A.4) | No (no states) |
-| `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit/discard (§3A.4) | Yes |
+| `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit (§3A.4) | No (no states) |
+| `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit (§3A.4) | Yes |
 | `Rejected` | Authored `reject` row matched — business prohibition; `Args` carries what was submitted | Dispatch — reject row matched (§3A.4) | Yes |
-| `InvalidArgs` | Arg validation failure — wrong type, unknown key | Ingress governance (§3A.4) | Yes |
-| `ConstraintsFailed` | Post-mutation constraints violated (rules, state ensures, event ensures) | Constraint evaluation → discard (§3A.4) | Yes |
+| `InvalidArgs` | Ingress validation failure — wrong type, unknown key, or an argument value that violates a constraint declared on it | Ingress governance (§3A.4) | Yes |
 | `Unmatched` | All guards failed (including `when` precondition) — no row matched; `EvaluatedRows` carries per-candidate guard trace | Dispatch — no row matched (§3A.4) | Yes |
 | `UndefinedEvent` | No transition rows or hooks for this event in current state | Dispatch — no rows for (state, event) (§3A.4) | Yes |
 | `Faulted` | Evaluator impossible path — a `Fault` that the type checker should have prevented (programmer error, not a business outcome) | Backstop | Yes |
 
 **`Rejected` vs `InvalidArgs`:** `Rejected` is a business decision authored in the precept (`-> reject "reason"`). `InvalidArgs` is a caller error — the args don't match the event's declared contract. Parallel with `UpdateOutcome.InvalidFields`. DDD's "business rejection vs. invalid input" distinction.
 
-**`EventOutcome.ConstraintsFailed` scope:** Covers ALL post-fire constraints: global rules, state ensures (`in`/`to`/`from`), AND event ensures. The containing DU (`EventOutcome`) identifies which operation produced the failure; no operation-type prefix is needed on the variant itself.
+**There is no `EventOutcome.ConstraintsFailed`.** The variant used to mean "the working copy was built and then failed a constraint check." No such check runs: the compiler proved every handler preserves every rule (spec §0.7), and §3A.4's phase order has no constraint-evaluation phase between recomputation and commit. Global rules, state ensures (`in`/`to`/`from`) and event ensures are all proven rather than re-evaluated, so no outcome reports them failing after a mutation.
+
+What does fail at runtime is ingress: an argument value that violates a constraint declared on it. That is `InvalidArgs`, and per spec §3A.2 it is collect-all — every failing argument is reported, not just the first.
+
+> **Open — the shape `InvalidArgs` needs.** `InvalidArgs(string Reason)` carries one string. Collect-all reporting of constraint violations on arguments wants the structured per-violation detail `ConstraintViolation` already carries (`Because`, `RelevantFields`, `FailingSubexpression`), the same way `UpdateOutcome.ConstraintsFailed` carries it for a patch. Whether `InvalidArgs` gains a `Violations` array, splits into two variants (structural arg errors vs. constraint failures on args), or stays a string is an API-shape decision neither the want document nor the specification settles. Left as-is here rather than guessed at.
 
 **`Transitioned` and `Applied` mutations:** `Mutations` is always populated on success — callers never need a second `InspectFire` call to get before/after field diffs. The evaluator computes the diff against the working copy it already maintains during execution.
 
@@ -142,10 +144,12 @@ public abstract record UpdateOutcome
 
 | Variant | Meaning | Pipeline stage |
 |---------|---------|----------------|
-| `Updated` | Patch applied, constraints passed, new Version committed | Commit |
-| `ConstraintsFailed` | Patch applied to working copy but constraints violated | Rule/ensure evaluation |
+| `Updated` | Patch passed its ingress check and was applied; new Version committed | Commit |
+| `ConstraintsFailed` | A patched value violates a constraint declared on the field it was entering — refused before the patch was applied, collect-all | Ingress governance (§3A.4) |
 | `FieldNotEditable` | Field's declared access mode (`Readonly`) prevents direct editing in current state | Access mode check |
 | `InvalidFields` | Type mismatch or structurally invalid patch | Type check |
+
+**`UpdateOutcome.ConstraintsFailed` is an ingress failure, not a post-mutation one.** The constraints it reports are the ones declared on the fields the patch writes, checked as the values enter and before anything derives from them (spec §0.7, *Governance*). It upholds the declared contract of the slot the value enters and nothing wider — an editable field is an ordinary write site, and the rules that reach it through other fields were discharged by the compiler like any other write site's obligations. The variant name reads as though the check were a sweep over the finished working copy; it is not, and the name should be revisited when the `Update` API is next opened.
 
 ---
 
@@ -222,7 +226,7 @@ public sealed record UpdateInspection(
 - `Fields` — ALL non-omitted fields with post-patch values and recomputed derived fields.
 - `Constraints` — rules evaluated against the hypothetical post-patch state.
 - `Events` — full EventInspection for every event defined in the current state, evaluated against the hypothetical field state. Undefined events for other states are not included.
-- `HypotheticalResult` — non-null when the patch is complete and all constraints pass.
+- `HypotheticalResult` — non-null when the patch is complete and passes its ingress check.
 
 Returned by `Version.InspectUpdate(fields?)`. When called with no patch, returns the landscape against current field values.
 
@@ -237,11 +241,13 @@ public sealed record TransitionInspection(
     ImmutableArray<FieldSnapshot> PostFields);
 ```
 
-- `Prospect` — would this row fire? `Certain` when guard passed and all constraints satisfied; `Possible` when guard evaluation is ambiguous due to missing args; `Impossible` when guard failed or constraints violated.
+- `Prospect` — would this row fire? `Certain` when the guard passed; `Possible` when guard evaluation is ambiguous due to missing args; `Impossible` when the guard failed. The guard alone decides: dispatch is first-matching-guard-wins (spec §3A.4 phase 2), so no constraint result can turn a guard-passing row into a non-firing one.
 - `Effect` — a discriminated union encoding the row's outcome kind. Replaces the previous `string? TargetState` nullable encoding. Consumers pattern-match on `Effect` to determine transition target, no-transition, or rejection. See `RowEffect` below.
 - `GuardSummary` — human-readable description of the guard condition. All rule failure surfaces carry a human-readable description (contract rule). `null` when no guard applies or when the guard passed without ambiguity. Populated by the runtime when the guard fails or evaluates to `Possible` (ambiguous due to missing args).
 - `PostFields` — ALL non-omitted fields in the target state, post-mutation + recomputation. Fields whose access mode changes upon transition reflect the target state's mode.
 - `Constraints` — constraint evaluation results for this specific row.
+
+> **Open — what the `ConstraintResult` arrays mean now.** `TransitionInspection.Constraints`, `UpdateInspection.Constraints` and `EventInspection.EventEnsures` were shaped around a pipeline that evaluated rules against the finished working copy. Execution no longer does that, and spec §3A.6 says inspection has no constraint-evaluation phase to preview because there is none to preview. What the want document asks inspection to report instead is proof provenance — "no check needed here, and here are the premises it was proven from" (`what-i-want-2026-07-16.md:211`) — but neither that document nor the specification says which type carries it. The three arrays are left exactly as they are, and their descriptions above still describe the old model. Deciding whether they become ingress results, proof-provenance records, or a plain report of which declared constraints happen to hold in the previewed configuration is a design question, not a correction.
 
 ### RowEffect
 
@@ -346,7 +352,7 @@ public enum FieldAccessMode { Read, Write }
 
 **Four commit/inspect pairs, consistent naming:** Every commit verb (`Fire`, `Update`) has an `Inspect___` counterpart. Fire/Update require complete input and return one committed outcome. InspectFire/InspectUpdate accept optional partial input and return an annotated landscape.
 
-**Why InspectFire/InspectUpdate are separate:** Fire and Update are mutually exclusive commit operations — field patches and event args produce a new Version through fundamentally different pipelines (row matching + transition vs. access-mode check + constraint evaluation). A unified `Inspect(fields?, event?, args?)` would force callers to disentangle which combination was evaluated and would conflate two non-overlapping input/output shapes.
+**Why InspectFire/InspectUpdate are separate:** Fire and Update are mutually exclusive commit operations — field patches and event args produce a new Version through fundamentally different pipelines (row matching + transition vs. access-mode check + ingress validation of the patched values). A unified `Inspect(fields?, event?, args?)` would force callers to disentangle which combination was evaluated and would conflate two non-overlapping input/output shapes.
 
 **Why Update, not Edit:** Renamed from `Edit` to avoid confusion with `edit` declarations in the DSL (per-state field access blocks). `Update` describes what the caller does to field values; `edit` describes what the precept author declares.
 

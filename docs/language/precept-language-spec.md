@@ -2077,7 +2077,7 @@ Pattern B is not an ungoverned loophole. The entity is governed from birth by th
 The `initial` modifier on an event designates it as the construction event. The runtime's `Create(args)` operation fires this event atomically as part of entity creation:
 
 1. Build a hollow version (defaults applied, initial state set, omitted fields structurally absent).
-2. Fire the initial event with the caller's args through the standard pipeline — same guards, same mutations, same ensures, same constraint checking as any other event.
+2. Fire the initial event with the caller's args through the standard pipeline — same ingress validation of the supplied arguments, same guards, same action chain as any other event.
 3. Return the outcome — same verdict space the caller uses for every event (see §3A.2).
 
 If the precept does not declare an initial event, `Create()` is parameterless and always succeeds (the compiler guarantees all fields have defaults or are optional — enforced by `RequiredFieldsNeedInitialEvent` / `InitialEventMissingAssignments`).

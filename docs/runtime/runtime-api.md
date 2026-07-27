@@ -145,12 +145,12 @@ Version version = outcome switch
     EventOutcome.Created c                => c.Result,     // construction succeeded — entity now exists in initial state
     EventOutcome.Rejected r               => throw new BusinessException(r.Reason),
     EventOutcome.InvalidArgs e            => throw new ArgumentException(e.Reason),
-    EventOutcome.ConstraintsFailed f      => HandleViolations(f.Violations),
     EventOutcome.Faulted fault            => throw new InvalidOperationException(fault.Fault.Message),
     // Transitioned — structurally impossible (construction is terminal in initial state)
     // Applied — not a Create() outcome (Create() produces Created, not Applied)
     // Unmatched — structurally impossible (no-match at construction → Rejected)
     // UndefinedEvent — structurally impossible (compiler ensures initial event rows exist)
+    // ConstraintsFailed — structurally impossible (no post-mutation constraint evaluation exists)
 };
 
 // Precepts WITHOUT an initial event — all fields have defaults
@@ -159,16 +159,15 @@ EventOutcome simple = precept.Create();  // always Created
 
 `Create` is construction. It always returns `EventOutcome.Created` on success — regardless of whether an initial event is declared. `Created` means "an entity was brought into existence." Whether that creation involved firing an initial event or just applying defaults is an implementation detail — the outcome category is the same.
 
-If the precept declares an `initial` event, `Create` fires it atomically: build hollow version (defaults + initial state + omitted fields) → evaluate construction rows (first-match) → execute matched row's action chain → evaluate constraints → return outcome. If no initial event is declared, `Create` constructs from defaults and returns `Created` (always succeeds by compile-time guarantee C59/C86).
+If the precept declares an `initial` event, `Create` fires it atomically: validate the supplied arguments at ingress → build hollow version (defaults + initial state + omitted fields) → evaluate construction rows (first-match) → execute matched row's action chain → commit → return outcome. There is no constraint-evaluation step between the action chain and the commit: the compiler proved that the initial event establishes every rule (spec §0.7), so a construction that ran to completion is valid by construction. If no initial event is declared, `Create` constructs from defaults and returns `Created` (always succeeds by compile-time guarantee C59/C86).
 
 **Construction outcome space:** `Create()` returns exactly one of:
 
 | Outcome | Meaning | When produced |
 |---------|---------|---------------|
-| `Created` | Construction succeeded. Entity now exists in the initial state (stateful) or with `State = null` (stateless). | A mutation row matched and all post-mutation constraints passed. |
+| `Created` | Construction succeeded. Entity now exists in the initial state (stateful) or with `State = null` (stateless). | A mutation row matched and its action chain ran to completion. |
 | `Rejected` | Intake refused. Entity was NOT created. | An authored `reject` row matched, OR all `when` guards failed with no unconditional fallback (synthesized reason: `"No construction row matched arguments"`). |
-| `InvalidArgs` | Argument validation failed before row matching. | Wrong type, unknown key, or missing required argument. |
-| `ConstraintsFailed` | Post-mutation constraint violations (collect-all semantics). | A mutation row matched and executed, but constraint evaluation found violations. |
+| `InvalidArgs` | Ingress validation failed, before row matching — collect-all, so every failing argument is reported. | Wrong type, unknown key, missing required argument, or an argument value that violates a constraint declared on it. |
 | `Faulted` | Evaluator impossible path / runtime fault. | The evaluator encountered an impossible condition that the compiler should have prevented. |
 
 **Structurally impossible outcomes from `Create()`:**
@@ -176,8 +175,9 @@ If the precept declares an `initial` event, `Create` fires it atomically: build 
 - `Applied` — exclusively a `Fire()` outcome. `Create()` produces `Created`, never `Applied`.
 - `Unmatched` — the compiler guarantees at least one construction row exists (`ZeroConstructionRows` diagnostic). If all guards fail at runtime, the result is `Rejected`, not `Unmatched`.
 - `UndefinedEvent` — `Create()` targets the declared initial event; the compiler ensures it has rows.
+- `ConstraintsFailed` — there is no post-mutation constraint evaluation to fail. The compiler proved that the initial event establishes every rule (spec §0.7, §3A.2).
 
-**Why `Create` returns `EventOutcome`:** Construction goes through the full event pipeline — same guards, same ensures, same constraint checking. The caller uses the same exhaustive pattern matching they use for every `Fire`, minus the impossible variants.
+**Why `Create` returns `EventOutcome`:** Construction goes through the full event pipeline — same ingress validation of the supplied arguments, same guards, same action chain. The caller uses the same exhaustive pattern matching they use for every `Fire`, minus the impossible variants.
 
 **Semantic guarantee:** After successful construction (`EventOutcome.Created`), `version.State == precept.InitialState.Name` for stateful precepts, or `version.State == null` for stateless precepts. Always. No exceptions.
 
@@ -247,6 +247,18 @@ public sealed class Precept
 - **`InitialState` nullable.** `null` for stateless precepts; otherwise a `StateDescriptor`.
 - **Constraint catalog is definition-level.** `Precept.Constraints` exposes every declared constraint (rules, state ensures, event ensures) with full metadata: kind, scope, anchor, `because` rationale, referenced fields, guard presence. This is the full catalog — unfiltered by state. Callers use it for definition-level introspection (e.g., "what rules does this precept declare?").
 
+### Definition Load and the Certificate Gate
+
+The runtime does not re-evaluate rules against a finished working copy, so what stands behind the guarantee at runtime is not a second evaluation of the rules — it is a check on the definition itself, run once when the definition is loaded.
+
+Alongside the compiled definition the compiler emits a **certificate**: a checkable record of the proof, carrying for each obligation the theorem, the premises the proof used (which guard, which argument constraint, which pre-state rule), and the derivation. `Precept.From(Compilation)` runs the certificate checker over that record before it will return a usable `Precept`, and **refuses to govern under a definition whose certificate does not verify**. A definition that was never proven, that was tampered with, or that is stale with respect to the checker never governs anything. The confidence is rooted in verification the runtime performed itself rather than in provenance it assumed.
+
+The checker walks the recorded derivation and confirms each step; it never repeats the search for a proof. That is why it stays small and fast enough to run on every load.
+
+The certificate also tells the runtime which checks it may not skip. The premise list *is* the set of runtime validations the proofs depend on — which argument constraints and which guards must run — derived from the proof rather than maintained as a parallel list alongside it.
+
+> **Not yet built.** No certificate is emitted, no checker exists, and `Precept.From` performs no such gate today. This section states the contract the runtime is being built to; the shape of the certificate record and the checker's API are not settled here.
+
 ---
 
 ## Restoration
@@ -263,7 +275,7 @@ Version version = outcome switch
 };
 ```
 
-`Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately and recomputes computed fields. It does **not** re-validate constraints: restored state is trusted as valid at the time it was persisted — like a direct database read — and re-checking would block data written under an earlier definition (spec §0.7; evaluator.md Decision 5). Migration on schema change is the caller's responsibility; a stale value is re-governed by the next operation's post-mutation constraint sweep (spec §3A.4).
+`Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately and recomputes computed fields. It does **not** re-validate constraints: restored state is trusted as valid at the time it was persisted — like a direct database read — and re-checking would block data written under an earlier definition (spec §0.7; evaluator.md Decision 5). Migration on schema change is the caller's responsibility. Nothing re-governs a stale value later either: there is no pass over the finished working copy that a subsequent operation could catch it in (spec §0.7, §3A.4). What restore trusts is the data; what the runtime verifies for itself is the *definition* — see § Definition Load and the Certificate Gate.
 
 > ⚠️ **Design note:** The implementation uses `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — and returns a structured `RestoreOutcome` rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
 >
@@ -352,17 +364,18 @@ Version next = outcome switch
     EventOutcome.Applied a                => a.Result,
     EventOutcome.Rejected r               => throw new BusinessException(r.Reason),
     EventOutcome.InvalidArgs e            => throw new ArgumentException(e.Reason),
-    EventOutcome.ConstraintsFailed f      => HandleViolations(f.Violations),
     EventOutcome.Unmatched                => HandleNoMatch(),
     EventOutcome.UndefinedEvent           => HandleUnknownEvent(),
 };
 ```
 
-Fire runs the event pipeline in § 3A.4 order (`precept-language-spec.md`, § 3A.4, *Operation execution order*): ingress governance (arg validation) → dispatch (row matching, first-match with guard evaluation) → exit actions → the state change and `omit` reset → the row's action chain on the working copy (mutation rows) or rejection (reject rows) → entry actions → computed-field recomputation → constraint evaluation (collect-all) → commit or discard. Returns one `EventOutcome` variant. See `result-types.md` for the full hierarchy.
+Fire runs the event pipeline in § 3A.4 order (`precept-language-spec.md`, § 3A.4, *Operation execution order*): ingress governance (arg validation) → dispatch (row matching, first-match with guard evaluation) → exit actions → the state change and `omit` reset → the row's action chain on the working copy (mutation rows) or rejection (reject rows) → entry actions → computed-field recomputation → commit. Returns one `EventOutcome` variant. See `result-types.md` for the full hierarchy.
+
+There is no constraint-evaluation stage between recomputation and commit, and no pass/fail decision the commit waits on. Ingress validation of the arguments and guard evaluation are the two checks that run, and they are exactly the premises the compiler's proofs rest on (spec §0.7). Everything else was proven at compile time; a working copy the operation completed is promoted unconditionally. The working copy is discarded only when the operation refuses before it finishes — arguments that fail ingress, or a `reject` row that wins dispatch.
 
 > Two things § 3A.4 leaves unsettled are not resolved by this sequence and should not be read as answered here: when a state carries more than one state action, whether all of them fire and in what order; and whether entry actions fire at construction and on a self-transition. See § 3A.4 / Open Questions.
 
-**Row dispatch model:** Transition rows come in two shapes — mutation rows (`TransitionRowMutation`: carry action chain + success outcome) and reject rows (`TransitionRowReject`: carry reject clause only). Row matching evaluates guards in declaration order; the first matching row's shape determines the outcome. A mutation row executes its action chain and produces `Transitioned`, `Applied`, or `ConstraintsFailed`. A reject row produces `Rejected` with the authored reason string. The two shapes are grammar-level constructs — a single row cannot mix mutations with rejection.
+**Row dispatch model:** Transition rows come in two shapes — mutation rows (`TransitionRowMutation`: carry action chain + success outcome) and reject rows (`TransitionRowReject`: carry reject clause only). Row matching evaluates guards in declaration order; the first matching row's shape determines the outcome, and the remaining rows are not evaluated (spec §3A.4 phase 2). A mutation row executes its action chain and produces `Transitioned` or `Applied`. A reject row produces `Rejected` with the authored reason string. The two shapes are grammar-level constructs — a single row cannot mix mutations with rejection.
 
 ### Update
 
@@ -385,7 +398,9 @@ Version next = outcome switch
 };
 ```
 
-Update runs the field-write pipeline: access mode check → type validation → patch application to working copy → computed field recomputation → constraint evaluation (collect-all) → commit or discard. Returns one `UpdateOutcome` variant.
+Update runs the field-write pipeline: access mode check → type validation → ingress validation of each patched value (collect-all) → patch application to working copy → computed field recomputation → commit. Returns one `UpdateOutcome` variant.
+
+Ingress validation happens **before** the value is applied, and it holds the incoming value to the constraints declared on the field it enters — nothing wider (spec §0.7, *Governance*). It is the same operation-blind check every externally-supplied value gets. There is no second pass over the finished working copy: an editable field is an ordinary write site, and the compiler discharged its obligations at compile time like any other. A patched value that fails its check is refused before any mutation runs, so nothing is rolled back.
 
 **Why Update, not Edit:** Renamed from `Edit` to avoid confusion with `edit` declarations in the DSL (per-state field access blocks). `Update` describes what the caller does to field values; `edit` describes what the precept author declares.
 
@@ -457,7 +472,7 @@ public sealed record ConstraintViolation(
 - `FailingSubexpression` — the innermost subexpression text that evaluated to false
 - `FailingValue` — the `JsonElement` at the failure site (e.g., the computed value that violated the bound)
 
-Appears in `EventOutcome.ConstraintsFailed.Violations` and `UpdateOutcome.ConstraintsFailed.Violations`. Only produced for constraints that are definitively violated (not unresolvable — commit operations have complete data).
+Appears in `UpdateOutcome.ConstraintsFailed.Violations` — the ingress failures on an update patch, one per constraint the incoming values did not satisfy. Only produced for constraints that are definitively violated (not unresolvable — commit operations have complete data). Ingress failures on event arguments surface through `EventOutcome.InvalidArgs`, which carries a reason string rather than this type; see `result-types.md` for the open question that leaves.
 
 > **Provisional (Shane ruling 2026-05-04):** Shape promoted from minimal 2-field form to the canonical 5-field design. Field population (especially `FailingSubexpression` and `FailingValue`) depends on evaluator instrumentation; all fields nullable/defaultable for fields not yet wired. `FieldNames` dropped — superseded by typed `ImmutableArray<FieldSnapshot>`.
 
@@ -645,7 +660,9 @@ public sealed class FiredArgs
 
 ### Correctness Invariant
 
-**Inspection and commit share the same evaluation path.** `InspectFire` runs the same pipeline as `Fire`— same guard evaluation, same action chain, same constraint checking. The only difference is disposition: inspection discards the working copy; commit promotes it on success. This is a structural guarantee, not a convention.
+**Inspection and commit share the same evaluation path.** `InspectFire` runs the same pipeline as `Fire` — same ingress validation of the supplied arguments, same guard evaluation, same action chain, same computed-field recomputation. The only difference is disposition: inspection discards the working copy; commit promotes it. This is a structural guarantee, not a convention.
+
+Because execution has no constraint-evaluation phase, inspection has none to preview either (spec §3A.6). What inspection can answer is what the operation would actually decide: whether the supplied arguments pass ingress, which row's guard would win, and what the resulting field values would be. Where a rule holds for a reason other than a check — because the compiler proved this handler preserves it — inspection reports the proof and the premises it used rather than a verdict it did not compute.
 
 **Survey grounding:** XState's `transition()` / `getNextSnapshot()` pair — same code path, different output. CEL's `ExhaustiveEval` — same `Interpretable` tree, different evaluation mode. K8s dry-run — same controller logic, different commit behavior.
 
@@ -863,19 +880,20 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 | Build hollow version | Defaults applied, `State = InitialState` | Defaults applied, `State = null` |
 | Fire initial event (if declared) | Full Fire pipeline | Full Fire pipeline — identical |
 | State-set assignment | `Version.State` ← initial state name | Omitted — no state to assign |
-| `to <State> ensure` entry guards | Evaluated against initial state | Skipped — no state to enter |
-| `in <State> ensure` residency checks | Evaluated against initial state | Skipped — no state to enter |
+| `to <State> ensure` entry constraints | In scope for the initial state — proven at compile time, not evaluated here | Out of scope — no state to enter |
+| `in <State> ensure` residency constraints | In scope for the initial state — proven at compile time, not evaluated here | Out of scope — no state to enter |
 | Omit-on-entry clearing | Applied for initial state | Skipped — no state to enter |
-| Arg ensures (`on <Event> ensure`) | Evaluated if initial event declared | Evaluated if initial event declared |
-| Field constraints and global rules | Always evaluated | Always evaluated |
+| Arg ensures (`on <Event> ensure`) | Evaluated at ingress if initial event declared | Evaluated at ingress if initial event declared |
+| Field constraints on the supplied arguments | Evaluated at ingress | Evaluated at ingress |
+| Global rules | Proven at compile time to be established by construction — not evaluated here | Proven at compile time to be established by construction — not evaluated here |
 | Computed field recomputation | Always performed | Always performed |
-| Working copy promotion/discard | Standard protocol | Standard protocol |
+| Working copy promotion | Unconditional once construction completes | Unconditional once construction completes |
 
 **Contract:**
 - `Version.State` is `null` for stateless precepts in all outcomes that include a version (`Created`, `Transitioned`).
 - `CreateInitialVersion` returns `EventOutcome.Created(version)` where `version.State == null` when construction succeeds.
 - `EventOutcome.Transitioned` is never produced during stateless construction — there are no transitions.
-- The `Rejected` and `ConstraintsFailed` outcomes remain possible; stateless construction does not suppress business-rule failures.
+- The `Rejected` and `InvalidArgs` outcomes remain possible; stateless construction does not suppress an authored refusal or an argument that fails its ingress check.
 
 **Compiler guarantee:** The compiler enforces `RequiredFieldsNeedInitialEvent` / `InitialEventMissingAssignments` for stateless precepts exactly as for stateful precepts — same rules, same diagnostics. Stateless is not a weaker contract.
 
@@ -888,7 +906,7 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 - **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.
 - **No build-time analysis.** Graph analysis, type checking, and compilation are owned by the compiler pipeline. `Precept.From()` accepts only an error-free `Compilation` — it does not re-analyze.
-- **No migration logic.** If the definition changed since data was stored, migration is the caller's responsibility. Restore does **not** re-validate — restored state is trusted as valid at persistence time (spec §0.7), so schema drift is not detected on load. A stale value surfaces at the next operation, whose post-mutation constraint sweep (spec §3A.4) governs the resulting working copy.
+- **No migration logic.** If the definition changed since data was stored, migration is the caller's responsibility. Restore does **not** re-validate — restored state is trusted as valid at persistence time (spec §0.7), so schema drift is not detected on load. It is not detected later either: no subsequent operation re-governs a value that did not enter through the contract (spec §0.7). A host that restores data written under an older definition has stepped outside the guarantee, and nothing inside the engine will notice.
 
 ---
 
