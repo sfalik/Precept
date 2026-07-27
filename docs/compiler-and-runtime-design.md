@@ -3,7 +3,7 @@
 > **Status:** Canonical design — catalog-first pipeline
 > **Audience:** compiler, runtime, language-server, MCP, and documentation authors
 
-**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Section 5b covers NameBinder. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
+**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the shape of the design. Sections 4–5 cover Lexer and Parser. Section 5b covers NameBinder. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
 
 ## Non-Negotiable Rules
 
@@ -67,7 +67,7 @@
   - [Current surface](#current-surface)
 - [11. Runtime surface and operations](#11-runtime-surface-and-operations)
   - [Evaluator](#evaluator)
-  - [Constraint evaluation matrix](#constraint-evaluation-matrix)
+  - [Per-operation validation and dispatch matrix](#per-operation-validation-and-dispatch-matrix)
   - [Create](#create)
   - [Restore](#restore)
   - [Fire](#fire)
@@ -103,8 +103,8 @@ The guarantee is **prevention, not detection.** Invalid entity configurations ca
 
 Precept's guarantee is the inverse posture, and the inversion is the whole point. Coverage is not a list of bug categories; it is defined *structurally*, as an exhaustive sweep over every place a bad configuration could arise — and there are exactly two such places:
 
-- a **computed value** that could land outside its declared limits — covered at *compile time* by a proof obligation the proof engine must discharge, or the definition is rejected;
-- an **externally-supplied value** crossing an operation boundary — covered at *runtime* by a declared constraint the engine enforces on every operation, on a working copy discarded whole if it fails.
+- a **value the definition itself produces** — a computed field, or a value a handler writes — that could break a declared rule or land outside a declared bound: covered at *compile time* by a proof obligation the proof engine must discharge, or the definition is rejected;
+- a **value supplied from outside** crossing an operation boundary — an event argument, a construction input, a direct field edit: held at *ingress* to the constraints declared on the slot it enters, at the moment it enters, before any computation derives from it. That is what makes the premises the compile-time proofs rest on true of the value that actually arrived.
 
 Neither has a silent-skip path. The compile-time obligation is *created at every fault-prone site* and gated only on *discharge*; an obligation the engine cannot prove **rejects the definition** rather than quietly passing — skipping the obligation because a bound is unprovable would be a soundness inversion, forbidden by construction (§1.1). The runtime constraint is enforced *operation-blind*; no code path reaches a commit without passing it. So where a floor's default is "unconsidered ⇒ allowed," Precept's default is "unproven ⇒ rejected; ungoverned ⇒ nothing commits." The guarantee *fails closed*.
 
@@ -113,7 +113,7 @@ And it is **closed under extension of the language** — which a floor can never
 **What "beyond the floor" looks like, concretely — first, on the fault axis.** The distinction is easy to assert and easy to disbelieve, so here are three compile-time checks a fault-floor cannot express — each grounded in the actual proof engine, each discharged before any entity exists. All three are still, at bottom, *fault avoidance* — they prevent a crash, overflow, or divide-by-zero — but proven far more powerfully than a floor's fixed per-operator guards. Hold that qualifier: the sharper break from a floor is the *second* axis below, where the rule has nothing to do with faults at all.
 
 - **A computed result proven in-bounds by interval arithmetic through the whole expression — not a check on its value.** In [`samples/invoice-line-item.precept`](../samples/invoice-line-item.precept), `DiscountAmount <- Subtotal * DiscountPercent / 100` is a *computed* field, and `DiscountPercent` is declared `nonnegative max 100`. The proof engine propagates the operand intervals forward through `*` and `/` — each operator carries an `IntervalTransfer` in the `Operations` catalog (`ProofEngine.Intervals.cs`) — and checks the resulting interval against `DiscountAmount`'s own declared bounds. A floor has no notion of *reasoning about a whole computation's value-range from its operands' declared bounds and checking it against the result's declared bound*; it can only test the final number at runtime, after the bad value already exists. Precept rejects the *definition*.
-- **A division whose safety rests on a compile-time proof, not a runtime guard.** The `/ 100` above is a fault-prone site. A floor emits a divide-by-zero guard on *every* division and refuses the bad value when it flows. Precept instead discharges the obligation statically (the divisor is the literal `100`, provably nonzero — Strategy 1) and the guarantee rests entirely on that proof; had the divisor been an unprovable field, the *definition* is rejected and no entity is ever created to be checked. A computed value has no ingress door at which a runtime check could sit (§1.2), so for computed values the compile-time proof is the *whole* guarantee — the evaluator's divide-by-zero trap is defense-in-depth, unreachable for contract data, and a trap firing on contract data is a proof-engine defect, not the guarantee working (§1.1).
+- **A division whose safety rests on a compile-time proof, not a runtime guard.** The `/ 100` above is a fault-prone site. A floor emits a divide-by-zero guard on *every* division and refuses the bad value when it flows. Precept instead discharges the obligation statically (the divisor is the literal `100`, provably nonzero — Strategy 1) and the guarantee rests entirely on that proof; had the divisor been an unprovable field, the *definition* is rejected and no entity is ever created to be checked. A computed value has no ingress door at which a runtime check could sit (§1.2), so for computed values the compile-time proof is the *whole* guarantee — the evaluator carries no divide-by-zero test of its own. It performs the division on the strength of the proof, and if the proof were wrong nothing downstream would catch it (§1.1).
 - **A bound discharged from a sibling guard — no check placed on the mutation at all.** For `from S on E when Counter >= MaxCount -> reject` followed by `set Counter = Counter + 1`, the reject row's guard narrows the current row's interval so `Counter + 1` is *provably* within `maxcount`; `BuildNarrowedIntervals` (`ProofEngine.Intervals.cs`) composes the sibling exclusion. The obligation discharges from a `when`-established fact — a check the runtime never has to perform.
 
 Each rejects a *definition* on interval-and-provenance reasoning alone, with no entity in existence. That is the categorical gap made concrete on the fault axis: a floor guards values as they flow past a fixed list of dangerous operators; Precept proves the definition admits no bad value, then leaves the site unguarded *because it proved it did not need guarding*.
@@ -122,17 +122,21 @@ Each rejects a *definition* on interval-and-provenance reasoning alone, with no 
 
 Take [`samples/saas-trial-to-paid.precept`](../samples/saas-trial-to-paid.precept): `rule PlanMonthlyFee > '0.00 USD' when ConversionStatus == "Converted"` ("a converted trial must have a positive monthly fee — a converted customer is paying"). `PlanMonthlyFee` is never a divisor, never flows into a bounded arithmetic result, never touches a fault-prone site. Violating it throws nothing — no crash, no overflow. It is a *pure business-integrity rule*, not a safety rule. A fault-floor would never guard it, because there is no fault to guard. Precept guarantees it holds for every configuration, always — no operation can commit a `Converted` configuration whose `PlanMonthlyFee` is not positive.
 
-**Be exact about the mechanism, because it is not the compile-time proof of the fault examples.** `PlanMonthlyFee` is *externally supplied* — set from the `AcceptOffer(MonthlyFee ...)` event argument (and it is an `editable` field). The compiler cannot know what value a caller will supply, so this rule is **not proven at compile time** — it is a `ConstraintKind.Invariant` constraint plan **governed at runtime**: enforced on every operation, on a working copy discarded whole if it fails (spec §3A.4), with no code path that reaches a commit without passing it. The guarantee is exactly as absolute as the fault-side proofs, but the mechanism differs by *provenance*, per the one-net/two-regions split (§1.1 Composition): had this positivity instead been carried as a *bound on a computed field* — e.g. a computed `PlanMonthlyFee` declared `positive`, whose definition already forced it positive — that requirement would be discharged **statically**, as a bound-containment obligation, by the very same machinery that discharges the fault obligations above (Strategy 6 compositional propagation, `ProofEngine.Composition.cs`). The requirement is the same; where it is *proven* (computed, bound-carrying target) versus *governed* (a free-standing relational `rule`, or any externally-supplied value) is decided by provenance, not by whether the rule involves a fault. Neither region has a silent-skip path.
+**Be exact about the mechanism, because the obvious answer is the wrong one.** `PlanMonthlyFee` is *externally supplied* — set from the `AcceptOffer(MonthlyFee ...)` event argument, and it is an `editable` field. It would be natural to conclude that the compiler therefore cannot prove this rule and must hand it to the runtime to re-check after every operation. That is not what happens. Where a value came from does not decide whether a rule is proven or governed; a declared premise does.
 
-That is the sharper categorical gap: a fault-floor is a *lower bound on fault classes* and says nothing about a rule outside them; Precept structurally guarantees **every declared rule — fault-adjacent or not** — by proof where the value is computed and by governance where it is supplied, with the *same* "no unchecked path, nothing left over" property in both cases. "Positive monthly fee" and "no divide-by-zero" are not two different kinds of guarantee to Precept; they are the same closed net over two regions.
+The rule is proven at compile time like any other. Every handler that could break it carries an obligation to leave it holding — the row that writes `PlanMonthlyFee`, and equally the row that sets `ConversionStatus` to `"Converted"`, because the rule mentions both fields. The proof closes from a premise the author declared: a constraint on the `MonthlyFee` argument, a `when` guard on the row, or a rule that already held before the operation. If no such premise exists, the compiler **rejects the definition** and names the condition that would close the proof. It does not accept the definition and leave the rule to a runtime check. The accepted cost of that posture is that more definitions are refused, and authors write guards they would not otherwise have written.
+
+Runtime governance then does one job here, and it is a narrow one: it holds the incoming `MonthlyFee` to the constraint declared on that argument, at the moment it arrives, so the premise the proof rests on is true of the actual value (§1.1 Composition). It does not re-evaluate the rule against the finished configuration.
+
+That is the sharper categorical gap: a fault-floor is a *lower bound on fault classes* and says nothing about a rule outside them; Precept structurally guarantees **every declared rule — fault-adjacent or not** — by proof at compile time, with ingress making the premises those proofs rest on true of the values that arrive from outside. "Positive monthly fee" and "no divide-by-zero" are not two different kinds of guarantee to Precept; they are the same closed net, discharged the same way.
 
 **How the net is woven: three cooperating mechanisms across two compiler stages and the runtime.** The single guarantee decomposes — for the reader's sake, not as its definition — into three pieces of machinery. What follows is a map of *which part of the pipeline secures which region of the net*, not a taxonomy of bugs Precept "checks for":
 
 - **Business-process soundness** — established by the **graph analyzer** (pipeline stage 5, §7). Before any entity exists, it proves the lifecycle graph is navigable: every declared state is reachable, every non-terminal state has a path forward (no dead-ends), and required states dominate every path to completion. These are structural properties of the state machine, computed by graph analysis — reachability partition, dead-end detection, dominator computation — **not** discharged fault obligations. A definition whose state graph is unsound is rejected here, before the proof engine runs.
-- **Calculation soundness** — the **proof engine** (pipeline stage 6, §8) secures the *computed* region of the net. Its coverage is emphatically **not** the short list that makes it look like a floor — division, overflow, empty-collection access, bound containment are *illustrations*, not the boundary. The boundary is the exhaustive site sweep of [`docs/compiler/soundness-and-coverage.md`](compiler/soundness-and-coverage.md) §3: **every** site where a computed value could leave its declared limits raises an obligation, discharged at compile time under prove-or-reject or the definition is rejected. This is the chain §1.2 walks end to end — the fault-obligation chain, and it alone.
-- **Constraint governance** — enforced by the **runtime** — and the philosophy leads with this one ("governance, not validation"). Every declared constraint is enforced on every operation, with no code path that bypasses it: a `rule` invariant, an `ensure` on a state or event (the `ConstraintKind` family — invariant, state-resident/entry/exit, event-precondition), a field's `min`/`max`, `notEmpty`, or length/count bound, and any relational or comparison rule over the configuration. Externally-sourced values are checked at ingress; mutations run on a working copy discarded whole if any constraint fails (spec §3A.4), so no operation commits a configuration that violates a declared rule. This is the runtime half — not a proof that a value is known in advance, but the structural fact that *there is no unchecked path*.
+- **Calculation soundness** — the **proof engine** (pipeline stage 6, §8) secures the *computed* region of the net. Its coverage is emphatically **not** the short list that makes it look like a floor — division, overflow and empty-collection access are *illustrations*, not the boundary. (Containment within a declared bound belongs on neither list: a bound is rule shorthand, so keeping a value inside it is rule preservation under the same single constraint mechanism as any other rule. The disposition is identical — prove it or reject the definition — but it is not a fault gate and should not be quoted as one. See spec §0.7.) The boundary is the exhaustive site sweep of [`docs/compiler/soundness-and-coverage.md`](compiler/soundness-and-coverage.md) §3: **every** site where a value could break a declared rule or leave its declared limits raises an obligation, discharged at compile time under prove-or-reject or the definition is rejected. This is the chain §1.2 walks end to end.
+- **Constraint governance** — enforced by the **runtime** — and the philosophy leads with this one ("governance, not validation"). Every value entering the entity from outside the definition — an event argument, a construction input, a direct field edit — is held to the constraints declared on the slot it enters, at the moment it enters, before any computation derives from it: the field's `min`/`max`, `notEmpty`, a length or count bound, or a constraint declared on the argument. Enforcement is operation-blind and there is no code path into the entity's data that bypasses it. This is the runtime half — not a proof that a value is known in advance, but the structural fact that *there is no unchecked path* into the data. It is the field's own declared contract and nothing wider: no second pass re-checks the finished configuration after the mutations complete, because every handler was already proven to preserve every rule. Guards still run — a row whose `when` condition is false does not fire — but that is choosing which row applies, not re-checking the result.
 
-Two of the three are compile-time proofs, but by *different* stages doing *different* work — and this distinction is load-bearing: the graph analyzer proves the lifecycle coordinate system is navigable; the proof engine proves no computation lands the data outside its declared limits. Do not collapse them into one undifferentiated "proven" bucket, and do not read either as the proof engine standing in for the whole compiler. The third mechanism, constraint governance, is the runtime half. Calculation soundness and constraint governance are then two faces of the *same* declared constraints, split only by where the value comes from: a bound on an externally-supplied field is governed at ingress, while the identical bound on a value computed inside the definition is proven at compile time (§1.1 Composition) — the *computed* and *supplied* regions of the one net above. What unifies all three is not a taxonomy of bugs but the structural closure claim above — coverage is an exhaustive sweep with nothing left over, not an enumerated list. The correctness category is not "what bugs you try to catch" but "what bugs cannot exist."
+Two of the three are compile-time proofs, but by *different* stages doing *different* work — and if the two are collapsed the reader loses which stage owns which failure: the graph analyzer proves the lifecycle coordinate system is navigable; the proof engine proves no computation lands the data outside its declared limits. Do not collapse them into one undifferentiated "proven" bucket, and do not read either as the proof engine standing in for the whole compiler. The third mechanism, constraint governance, is the runtime half. Calculation soundness and constraint governance are two faces of the *same* declared constraints, and they are not alternatives to each other: every declared rule is proven at compile time, and ingress makes the premises those proofs rest on true of the values that arrive from outside. The one asymmetry worth naming is about where a check *could* sit, not about what gets proven — a value computed inside the definition has no ingress door, so for computed values the compile-time proof is the entire mechanism (§1.1 Composition). What unifies all three is not a taxonomy of bugs but the structural closure claim above — coverage is an exhaustive sweep with nothing left over, not an enumerated list. The correctness category is not "what bugs you try to catch" but "what bugs cannot exist."
 
 Everything in this document — every pipeline stage, every artifact, every runtime operation — exists to deliver that guarantee. Section 1.1 states the mechanism behind each part — compile-time structural soundness (graph analyzer), compile-time fault prevention (proof engine), and runtime governance; §1.2 tells the single connected walk from a fault-prone site to the committed guarantee, which is the proof-engine-and-runtime seam and does not restate the graph analyzer's structural work.
 
@@ -144,11 +148,11 @@ The guarantee *statement* — what an author can rely on — is in the language 
 
 **Fault prevention** (compile-time — proof engine). The type checker stamps a proof obligation at every fault-prone site — where "site" is not a memorized operator list but any node whose catalog construct declares `ProofRequirements`, or any value flowing into a bound-carrying field (see §1.2 for the site-determination rule; the parenthetical cases here are illustrations: division → divisor non-zero; arithmetic into a bounded field → interval containment; collection access → non-empty; assignment → declared-bound containment). The proof engine discharges each obligation by establishing that the operand carries a discharging fact — a declared modifier/rule narrowed into its interval, a `when`-guard fact on the path, or a statically-known value. Discharge is **prove-or-reject**: an obligation the engine cannot prove emits its diagnostic. The obligation is *created at every site* and gated only on *discharge* — never on creation. Gating creation on provability (skipping the obligation when an interval is unbounded) is a soundness inversion: an unprovable bound must emit, never skip.
 
-**Governance** (runtime). Ingress (`TypeRuntime` / `TypeRuntimeMeta`) enforces every declared constraint on externally-sourced values — event arguments, construction inputs, field edits — before the working copy derives any dependent value. Enforcement is operation-blind. Mutations run on a working copy that is discarded if any constraint fails (spec §3A.4), so no invalid configuration commits.
+**Governance** (runtime). Ingress (`TypeRuntime` / `TypeRuntimeMeta`) enforces every declared constraint on externally-sourced values — event arguments, construction inputs, field edits — before the working copy derives any dependent value. Enforcement is operation-blind, and it upholds the declared contract of the slot the value enters and nothing wider. Mutations run on a working copy so that they either all take effect or none does and no partial state is observable; promotion is not conditional on a constraint check. There is no post-mutation pass left to make a pass/fail decision, because every handler was proven at compile time to preserve every rule. No invalid configuration commits because none can be produced.
 
 **Composition.** The compile-time proof for an externally-sourced operand relies on the operand's *declared* constraint; ingress governance makes that constraint hold on the actual value. The compiler never inspects the value — it proves the structural "carries a constraint" fact and rejects when it cannot. The runtime check is the discharge of that declared precondition, not a fallback for a proof the compiler skipped.
 
-**Out-of-contract data and traps.** The `[StaticallyPreventable]` evaluator fault codes are defense-in-depth, unreachable for data that entered through the contract. They cover only out-of-contract entry: restored state (which is trusted, not re-validated — spec §0.7) and host injection bypassing the engine. A trap firing for contract data indicates a proof-engine gap — a defect to fix, not an accommodated path.
+**Out-of-contract data.** The guarantee covers values that entered through the contract — construction, events, edits. Two kinds of data do not: restored state, which is trusted and not re-validated (spec §0.7), and values a host injects by some route that bypasses the engine. Nothing stands behind those cases at evaluation time. The evaluator does not re-test what the compiler proved, so an out-of-contract value is not caught and turned into a graceful refusal — it is simply outside the envelope, and nothing inside the engine notices. What makes it safe for the evaluator to compute rather than check is the proof certificate, verified once when the definition is loaded.
 
 ### 1.2 Prove-or-reject: how the chain and runtime cooperate
 
@@ -162,13 +166,13 @@ Section 1.1 named fault prevention and governance as two mechanisms. This sectio
 
 3. **Both non-proven verdicts reject the definition.** This is *prove-or-reject*: there is **no deferral**. The compiler never accepts a definition and leaves a fault-prone site to a runtime check it did not prove safe. `Unresolved` rejects not because the write "might be broken," but because the definition left a reachable case with *no authored disposition* — and prevention does not admit that.
 
-4. **The composition seam.** For an *externally-sourced* operand — an event argument, a construction input, an edited field — the compile-time proof rests on the operand's *declared* constraint. Runtime ingress governance (`TypeRuntime` / `TypeRuntimeMeta`) is what makes that constraint *true* of the actual value, enforcing it operation-blind on a working copy discarded on failure. The runtime check discharges a declared precondition — it is **not** a fallback for a proof the compiler skipped. The compiler proved "carries its constraint"; ingress makes the constraint hold. This is the seam: two mechanisms, one guarantee.
+4. **The composition seam.** For an *externally-sourced* operand — an event argument, a construction input, an edited field — the compile-time proof rests on the operand's *declared* constraint. Runtime ingress governance (`TypeRuntime` / `TypeRuntimeMeta`) is what makes that constraint *true* of the actual value, enforcing it operation-blind and refusing the value at the boundary rather than after the fact. The runtime check discharges a declared precondition — it is **not** a fallback for a proof the compiler skipped. The compiler proved "carries its constraint"; ingress makes the constraint hold. This is the seam: two mechanisms, one guarantee.
 
-5. **Traps are defense-in-depth, for out-of-contract entry only.** The `[StaticallyPreventable]` evaluator faults exist for data that never passed through the contract (version-mismatched restore, host injection). For contract data they are unreachable; a trap firing on contract data is a proof-engine defect, not an accommodated path.
+5. **There is nothing standing behind the proof.** The evaluator carries no fault-prevention check: it does not re-test a divisor, re-check a bound, or guard an overflow. It computes. What justifies that is the proof certificate, verified once when the runtime loads the definition — the runtime refuses to govern under a definition whose certificate does not verify. Data that never passed through the contract (a restore under a changed definition, a host injection) is outside the guarantee, and nothing inside the engine notices when a host steps outside it.
 
 6. **Therefore** a definition that compiles has no unproven faults, no unreachable or dead-end states (the latter established upstream by the graph analyzer, §7, not by this fault walk), and cannot commit an invalid configuration. The compile-time proof and the runtime governance are the two ends of one chain — the chain is what makes the guarantee absolute rather than best-effort.
 
-**Why prove-or-reject, and not a fault-floor.** §1 already drew the *categorical* line — a floor's coverage is an enumerated list, open above itself and failing open; prove-or-reject's is a structural sweep that fails closed and is closed under language extension. That is what the posture *is*; the three reasons below are why the inversion is worth its cost — why we accept up-front rejection to get it. The alternative posture — accept the definition and rely on a runtime fault-floor to refuse the bad value — was considered and rejected. Three reasons, briefly: (a) compile-time prevention with a re-checkable certificate is part of Precept's *unique value proposition* — a fault-floor-only posture relocates the headline differentiator to runtime and weakens it; (b) prove-or-reject *pushes authors to build better precepts* — the fix for over-rejection is a stronger prover plus a legible author-stated rule, not a softer guarantee; (c) a *computed* value has **no external ingress to govern** — there is no door at which a runtime check could sit, so refusing a computed value at runtime is a fault in a governed refusal's costume, not governance. The full four-leg rationale — and the load-bearing condition that this posture is honest only as the ratified package over the strengthened engine — lives in [`docs/compiler/soundness-and-coverage.md`](compiler/soundness-and-coverage.md) §1; the precise, measurable boundary of what is and isn't a proof obligation lives in that doc's §3. This section states the guarantee; those sections state its rationale and its measurable edge.
+**Why prove-or-reject, and not a fault-floor.** §1 already drew the *categorical* line — a floor's coverage is an enumerated list, open above itself and failing open; prove-or-reject's is a structural sweep that fails closed and is closed under language extension. That is what the posture *is*; the three reasons below are why the inversion is worth its cost — why we accept up-front rejection to get it. The alternative posture — accept the definition and rely on a runtime fault-floor to refuse the bad value — was considered and rejected. Three reasons, briefly: (a) compile-time prevention with a re-checkable certificate is part of Precept's *unique value proposition* — a fault-floor-only posture relocates the headline differentiator to runtime and weakens it; (b) prove-or-reject *pushes authors to build better precepts* — the fix for over-rejection is a stronger prover plus a legible author-stated rule, not a softer guarantee; (c) a *computed* value has **no external ingress to govern** — there is no door at which a runtime check could sit, so refusing a computed value at runtime is a fault in a governed refusal's costume, not governance. The full four-leg rationale — and the condition without which this posture is not honest, that it holds only as the ratified package over the strengthened engine — lives in [`docs/compiler/soundness-and-coverage.md`](compiler/soundness-and-coverage.md) §1; the precise, measurable boundary of what is and isn't a proof obligation lives in that doc's §3. This section states the guarantee; those sections state its rationale and its measurable edge.
 
 ## 2. Architectural approach
 
@@ -367,7 +371,6 @@ The artifact inventory — what each stage produces and how artifacts are classi
 - **`ConstraintDescriptor`** — expression text, source lines, scope targets, guard metadata, `ConstraintKind` anchor.
 - **`ConstraintInfluenceMap`** — constraint → contributing fields with expression-text excerpts. Enables "which field change would fix this?" without reverse-engineering.
 - **Structured violation shapes** — `ConstraintViolation` carries failing constraint descriptor, evaluated field values, guard context, and failing sub-expression.
-- **Fault-site backstops** — `FaultSite` descriptors linked to `FaultCode` and the compiler-owned prevention `DiagnosticCode`.
 
 The complete severance contract — what crosses into the executable model and what does not — is defined in §10.
 
@@ -595,7 +598,7 @@ The full `StateGraph` inventory (topology shape — adjacency, predecessor/succe
 
 ## 8. Proof Engine
 
-The proof engine is the last analysis stage before the Precept Builder — and the compile-time half of the structural guarantee. It discharges statically preventable runtime hazards: if it can prove an operation is safe at compile time, no runtime check is needed; if it cannot, the compiler emits a diagnostic and the author must fix the source before an executable model is produced. Its key design choice: proof is bounded — four strategies only, no general SMT solver — and proof stops at analysis. The runtime receives only built fault-site residue for defense-in-depth, not the proof ledger itself.
+The proof engine is the last analysis stage before the Precept Builder — and the compile-time half of the structural guarantee. It discharges statically preventable runtime hazards: if it can prove an operation is safe at compile time, no runtime check is needed; if it cannot, the compiler emits a diagnostic and the author must fix the source before an executable model is produced. Its key design choice: proof is bounded — a closed, non-extensible set of strategies, each a simple predicate, and no general SMT solver — and proof stops at analysis. What crosses into the runtime is the proof certificate, which the runtime verifies once when it loads the definition; the proof ledger itself does not cross, and the runtime plants no checks of its own at the sites the proof cleared. (The strategy set is enumerated in [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md); this document does not restate the count, because the counts stated across the design documents disagree with each other and reconciling them is that document's job.)
 
 ```mermaid
 flowchart LR
@@ -626,25 +629,22 @@ flowchart LR
 | **Output** | `ProofLedger` — obligations and evidence, dispositions and preventable-fault links, diagnostics with semantic site attribution. |
 |---|---|
 | **Catalog role** | Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage is catalog-owned. |
-| **Consumers** | `Compilation`, LS/MCP proof reporting, Precept Builder fault backstops |
+| **Consumers** | `Compilation`, LS/MCP proof reporting |
 
-The full `ProofLedger` inventory (per-obligation disposition shape, strategy set with bounded four-strategy rationale, initial-state satisfiability, constraint influence, coverage map) lives in [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md). The doc also covers the catalog-driven obligation generation contract, the two-pass design, and the proof-coverage boundary that gates v1. The precise, measurable prove/don't-prove matrix — every `FaultCode` × obligation-creation site × disposition, plus the admissibility disqualifier and the bucket test for new failing cases — lives in [`docs/compiler/soundness-and-coverage.md`](./compiler/soundness-and-coverage.md) §3.
+The full `ProofLedger` inventory (per-obligation disposition shape, the bounded strategy set and its rationale, initial-state satisfiability, constraint influence, coverage map) lives in [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md). The doc also covers the catalog-driven obligation generation contract, the two-pass design, and the proof-coverage boundary that gates v1. The precise, measurable prove/don't-prove matrix — every `FaultCode` × obligation-creation site × disposition, plus the admissibility disqualifier and the bucket test for new failing cases — lives in [`docs/compiler/soundness-and-coverage.md`](./compiler/soundness-and-coverage.md) §3.
 
 ### Proof/fault chain
 
-The end-to-end prevention/backstop chain:
+The end-to-end prevention chain:
 
 ```
-catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode → FaultCode → FaultSiteDescriptor
+catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode ↔ FaultCode
 ```
 
 - **Catalog metadata → `ProofRequirement`** — catalog entries declare what must be provable at each call site.
 - **`ProofRequirement` → `ProofObligation`** — the proof engine instantiates the requirement against a specific semantic site.
-- **`ProofObligation` → `DiagnosticCode`** — an unresolved obligation becomes an authoring-time diagnostic.
-- **`DiagnosticCode` → `FaultCode`** — each diagnostic has a prevention counterpart: the fault that would occur if this site somehow reached runtime.
-- **`FaultCode` → `FaultSiteDescriptor`** — if the site survives to runtime (defense-in-depth only), the Precept Builder plants a backstop.
-
-`FaultSiteDescriptor` is the runtime face of an impossible path that a correct program never reaches.
+- **`ProofObligation` → `DiagnosticCode`** — an unresolved obligation becomes an authoring-time diagnostic, and the definition is rejected.
+- **`DiagnosticCode` ↔ `FaultCode`** — each prevention diagnostic names the fault it exists to prevent. This pairing is a build-time integrity check over the catalogs, not a runtime path: nothing is planted at the site, and the evaluator has nothing to fall back on. The chain ends at the compiler.
 
 > **Precept Innovations**
 > - **Catalog-declared proof obligations.** Proof obligations originate in catalog metadata (`BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`) — not in hardcoded obligation lists in the proof engine. The proof engine is a generic obligation-discharger, not a domain-knowledge owner. Adding a new operation to the catalog automatically adds its proof obligations to the discharge queue.
@@ -652,7 +652,7 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 > - **Compile-time satisfiability checking.** The proof engine guarantees that initial-state configurations are satisfiable at compile time. Without this, an author can write contradictory defaults and constraints (e.g., `default 0` with `ensure X > 5`) and not discover the contradiction until a `Create` call fails at runtime. It is the proof engine's signature contribution.
 > - **`ConstraintInfluenceMap`.** The Precept Builder can produce a precomputed map from constraints to contributing fields (with expression-text excerpts). This makes AI inspection structurally superior — an agent can answer "which field change would satisfy this constraint?" without reverse-engineering expressions. This is a structural differentiator for the MCP surface.
 > - **Structured "why not" explanations.** Constraint violations carry structured explanation depth — the failing expression, evaluated field values, guard context, and failing sub-expression — not just a boolean status. This transforms MCP tools from status reporters to causal reasoning engines.
-> - **Bounded, non-extensible strategy set.** Four strategies only, each a simple predicate function — not a general solver framework. This makes the proof engine predictable, auditable, and implementable without external dependencies.
+> - **Bounded, non-extensible strategy set.** A closed set of strategies, each a simple predicate function — not a general solver framework. This makes the proof engine predictable, auditable, and implementable without external dependencies.
 
 See [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md) for the full stage design including strategy details and the proof/fault chain.
 
@@ -698,12 +698,12 @@ flowchart LR
 | `StateGraph` | GraphAnalyzer | compile-time |
 | `ProofLedger` | ProofEngine | compile-time |
 | `Compilation` | Compiler | compile-time aggregate |
-| Descriptor tables, slot layout, dispatch indexes, constraint-plan indexes, fault-site backstops | `Precept Builder` (`Precept.From`) | runtime |
+| Descriptor tables, slot layout, dispatch indexes, constraint-plan indexes | `Precept Builder` (`Precept.From`) | runtime |
 | `Precept` | `Precept Builder` (`Precept.From`) | runtime executable model |
 | `Version` | runtime operations | runtime entity snapshot |
 | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` | Evaluator | runtime results |
 | `ConstraintResult`, `ConstraintViolation` | Evaluator | runtime results |
-| `Fault` | Evaluator | runtime backstop (impossible-path only) |
+| `Fault` | Evaluator | engine-invariant breach only |
 
 ### Incremental compilation model
 
@@ -715,7 +715,7 @@ flowchart LR
 
 ### Definition versioning
 
-When a `.precept` file changes (field added, state renamed, constraint tightened), persisted `Version` instances compiled against the old definition carry values the new definition would not accept. `Restore` itself does not reject them — it is trusted hydration and does not re-validate (spec §0.7) — but the next operation's post-mutation sweep will, so a stale entity can become unusable rather than un-loadable. **This is a known gap — definition migration is out of scope for v1.** The contract digest hash provides change detection; a structural diff API provides change enumeration; but automated migration is deferred. Host applications that need to handle definition evolution must manage the migration externally. The gap is acknowledged so downstream design does not assume migration exists.
+When a `.precept` file changes (field added, state renamed, constraint tightened), persisted `Version` instances compiled against the old definition carry values the new definition would not accept. `Restore` itself does not reject them — it is trusted hydration and does not re-validate (spec §0.7) — and no later operation re-governs them either, because there is no pass over the finished configuration that would. A stale value therefore persists, silently, until something writes over it. That is the honest consequence of trusted hydration: the compiler's proofs lean on "every rule already held before this operation," which is proven for data that arrived through the contract and *assumed* for data restored under a definition that has since changed. **This is a known gap — definition migration is out of scope for v1.** The contract digest hash provides change detection; a structural diff API provides change enumeration; but automated migration is deferred. Host applications that need to handle definition evolution must manage the migration externally. The gap is acknowledged so downstream design does not assume migration exists.
 
 > **Precept Innovations**
 > - **Contract digest hash.** A deterministic semantic hash enables definition-change detection without source diffing. Without it, host applications would need to compare source text (fragile — comments and whitespace cause false positives) or track file modification times (wrong — doesn't detect semantic equivalence). It grounds deployment safety and the future migration story.
@@ -740,9 +740,9 @@ flowchart LR
     LOW --> OUT
 ```
 
-| **Output** | `Precept` — sealed executable model: descriptor tables and slot layout, dispatch indexes, prebuilt execution plans, constraint-plan indexes, reachability/topology indexes, inspection metadata, fault-site backstops |
+| **Output** | `Precept` — sealed executable model: descriptor tables and slot layout, dispatch indexes, prebuilt execution plans, constraint-plan indexes, reachability/topology indexes, inspection metadata |
 |---|---|
-| **Catalog role** | Catalog metadata reaches runtime only in built semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue. The Precept Builder reads catalog metadata transitively through already-resolved model identities — it does not perform fresh catalog lookups for classification. |
+| **Catalog role** | Catalog metadata reaches runtime only in built semantic form: descriptor identity, resolved operation/function/action identity, and constraint descriptors. The Precept Builder reads catalog metadata transitively through already-resolved model identities — it does not perform fresh catalog lookups for classification. |
 | **Consumers** | `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications |
 
 The full `Precept` executable model — descriptor tables, dispatch indexes, execution plans, flat opcode model, constraint activation indexes, six-pass transformation pipeline, and the "Restructuring, not renaming" design principle — lives in [`docs/runtime/precept-builder.md`](../runtime/precept-builder.md). The cross-stage Executable-model contract table below is retained here as the single-page view of runtime-concern → executable-structure → consumer.
@@ -760,11 +760,10 @@ The full `Precept` executable model — descriptor tables, dispatch indexes, exe
 | access | per-state field access-mode index and query surface | update and inspect update |
 | constraints | explicit executable plan indexes for `always`, `in`, `to`, `from`, and `on` anchors | create, restore, fire, update, inspect |
 | inspection | row/source/result-shaping metadata for `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, `FieldSnapshot` | inspection surfaces |
-| fault backstops | `FaultSite`/fault-site descriptors linked to `FaultCode` and prevention `DiagnosticCode` | impossible-path defense only |
 
 ### `Version` serialization contract
 
-Host applications must persist and hand back to `Restore` the following: the current state name (or stateless marker), and field values keyed by field name. The serialization shape is `(string StateName, IDictionary<string, object?> FieldValues)` — or equivalently, `(StateDescriptor?, SlotArray)` at the descriptor level. Hosts own the serialization format (JSON, binary, database columns); Precept owns the contract for what data is required. `Restore` does not re-validate the supplied data against the current definition's constraints — restored state is trusted as valid at the time it was persisted, and is re-governed by the next operation's post-mutation sweep (spec §0.7, owner decision 2026-06-02).
+Host applications must persist and hand back to `Restore` the following: the current state name (or stateless marker), and field values keyed by field name. The serialization shape is `(string StateName, IDictionary<string, object?> FieldValues)` — or equivalently, `(StateDescriptor?, SlotArray)` at the descriptor level. Hosts own the serialization format (JSON, binary, database columns); Precept owns the contract for what data is required. `Restore` does not re-validate the supplied data against the current definition's constraints — restored state is trusted as valid at the time it was persisted, and no later operation re-governs it (spec §0.7).
 
 > **Precept Innovations**
 > - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. Without this, the evaluator would need to walk expression trees at runtime and re-resolve operation kinds and field names on every operation. Flat plans make evaluation predictable-time and the execution trace trivially inspectable.
@@ -813,42 +812,40 @@ flowchart TD
 
     FIRE(["Fire · InspectFire"]):::input
     UPD(["Update · InspectUpdate"]):::input
-    FAULT(["Fault backstops"]):::input
 
     EVAL --> FIRE
     EVAL --> UPD
-    EVAL --> FAULT
 ```
 
 ### Evaluator
 
-| **Input** | `Precept`, `Version`, descriptor-keyed arguments or patches, prebuilt execution plans, constraint-plan indexes, fault-site backstops |
+| **Input** | `Precept`, `Version`, descriptor-keyed arguments or patches, prebuilt execution plans, constraint-plan indexes |
 |---|---|
-| **Output** | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` (commit); `EventInspection`, `UpdateInspection`, `RowInspection` (inspect); `Fault` (impossible-path only) |
+| **Output** | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` (commit); `EventInspection`, `UpdateInspection`, `RowInspection` (inspect); `Fault` (engine-invariant breach only) |
 
-Valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections. `Fault` is reserved for defense-in-depth classification of impossible-path engine invariant breaches.
+Valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections. `Fault` is reserved for classifying a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. It is not a fault-prevention check standing behind the proof; the evaluator carries none.
 
-### Constraint evaluation matrix
+### Per-operation validation and dispatch matrix
 
-Every operation evaluates constraints through the same prebuilt plan indexes. Access-mode checks and row dispatch are independent of constraint evaluation.
+Ingress validation, access-mode checks and row dispatch are the three things an operation does before it executes. No operation re-checks the finished configuration afterwards.
 
-| Operation | Access-mode checks | Row dispatch | Constraint plans evaluated |
+| Operation | Ingress validation of supplied values | Access-mode checks | Row dispatch |
 |---|---|---|---|
-| `Fire` | no | yes | `always`, `from <current>`, `on <event>`, `to <target>` |
-| `InspectFire` | no | yes | same as `Fire` |
-| `Update` | yes | no | `always`, `in <current>` |
-| `InspectUpdate` | yes | no | same as `Update`, plus event-prospect evaluation over hypothetical state |
-| `Create` with initial event | no | yes (initial event) | `always`, plus initial-event fire-path plans |
-| `Create` without initial event | no | no | `always`, `in <initial>` |
-| `Restore` | no | no | `always`, `in <current>` |
+| `Fire` | event arguments | no | yes |
+| `InspectFire` | event arguments | no | yes |
+| `Update` | the field values in the patch | yes | no |
+| `InspectUpdate` | the field values in the patch | yes | no |
+| `Create` with initial event | construction inputs and initial-event arguments | no | yes (initial event) |
+| `Create` without initial event | construction inputs | no | no |
+| `Restore` | none — trusted hydration | no | no |
 
-Two rules: (1) `Restore` bypasses access-mode checks, row dispatch, **and** constraint evaluation — trusted hydration (spec §0.7, owner decision 2026-06-02); it does recompute computed fields. (2) `to` ensures are transitional — they do not participate in `in`-anchor evaluation.
+Two rules: (1) `Restore` bypasses ingress validation, access-mode checks and row dispatch alike — persisted data was governed when it was written, so hydration reconstitutes it rather than re-checking it (spec §0.7); it does recompute computed fields. (2) `to` ensures are transitional — they scope to entering a state, not to residing in it.
 
 Inspection and commit paths execute the same prebuilt plans. Disposition alone differs — report vs. enforce.
 
-The four operations (Create, Restore, Fire, Update) and their per-operation input/output contracts, including the "Update exists because Precept owns the data layer" positioning and the "Restore recomputes before validating" discipline, live in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md). Two cross-operation discriminators that this monolith uniquely captures:
+The four operations (Create, Restore, Fire, Update) and their per-operation input/output contracts, including the "Update exists because Precept owns the data layer" positioning and trusted hydration on `Restore`, live in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md). Two cross-operation discriminators that this monolith uniquely captures:
 
-- **Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` / `EventConstraintsFailed` (rows matched but guard or constraint prevented the transition).** Most state machine runtimes cannot make this distinction at the type level — leaving callers to infer why an event produced no transition.
+- **Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` (a row matched and its disposition was `reject`).** Most state machine runtimes cannot make this distinction at the type level — leaving callers to infer why an event produced no transition.
 - **`Update` exists because Precept is not a state machine runtime** — it is a domain integrity engine that owns the data layer alongside the lifecycle layer. A pure event/transition mechanism would leave direct field edits ungoverned; `Update` closes that gap without routing every data change through an event.
 
 ### Structured outcomes
@@ -858,12 +855,14 @@ The structural guarantee means that a valid executable model communicates entire
 **Diagnostics** — produced by the compiler pipeline. Authoring-time findings against source. Error diagnostics block `Precept` construction.
 
 **Runtime outcomes** — produced by runtime operations. Expected success, domain rejection, or boundary-validation results. These are normal, in-domain behavior:
-- Business outcomes: `Rejected`, `EventConstraintsFailed`, `UpdateConstraintsFailed`, `RestoreConstraintsFailed`
+- Business outcomes: `Rejected` — a matched row whose disposition is `reject`
 - Routing/availability: `Unmatched`, current provisional `UndefinedEvent`
 - Boundary validation: `InvalidArgs`, `InvalidInput`, `RestoreInvalidInput`
 - Access enforcement: `AccessDenied`
 
-**Faults** — produced only by the evaluator backstop. Impossible-path engine invariant breaches. Every `FaultCode` has a compiler-owned diagnostic counterpart (the prevention rule that should have blocked the site). But many diagnostics have no fault counterpart, and many runtime outcomes are intentionally modeled as normal results, not faults.
+There is no `*ConstraintsFailed` outcome in any of these families, and there cannot be one: a definition only compiles if every handler was proven to preserve every rule, so no operation can reach the point of committing a configuration that breaks one. An outcome for that case would name something the compiler already made impossible.
+
+**Faults** — produced only when the engine breaks one of its own invariants. Every `FaultCode` has a compiler-owned diagnostic counterpart (the prevention rule that should have blocked the site). But many diagnostics have no fault counterpart, and many runtime outcomes are intentionally modeled as normal results, not faults.
 
 | Category | Compile-time surface | Runtime surface |
 |---|---|---|
@@ -872,17 +871,17 @@ The structural guarantee means that a valid executable model communicates entire
 | Business prohibition or rule failure | may have no compile-time issue | structured domain outcome |
 | Routing/availability result | may have no compile-time issue | structured boundary outcome |
 | Caller input/data mismatch | descriptor/type contracts exist | structured boundary-validation outcome |
-| Impossible-path invariant breach | compiler-owned prevention rule | `Fault` (defense-in-depth; should be unreachable) |
+| Engine-invariant breach | compiler-owned prevention rule | `Fault` (an engine defect; should be unreachable) |
 
 ### Commit outcomes by operation
 
 | Operation | Success | Domain outcome | Boundary-validation | Invariant breach |
 |---|---|---|---|---|
-| `Create` / `Fire` | `Applied`, `Transitioned` | `Rejected`, `EventConstraintsFailed`, `Unmatched` | `InvalidArgs`, provisional `UndefinedEvent` | `Fault` |
-| `Update` | `FieldWriteCommitted` | `UpdateConstraintsFailed`, `AccessDenied` | `InvalidInput` | `Fault` |
-| `Restore` | `Restored` | `RestoreConstraintsFailed` | `RestoreInvalidInput` | `Fault` |
+| `Create` / `Fire` | `Applied`, `Transitioned` | `Rejected`, `Unmatched` | `InvalidArgs`, provisional `UndefinedEvent` | `Fault` |
+| `Update` | `FieldWriteCommitted` | `AccessDenied` | `InvalidInput` | `Fault` |
+| `Restore` | `Restored` | — | `RestoreInvalidInput` | `Fault` |
 
-**Inspection** shares the same prebuilt plans as commit — it is not a second evaluator. `InspectFire` / `InspectUpdate` preview every possible transition (or field-edit outcome) with full constraint evaluation, using the same plans in report mode rather than enforce mode. The full shape of `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, and `FieldSnapshot` lives in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md).
+**Inspection** shares the same prebuilt plans as commit — it is not a second evaluator. `InspectFire` / `InspectUpdate` preview every possible transition (or field-edit outcome) — which rows match, which guards hold, and whether the supplied values pass ingress — using the same plans in report mode rather than enforce mode. What inspection does *not* do is predict a post-mutation constraint verdict, because no such check runs; a rule that a proof already discharged has nothing to report at runtime beyond the premises it was proven from. The full shape of `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, and `FieldSnapshot` lives in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md).
 
 ### Constraint query contract
 
@@ -896,15 +895,15 @@ Three tiers, additive in specificity:
 
 ### Structured "why not" violation explanations
 
-When `Fire` returns `Rejected` or `EventConstraintsFailed`, or `Update` returns `UpdateConstraintsFailed`, the outcome carries `ConstraintViolation` objects with **structured explanation depth**: the failing constraint descriptor, the expression text, the evaluated field values at the point of failure (`{ field: value }` pairs), the guard context that scoped the constraint (if guarded), and the specific sub-expression that failed. This is not a formatting concern — it is cheap to compute during evaluation and transforms MCP and inspection from "it failed" to "it failed because X was 3 and the constraint requires X > 5."
+When `Fire` returns `Rejected` or `InvalidArgs`, or `Update` returns `InvalidInput`, the outcome carries `ConstraintViolation` objects with **structured explanation depth**: the failing constraint descriptor, the expression text, the evaluated field values at the point of failure (`{ field: value }` pairs), the guard context that scoped the constraint (if guarded), and the specific sub-expression that failed. This is not a formatting concern — it is cheap to compute during evaluation and transforms MCP and inspection from "it failed" to "it failed because X was 3 and the constraint requires X > 5."
 
 The multi-span attribution pattern from the Rust borrow checker provides relevant precedent for this design: a single borrow-checker diagnostic carries multiple labeled source spans (primary span for the conflict, secondary spans for the causal chain — "first mutable borrow occurs here," "second mutable borrow occurs here," "first borrow later used here"). Precept's `ConstraintViolation` follows the same structural principle — the failing expression, the contributing field values, and the guard context form a labeled causal chain, not a single error site. Infer (Meta) takes a similar approach with `bug_trace` — an ordered array of inter-procedural trace steps, each attributed to a source location with a description of what the analysis observed.
 
 > **Precept Innovations**
-> - **Structured outcomes taxonomy.** Every runtime operation communicates through a structured outcome — success, domain rejection, boundary validation, or impossible-path fault. There are no exceptions, no error codes, no untyped failures. An AI agent or host application can pattern-match on outcome type and always know what happened and why.
-> - **Inspection API.** `InspectFire` and `InspectUpdate` preview every possible action and its outcome without executing anything — using the same prebuilt plans as commit. No other state machine library or rules engine provides read-only preview of transitions with full constraint evaluation before committing.
+> - **Structured outcomes taxonomy.** Every runtime operation communicates through a structured outcome — success, domain rejection, boundary validation, or engine-invariant fault. There are no exceptions, no error codes, no untyped failures. An AI agent or host application can pattern-match on outcome type and always know what happened and why.
+> - **Inspection API.** `InspectFire` and `InspectUpdate` preview every possible action and its outcome without executing anything — using the same prebuilt plans as commit. No other state machine library or rules engine provides read-only preview of every row's guard outcome and ingress result before committing.
 > - **Causal violation explanations.** Constraint violations carry structured explanation depth — evaluated field values, guard context, failing sub-expression — not just a boolean. This makes MCP tools causal reasoning engines, not status reporters.
-> - **Restore with recomputation-first constraint evaluation.** Persisted data is never trusted — Restore recomputes computed fields before evaluating constraints, catching stale computed values that would otherwise pass through silently.
+> - **Trusted hydration on `Restore`.** Persisted data is not re-checked on the way back in — it was governed when it was written, so hydration reconstitutes the entity rather than making a second pass over the whole configuration, exactly as a direct database read trusts the rows it loads. `Restore` does recompute computed fields, so a derived value is re-derived from the restored inputs rather than read back as stored.
 
 ## 12. Type and immutability strategy
 
@@ -974,7 +973,7 @@ The `ConstraintInfluenceMap` (§8 innovation) would make MCP tools causal reason
 
 > **Precept Innovations**
 > - **MCP vocabulary from catalogs.** The catalog-reference tools' vocabulary is generated from the same catalogs that drive grammar and completions. A developer (human or AI) who knows the MCP vocabulary already knows the language surface — no redundancy, no drift.
-> - **Inspection as a first-class MCP operation (planned).** `precept_inspect` will provide read-only preview of every possible transition from any state — with full constraint evaluation, per-row prospects, and structured outcomes. Without inspection, AI agents would need to speculatively fire events and observe outcomes to determine what the lifecycle allows, rather than querying the full action landscape before committing.
+> - **Inspection as a first-class MCP operation (planned).** `precept_inspect` will provide read-only preview of every possible transition from any state — guard outcomes, per-row prospects, and structured outcomes. Without inspection, AI agents would need to speculatively fire events and observe outcomes to determine what the lifecycle allows, rather than querying the full action landscape before committing.
 > - **Causal reasoning in tool output.** Structured "why not" explanations in fire/update results (planned) transform MCP from status reporting to causal reasoning — an AI agent can explain failures without access to source code.
 > - **AI-first, not AI-adapted.** The MCP surface was designed alongside the core API, not retrofitted. Structured outcomes, deterministic shapes, and complete vocabulary exposure are architectural requirements, not afterthoughts.
 
