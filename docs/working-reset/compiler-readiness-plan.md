@@ -39,7 +39,7 @@ step 1 assumes all three already exist.
 |---|---|---|---|---|
 | 0 | Make the instructions true | **Done** 2026-07-25, `355d9b37` `89392acd` | 1 | — |
 | 1 | Work out what is actually decided, and by whom | **Done** 2026-07-26, `f813e709` `a240a788` `183c2569` `714c7e8d` `7e224b9a` (slice 1.6 disposal deferred to phase 8 and does not block) | 1 | — |
-| 2 | Settle every place canon and the want document disagree | **In progress** 2026-07-27 — register built (123 rows, 79 new); specification, runtime, evaluator and architecture documents corrected; philosophy staged for **Shane** | 1 | Phase 1 |
+| 2 | Settle every place canon and the want document disagree | **In progress** 2026-07-27 — 133 rows, ~101 executed. Conditions 1, 2, 5 pass; 3 and 4 failed the independent recheck and the gaps it named are closed, so both need re-running. Open: the fault-backstop family (19 rows, five files), and **Shane's** four philosophy rows | 1 | Phase 1 |
 | 3 | Corrected statement of the language, and the catalog drift check | Not started | 0 | Phase 2 |
 | 4 | Draft the certificate step list and count it | Not started | 0 | Phase 3; ends on **Shane's** recorded word |
 | 5 | Settle the obligation families and the discharge procedure | Not started | 0 | Phases 3, 4 |
