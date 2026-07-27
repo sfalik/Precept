@@ -404,12 +404,28 @@ No design is proposed. What the findings bear on:
    It does not manufacture the bound from arithmetic, and the step from `|A| ≥ a ∧ |B| ≥ b` to a non-zero
    stored product needs a comparison against the format's smallest magnitude that no surveyed system
    performs.
-4. **New language surface implication — flagging and stopping, per the brief.** Precept has no way today
-   to state a lower bound on magnitude. `nonzero` is a disequality; `min`/`max` are bounds on value, not on
-   absolute value, and a two-sided bound like `min -100 max 100` says nothing about distance from zero.
-   Expressing what a composed divisor proof would need — the equivalent of `|x| ≥ k` — would be a new
-   modifier or constraint form. That is language surface, and per CLAUDE.md's pre-design gate it is a
-   conversation with the owner, not something this research should shape further.
+4. **~~New language surface implication.~~ Withdrawn 2026-07-26 — this was wrong, and the correction
+   changes where the work goes.** The claim was that Precept "has no way today to state a lower bound on
+   magnitude", so expressing `|x| ≥ k` would need a new modifier and would therefore be language surface
+   requiring an owner conversation. **`abs()` already exists** — `precept-language-spec.md:1571` and
+   `primitive-types.md:611` both declare it over the primitive numeric lane, type-preserving. So an author
+   can already write `when abs(Divisor) >= 0.01`, and it parses and type-checks.
+
+   What is actually missing is narrower. Checked at HEAD 2026-07-26: a handler guarded
+   `when abs(Product) >= 0.01` dividing by `Product` is **refused** — the divisor obligation comes back
+   `Unresolved` and the file fails with `PRE0083`, while the same handler guarded `when Product != 0` or
+   `when Product > 0` discharges by `GuardInPath`. So the guard is expressible and the proof engine does
+   not read it: `abs(...)` in a guard establishes nothing about its argument.
+
+   **That makes this build work against an existing language, not new surface**, and it does not need the
+   pre-design conversation. It is still a statement about what the compiler does rather than what it
+   should do, so what the guard *ought* to establish belongs to phase 5's discharge procedure — but the
+   author-facing form the domain literature asks for is already in the grammar.
+
+   The observation the original point rested on survives and is worth keeping: `nonzero` is a
+   disequality, and `min`/`max` bound the value rather than its distance from zero, so a two-sided bound
+   like `min -100 max 100` says nothing about how close to zero the value may be. The mistake was
+   concluding from that that the language cannot express the property at all.
 
 ## Conclusions
 
