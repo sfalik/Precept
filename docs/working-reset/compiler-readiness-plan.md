@@ -731,9 +731,34 @@ And the register as a whole: you are looking for anything resolved in a directio
 **What blocks it.** Phase 1, entirely. Resolving a contradiction before knowing which side you actually
 took is how the last two months were spent.
 
-**Size.** Two to three working days. The starting list is 25 rows; the search is expected to find between
-10 and 30 more, on no firmer basis than the shape of the correction list. Note that executing a resolution
-means editing the specification, not just recording a verdict.
+**Size — re-estimated 2026-07-27, and the original was wrong by a factor of four.** The estimate below is
+kept because a plan that quietly revises its own sizes cannot be held to them.
+
+*Original:* "Two to three working days. The starting list is 25 rows; the search is expected to find
+between 10 and 30 more, on no firmer basis than the shape of the correction list. Note that executing a
+resolution means editing the specification, not just recording a verdict."
+
+*What the search actually found:* **123 rows — 44 carried from the correction list and 79 new**, against a
+predicted 35 to 55. Run at HEAD `b93d1db1`, recorded in `phase-2/contradiction-register.md`, every cited
+site re-resolving.
+
+The prediction was made "on no firmer basis than the shape of the correction list", and that is exactly
+where it failed: the correction list covered the documents somebody had already looked at. The largest
+single miss is `docs/compiler-and-runtime-design.md`, which no earlier pass had swept at all and which
+carries seventeen backstop sites on its own. Two further findings are not sweep rows at all but direct
+collisions with what the want document means by proving: `proof-engine.md:2687` is a section headed "No
+Inductive Proof", and `graph-analyzer.md:790` grounds guard satisfiability on "the proof engine's SMT
+integration" while the specification excludes SMT proof artifacts by name.
+
+*Revised size:* the specification's fifteen rows took one pass. On that rate the remaining rows are **five
+to eight working days**, not two to three, and the phase is unlikely to close in one sitting. Executing a
+resolution means editing a canonical document, not recording a verdict.
+
+**What this says about the other phases' sizes.** Every size in this plan was estimated the same way, from
+the shape of what somebody had already found. Phase 2 is the first to be measured against reality and it
+came in four times over. That is one data point and it is not a reason to inflate the rest — but the next
+phase whose search finds far more than predicted should be treated as the second point on a line, not as a
+surprise.
 
 **Going wrong, as distinct from slow.** Slow is a long register. Going wrong is the search procedure
 finding a materially different set each time it runs — that means it is not written tightly enough to be a
