@@ -1,0 +1,504 @@
+# The phase-2 contradiction register
+
+**One row per place the canonical documents on this branch and the want document say different
+things.** Each row carries the canonical text with file and line, the want document's line, the
+resolution, the reason, a grep pattern that returns zero hits once the row is executed, and an empty
+column for the commit that executes it. **A different slice does the executing — nothing here has
+been applied.**
+
+| Field | Value |
+|---|---|
+| Built | 2026-07-27 |
+| At | HEAD `b93d1db1`, branch `spike/Precept-V2-Radical-reset` |
+| Procedure | [`search-procedure.md`](search-procedure.md) — written before the search was run |
+| Want document | `docs/Working/what-i-want-2026-07-16.md`, bylined "Author: Shane". Cited as `want:N`. |
+| Inputs folded in | [`sweep-correction-list.md`](sweep-correction-list.md) (25 verified rows + 1 clarity row + 20 unverified leads), [`canon-contradictions-found-2026-07-14.md`](canon-contradictions-found-2026-07-14.md) (11 items), `phase-1/decision-register.json` § `walkUnresolved` (2 items) |
+| Row count | **123** distinct rows |
+| Of which carried from `sweep-correction-list.md` | 44 — the 25 verified rows, the clarity row `SC-1`, and 18 rows covering its 19 unverified leads (`C5-sib` is folded into `C5`), all re-verified at this HEAD |
+| New, found by this phase's own search | 79 |
+| Never executed | all 123 |
+
+**Line numbers hold at HEAD.** `git diff --stat 3f69b316..HEAD` over the canonical set returns empty,
+so every line number the correction list re-verified at `3f69b316` still resolves at `b93d1db1`. The
+drift the correction list records (six moved sites, four reworded) is drift from `ed57d7fd` to
+`3f69b316` and has already been absorbed into the numbers below. All 137 cited sites were re-resolved
+against HEAD when this file was written; zero were missing or out of range.
+
+> **Uncommitted work in the tree, 2026-07-27.** `git status` at the time this register was written
+> shows **`docs/runtime/runtime-api.md` modified but not committed**, by work outside this slice.
+> Reading the diff, it is already executing part of this register: the `ConstraintsFailed` case is
+> removed from the `Create` outcome table and the caller example (**R1**, **N4**, **N5**), and a new
+> "Definition Load and the Certificate Gate" section is added (**N68**). Two consequences a
+> re-runner must know: line numbers for `runtime-api.md` below `:148` are correct against HEAD and
+> **stale against the working tree**, and those four rows may already be executed by the time this
+> register is read. Re-verify `runtime-api.md` rows against the tree before editing them, and record
+> the executing commit in the commit column rather than opening a second edit.
+
+## How to read a row
+
+- **ID** — `S*`, `P*`, `R*`, `C*`, `SC-1` are the 2026-07-19 canon report's own identifiers, kept so
+  the two documents can be joined. `N*` are new in this phase.
+- **Grep** — run against `docs/language docs/compiler docs/runtime docs/philosophy.md` unless the row
+  is marked **WIDE**, in which case add `README.md docs/compiler-and-runtime-design.md`. Finish-line
+  condition 3 is this pattern returning zero hits after the row is executed. It is self-refereed: it
+  catches a forgotten file, not a resolution done wrong.
+- **`OWNER APPROVAL REQUIRED`** — every `docs/philosophy.md` row. Project rule: no philosophy edit
+  without Shane's explicit approval. These rows are recorded and **never executed** until he approves
+  the wording, which goes to him as a diff.
+- **`INTRA-CANON`** — canon contradicting canon rather than contradicting the want document. A
+  different kind of disagreement, the same repair. Carried because the phase's second input is made
+  of exactly these.
+- **`ADDITION`** — the want document requires something canon does not say at all. Nothing to delete;
+  something to write. The grep pattern for an addition row is inverted: it must return **more than
+  zero** hits once executed, and the row says so.
+
+**Honest note on completeness.** Nobody can prove this list complete and this register does not claim
+to. What is claimed: the procedure is written down, it was run at `b93d1db1`, and this is what it
+found. The procedure's § 6 names four things it will miss.
+
+---
+
+# 1. The post-mutation constraint sweep
+
+**want:199** — "Once the compiler has proven every rule, the runtime does **not** re-evaluate them
+against the post-mutation configuration." **want:165** — what runs at runtime is "the declared
+premises … and nothing beyond them."
+
+This is the largest family in the register and the correction list's largest single item. The
+atomicity guarantee survives everywhere — multi-action writes stay all-or-nothing and no partial
+state is observable. What goes is *constraint evaluation as the commit condition*.
+
+## 1.1 `docs/language/precept-language-spec.md`
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| S1 | `precept-language-spec.md:1969` | "This post-mutation sweep is one of two enforcement points. … The sweep then re-checks every constraint against the completed working copy. Ingress governs *what enters*; the sweep governs *the result*." | 199 | Delete the paragraph. §3A.4 returns to being about atomic all-or-nothing write mechanics only. **Revised 2026-07-26 (walk items 7, 8, 16): what replaces it is *not* a wider ingress check.** An editable write is an ordinary write site whose obligations the compiler discharges; runtime governance is left upholding the field's own declared contract as the value enters, operation-blind, exactly as `:266` already says. | The correction list's original direction moved relational enforcement to the editable-write ingress point per want:143. That reading does not work: ingress runs at execution phase 1 "before the working copy derives any dependent value" and computed fields recalculate at phase 7, so a rule reaching the edited field through a computed field would be checked against a value the operation then discards. Re-evaluating only the rules that depend on edited fields is the sweep under another name. | `grep -rn "the sweep governs" $CANON` | |
+| S2 | `precept-language-spec.md:1967` | "Constraints are evaluated against the working copy after all mutations complete. If every constraint passes, the working copy is promoted … If any constraint fails, the working copy is discarded…" | 199 | Keep the atomicity guarantee. Remove constraint evaluation as the commit condition: commit follows premise-validated execution unconditionally. | Every handler was proven to preserve every rule at compile time, so there is no post-mutation pass/fail decision left to make. | `grep -rn "If any constraint fails, the working copy is discarded" $CANON` | |
+| S3 | `precept-language-spec.md:149` | "Mutations are atomic. All mutations execute on a working copy. Constraints are evaluated against the working copy. If all constraints pass, the working copy is promoted." | 199 | Same as S2 — correct in lockstep with §3A.4. | The same model restated in §0.3. (Correction list footnote: line 149 sits in §0.3, not §0.2 as the 2026-07-19 report said.) | `grep -rn "If all constraints pass, the working copy is promoted" $CANON` | |
+| S4 | `precept-language-spec.md:162` | "A transition row is a flat sequence: evaluate a guard, execute assignments left-to-right, check rules and ensures." | 165 | Drop "check rules and ensures" as a runtime step. The row's runtime sequence is: validate args at ingress, evaluate the guard, execute assignments, commit. | Rules and ensures are not evaluated at runtime under the want. | `grep -rn "check rules and ensures" $CANON` | |
+| S5 | `precept-language-spec.md:1354` | "A *rule condition* — and a *constraint modifier* … is checked against the complete working copy *after* all mutations, so declaration order is irrelevant and any field is in scope." | 199 | The scoping conclusion survives; its justification changes. A rule constrains the whole configuration as a proof obligation over every write site, not because a runtime check runs after mutations. | The conclusion is right for a different reason. Deleting the sentence would lose a real scoping rule. | `grep -rn "checked against the complete working copy \*after\* all mutations" $CANON` | |
+| S6 | `precept-language-spec.md:1903` | "**Validation surfaces,** which are collect-all. Rules and ensures are evaluated exhaustively — every applicable constraint is checked, and all violations are reported." | 165, 199 | The runtime's validation points are ingress (event args, editable-field writes) and guards. Collect-all survives only where validation actually runs. | Rules and ensures are not evaluated at runtime, so there is no exhaustive rule evaluation to be collect-all about. | `grep -rn "Rules and ensures are evaluated exhaustively" $CANON` | |
+| S7 | `precept-language-spec.md:1938` | "\| `ConstraintsFailed` \| Post-mutation constraint violations (collect-all semantics). \|" | 199 | Remove or re-scope the outcome. It cannot arise. | The outcome presupposes post-mutation constraint evaluation. Ripples to R1, R6, N19, N20. | `grep -rn "ConstraintsFailed" $CANON` | |
+| S9 | `precept-language-spec.md:268` | "Because mutations execute on a working copy that is discarded if any constraint fails (§3A.4), an invalid configuration never persists — this is prevention, not detection." | 199 | Delete the clause tying governance to the sweep. An invalid configuration never persists because every handler is proven to preserve every rule. | §0.7's governance paragraph is otherwise the closest canon text to the want. Only this clause goes. | `grep -rn "discarded if any constraint fails" $CANON` | |
+| N1 | `precept-language-spec.md:2005` | "8. **Constraint evaluation.** Every applicable rule and ensure is evaluated against the working copy after all mutations complete, collect-all." | 165, 199 | Delete phase 8 from the operation execution order. The order ends at phase 7, computed-field recomputation, then commits. | **New.** The execution order is the normative eight-phase list every runtime document cites; the 2026-07-19 sweep corrected the prose above it and missed the list itself. Leaving it would leave the sweep normatively specified after every sentence describing it was deleted. | `grep -rn "Every applicable rule and ensure is evaluated against the working copy" $CANON` | |
+| N2 | `precept-language-spec.md:2004` | "7. **Computed-field recomputation.** After all mutations **and before any constraint is evaluated**, every computed field is re-derived from the working copy." | 199 | Keep the phase; delete "and before any constraint is evaluated". | **New.** Recomputation is real and stays; only its ordering-against-the-sweep clause presupposes a sweep. | `grep -rn "before any constraint is evaluated" $CANON` | |
+| N3 | `precept-language-spec.md:1899` | Heading "#### Collect-all vs first-match", and the two-category split it introduces. | 165 | Re-scope the section to the surfaces where validation still runs — event args, editable-field writes — and keep first-match for dispatch. | **New.** The heading survives; the category it names ("validation surfaces") shrinks with S6, and a section whose first category has been emptied reads as if the sweep is still there. | `grep -rn "Collect-all vs first-match" $CANON` (expect the heading to survive; the row is executed when its *rules-and-ensures* content is re-scoped — verify by reading, not only by grep) | |
+
+## 1.2 `docs/runtime/`
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| R1 | `runtime-api.md:171` | "\| `ConstraintsFailed` \| Post-mutation constraint violations (collect-all semantics). \| A mutation row matched and executed, but constraint evaluation found violations. \|" | 199 | Same as S7 — remove the outcome. | Presupposes the sweep. | `grep -rn "constraint evaluation found violations" $CANON` | |
+| N4 | `runtime-api.md:168` | "\| `Created` \| … \| A mutation row matched and all post-mutation constraints passed. \|" | 199 | Reword: construction succeeds when the construction row executes. | **New.** Named as adjacent in R1's note but never given its own row, so nothing would have checked it. | `grep -rn "all post-mutation constraints passed" $CANON` | |
+| N5 | `runtime-api.md:180` | "same guards, same ensures, same constraint checking" | 199 | Delete "same ensures, same constraint checking". | **New.** Same as N4 — named in R1's note, never a row. | `grep -rn "same guards, same ensures, same constraint checking" $CANON` | |
+| R2 | `runtime-api.md:361` | Fire pipeline: "… → computed-field recomputation → **constraint evaluation (collect-all) → commit or discard**." | 165, 199 | The final stage goes; the pipeline ends "…recomputation → commit." | Arg validation at ingress and guard evaluation are exactly the premises the want keeps; the tail is the sweep. (Re-verified: the sentence was rewritten since `ed57d7fd` and gained stages; the contradicting tail is unchanged.) | `grep -rn "constraint evaluation (collect-all) → commit or discard" $CANON` | |
+| R3 | `runtime-api.md:388` | "Update runs the field-write pipeline: access mode check → type validation → patch application to working copy → computed field recomputation → constraint evaluation (collect-all) → commit or discard." | 199 | The final stage goes. **Revised 2026-07-26 with S1**: what replaces it is not a wider ingress check but the compiler discharging the editable write as an ordinary write site; runtime governance upholds the field's own declared contract. | Same reasoning as S1. The original direction (want:143's "every rule that mentions the field") is superseded by walk items 7, 8 and 16. | `grep -rn "patch application to working copy → computed field recomputation → constraint evaluation" $CANON` | |
+| R4 | `runtime-api.md:648` | "`InspectFire` runs the same pipeline as `Fire` — same guard evaluation, same action chain, same constraint checking." | 199, 211 | Delete "same constraint checking". Inspect previews arg/ingress validation and guard outcomes, and cites proof provenance. | "Same constraint checking" inherits the sweep. want:211 changes what inspect reports, not just what it runs. | `grep -rn "same action chain, same constraint checking" $CANON` | |
+| R6 | `result-types.md:114` | "\| `ConstraintsFailed` \| Post-mutation constraints violated (rules, state ensures, event ensures) \| Constraint evaluation → discard (§3A.4) \| Yes \|" | 199 | Same as S7/R1 — the outcome taxonomy loses its post-mutation-violation case. | Presupposes the sweep. (Re-verified: the third column changed since `ed57d7fd`; the contradicting cell is unchanged.) | `grep -rn "Post-mutation constraints violated" $CANON` | |
+| R7a | `evaluator.md:533`, `:534`, `:536` | ":533 **Evaluate:** Run constraint plans against the working copy" / ":534 **Commit or discard:** If constraints pass, donate the working copy … if constraints fail, return the array" / ":536 This ensures that constraint evaluation sees the post-mutation state…" | 165, 199 | The Fire lifecycle loses the evaluate/discard model; commit is unconditional after premise-validated execution. Correct as one family with `:141`, `:144`, `:1638`, `:1842`. | The evaluator document is where the sweep is specified operationally; correcting the spec and leaving this makes the runtime document the operative one. | `grep -rn "Run constraint plans against the working copy" $CANON` | |
+| R7b | `evaluator.md:1753` | "Constraints are evaluated against the working copy AFTER action execution and computed field recomputation" — the "Post-mutation evaluation" row of § Constraint Evaluation Guarantees. | 199 | Corrects with the Fire-lifecycle family; the guarantees table loses the row. | The table restates the sweep as a guarantee. | `grep -rn "AFTER action execution and computed field recomputation" $CANON` | |
+| N6 | `evaluator.md:73`, `:505` | ":73 "Decision 7: Collect All Violations, Don't Short-Circuit"" / ":505 "Collect all violations; if any → row fails"" | 165, 199 | Re-scope Decision 7 to the surfaces where validation still runs; delete the row-fails step from the lifecycle diagram. | **New.** Decision 7 is a locked design decision whose subject disappears. Leaving it means the next reader of the evaluator design reinstates the sweep from a decision block. | `grep -rn "Collect all violations; if any → row fails" $CANON` | |
+| N7 | `evaluator.md:141` | "\| **Constraint evaluation** \| Read `ConstraintPlanIndex` buckets; evaluate each constraint's `ExecutionPlan` against slot array; collect violations \|" | 165 | The responsibility goes from the evaluator's responsibilities table. | **New.** Named inside R7a's family sentence but never a row of its own. Listed here so the pattern check covers it. | `grep -rn "evaluate each constraint's \`ExecutionPlan\` against slot array" $CANON` | |
+| N8 | `evaluator.md:940`, `result-types.md:209` | "Population requires evaluating the event ensures against the post-mutation working copy — currently passes empty array … **OQ-4 (pending)**" | 199, 211 | OQ-4 is answered by the model change, not by a choice: there is no post-mutation working copy to evaluate event ensures against. Inspect reports which premises run and cites provenance. | **New.** An open question whose two options both assume the sweep. Leaving it open invites phase 5 to answer it inside the old model. | `grep -rn "against the post-mutation working copy" $CANON` | |
+| N9 | `result-types.md:369` | "\| OPA `deny[msg]` \| Collect-all violation set \| ConstraintResult lists, not short-circuit. \|" | 165 | Re-scope with S6/N6 — the comparison row describes a surface that no longer exists in that form. | **New.** A comparator table entry that encodes the removed model. | `grep -rn "Collect-all violation set" $CANON` | |
+| N10 | `evaluator.md:287`, `:1476`, `:1467`, `:317`, `:608`, `:639`, `:706`, `:782`, `:783`, `:1383`; `precept-builder.md:115` (Pass 5), `:653`; `proof-engine.md:2202` | The `ConstraintPlanIndex` — buckets `Always`, `InState`, `FromState`, `ToState`, `OnEvent`, built by the Precept Builder, read by the evaluator at commit time. | 165, 199 | **Read before editing.** Constraint plans are still needed for the surfaces that survive (ingress governance of a field's declared contract, guards, inspect). What goes is the whole-entity evaluation at commit. Decide, in the same pass, whether the index keeps all five buckets or shrinks. | **New, and the largest structural consequence in this family.** The correction list corrects the sentences that *describe* the sweep and never touches the data structure that *implements* it across three runtime documents. A reader correcting only the prose would leave a builder pass, an index and an evaluator read path whose only consumer had been deleted. **This row may require a design decision about what the index becomes; if it does, it goes to "Waiting on Shane" rather than being resolved here.** | `grep -rn "ConstraintPlanIndex" $CANON` (expect a reduced, not zero, count — record the target count in the executing commit) | |
+
+## 1.3 `docs/compiler-and-runtime-design.md` — **WIDE**, never swept
+
+The 2026-07-19 sweep did not read this file. It is the architecture-overview entry point and
+`precept-language-spec.md:274` delegates the composition description to it, so every row here is new.
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep (WIDE) | Commit |
+|---|---|---|---|---|---|---|---|
+| N11 | `compiler-and-runtime-design.md:133` | "Externally-sourced values are checked at ingress; mutations run on a working copy discarded whole if any constraint fails (spec §3A.4), so no operation commits a configuration that violates a declared rule." | 199 | Delete the working-copy-discard clause; the ingress clause survives. | **New.** | `grep -rn "discarded whole if any constraint fails" $CANON_WIDE` | |
+| N12 | `compiler-and-runtime-design.md:147` | "Mutations run on a working copy that is discarded if any constraint fails (spec §3A.4), so no invalid configuration commits." | 199 | Same as N11. | **New.** | `grep -rn "so no invalid configuration commits" $CANON_WIDE` | |
+| N13 | `compiler-and-runtime-design.md:165` | "Runtime ingress governance … enforcing it operation-blind **on a working copy discarded on failure**." | 199 | Delete the discard clause. The composition seam survives and is the thing want:26 describes. | **New.** | `grep -rn "on a working copy discarded on failure" $CANON_WIDE` | |
+| N14 | `compiler-and-runtime-design.md:835` | The per-operation table column "Constraint plans evaluated". | 199 | The column goes with N10. | **New.** | `grep -rn "Constraint plans evaluated" $CANON_WIDE` | |
+| N15 | `compiler-and-runtime-design.md:861`, `:883` | "Business outcomes: `Rejected`, `EventConstraintsFailed`, `UpdateConstraintsFailed`, `RestoreConstraintsFailed`" and the per-operation outcome table row. | 199 | Remove the three `*ConstraintsFailed` outcomes from the taxonomy. | **New.** Three more outcome names presupposing the sweep, in a document the sweep list never covered. | `grep -rnE "EventConstraintsFailed\|UpdateConstraintsFailed\|RestoreConstraintsFailed" $CANON_WIDE` | |
+| N16 | `compiler-and-runtime-design.md:718` | "`Restore` itself does not reject them … **but the next operation's post-mutation sweep will**, so a stale entity can become unusable rather than un-loadable." | 141, 199 | Delete the sweep clause. Under the want a stale entity is trusted and is never re-governed; schema evolution is post-MVP (want:141). | **New.** | `grep -rn "the next operation's post-mutation sweep will" $CANON_WIDE` | |
+| N17 | `compiler-and-runtime-design.md:767` | "`Restore` does not re-validate … and **is re-governed by the next operation's post-mutation sweep** (spec §0.7, owner decision 2026-06-02)." | 141 | Delete the re-governance clause; the trusted-hydration half survives. | **New.** Same shape as R5a/R5b, in the unswept document. | `grep -rn "re-governed by the next operation's post-mutation sweep" $CANON_WIDE` | |
+
+---
+
+# 2. Restore is trusted, and is never re-governed
+
+**want:141** — "Restore/rehydration is *not* ingress — data coming back from persistence is trusted and
+unchecked, because it was governed when it was written."
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| S8 | `precept-language-spec.md:1946` | "Entity restoration … produces a distinct outcome space: successful restoration (data valid, constraints passed), **constraint failure (persisted data violates current definition's rules/ensures)**, or invalid input… Restoring an entity in an invalid state is not allowed — the governance guarantee applies from the moment an entity is loaded." | 141 | The constraint-failure case goes; restore trusts persisted data. The load-time verification that does exist under the want is the certificate check on the **definition**, not constraint evaluation on the **data**. | The paragraph also contradicts the spec's own `:272` trusted-restore sentence — an intra-canon contradiction independent of the want. | `grep -rn "Restoring an entity in an invalid state is not allowed" $CANON` | |
+| S10 | `precept-language-spec.md:272` | "…the next operation through the contract re-governs it (every constraint is checked against the resulting working copy, §3A.4), and the runtime fault traps backstop any out-of-contract value the evaluator would otherwise fault on." | 141, 165 | Both clauses go: nothing re-governs restored data, and there are no runtime fault traps. The trusted-restore first half survives. | Restored data is trusted "full stop" under want:141; want:165 removes the traps. | `grep -rn "the next operation through the contract re-governs it" $CANON` | |
+| R5a | `runtime-api.md:266` | "…a stale value is re-governed by the next operation's post-mutation constraint sweep (spec §3A.4)." | 141 | The sweep clause goes; the trusted-restore first half survives. **Scope addition carried on this row:** the runtime load-time certificate gate want:204 requires appears nowhere in runtime canon. See N78. | Nothing re-governs restored data. | `grep -rn "re-governed by the next operation's post-mutation constraint sweep" $CANON` | |
+| R5b | `runtime-api.md:891` | "A stale value surfaces at the next operation, whose post-mutation constraint sweep (spec §3A.4) governs the resulting working copy." | 141 | Same as R5a. | Same. | `grep -rn "whose post-mutation constraint sweep" $CANON` | |
+| R8 | `evaluator.md:1735` | At HEAD: "`Restore` bypasses both access-mode checks and constraint evaluation — trusted hydration (spec §0.7; Decision 5 below)." | 141 | **DISCHARGED — confirm and strike, do not edit.** The 2026-07-19 text ("bypasses access-mode checks but enforces constraint checks") is gone and the current text agrees with the want. | Re-verified at HEAD. A row that needs confirming, not correcting. | `grep -rn "bypasses access-mode checks but enforces constraint checks" $CANON` (already zero) | |
+| N18 | `compiler-and-runtime-design.md:907` **WIDE** **INTRA-CANON** | "**Restore with recomputation-first constraint evaluation.** Persisted data is **never trusted** — Restore recomputes computed fields before evaluating constraints, catching stale computed values that would otherwise pass through silently." | 141 | Delete. Restore does not evaluate constraints. | **New, and the sharpest contradiction found in the unswept document.** It contradicts want:141 *and* its own document at `:845` ("`Restore` bypasses access-mode checks, row dispatch, **and** constraint evaluation — trusted hydration") *and* `precept-language-spec.md:272`. Three-way. It reads as text that was never updated when the trusted-hydration decision landed. | `grep -rn "Persisted data is never trusted" $CANON_WIDE` | |
+| N19 | `runtime-api.md:261`, `:270` | ":261 `RestoreConstraintsFailed f => HandleSchemaDrift(f.Violations),`" and ":270 "**`RestoreConstraintsFailed` is superseded** … It should be removed when the Restore API is finalized … the example above is left until that API cleanup lands."" | 141 | Execute the removal canon already says is owed: delete the outcome from the example and delete the deferral note with it. | **New.** Canon states the correction and defers it to an API cleanup that no phase owns. Phase 2 owns it now. | `grep -rn "RestoreConstraintsFailed" $CANON` | |
+| N20 | `compiler-and-runtime-design.md:883` **WIDE** | The `Restore` row of the per-operation outcome table carries `RestoreConstraintsFailed`. | 141 | Delete the outcome from the table. Folded with N15. | **New.** | `grep -rn "RestoreConstraintsFailed" $CANON_WIDE` | |
+| N21 | `precept-language-spec.md:1946` (final sentence) | "Future migration logic runs before constraint evaluation, transforming persisted data to conform to the current definition." | 141 | Reword: schema evolution is post-MVP (want:141 says so explicitly), and it does not run "before constraint evaluation" because there is none. | **New.** The migration sentence is a separate claim from S8's outcome space and needs its own correction, or S8's edit leaves a dangling reference to a stage that no longer exists. | `grep -rn "Future migration logic runs before constraint evaluation" $CANON` | |
+
+---
+
+# 3. Runtime fault traps and defence in depth
+
+**want:165** — "**fault-prevention checks are omitted at evaluation time**. No divide-by-zero tests, no
+overflow guards, no re-checking of proven bounds on writes — the evaluator just computes."
+
+This family is far larger than the correction list's ten leads. It runs through six documents and
+includes a builder pass, a descriptor type, an opcode annotation and an evaluator dispatch check.
+**A resolution that deletes only the prose leaves the machinery.**
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| R9 | `precept-builder.md:426`, `:607`; family also `:115`, `:132`, `:488` | ":426 stamps `FaultSiteAnnotation` on opcodes from unresolved proof obligations; :607 "Fault backstops are defense-in-depth… When reached, they fire the `FaultCode`'s runtime behavior"." | 165 | The planting contract goes. Nothing stamps a fault-site annotation because there are no unresolved obligations in a definition that compiles. | Under prove-or-reject an unresolved obligation rejects the definition, so the annotation's only source is a compiler bug. | `grep -rn "FaultSiteAnnotation" $CANON` | |
+| N22 | `precept-builder.md:34`, `:283`, `:284`, `:591`, `:593`, `:595`, `:304` | Pass 6 — Fault Backstop Pass, its diagram box, its dependency row, and `Precept.FaultBackstops` as a derived tooling artifact. | 165 | Pass 6 loses its fault-backstop half. `ConstraintInfluenceMap` construction, its other responsibility, survives. | **New.** R9 corrects two sentences inside a pass that has a heading, a diagram, a dependency table row and a materialization contract. Correcting only the sentences leaves the pass. | `grep -rn "Fault Backstop Pass" $CANON` | |
+| N23 | `precept-builder.md:224`, `:653`, `:728` | `internal ImmutableArray<FaultSiteDescriptor> FaultBackstops { get; }` on `Precept`; the evaluator's consumed-surface list; the invariant that every annotation has a `[StaticallyPreventable]` `FaultCode`. | 165 | The member goes from the executable model, and the invariant with it. | **New.** A field on the shipped model type. | `grep -rn "FaultBackstops" $CANON` | |
+| R10 | `evaluator.md:147` | "\| **Fault backstop routing** \| At impossible-path sites: check `opcode.FaultSite` … non-null → `Faults.Create(annotation, context)` \|" | 165 | The routing responsibility goes. | Evaluation-time fault routing is exactly what want:165 removes. | `grep -rn "Fault backstop routing" $CANON` | |
+| N24 | `evaluator.md:437`, `:1005`, `:1013`, `:1443`, `:2094` | The opcode's `// ── Fault Backstop ──` field; "CC#6: Defense-in-depth fault backstop — zero overhead when FaultSite is null (proven safe)"; the two-layer defence model; the `Fault` production path; contract CC#6. | 165 | The whole CC#6 contract goes: no annotation on the opcode, no null check at dispatch, no second layer. | **New.** R10 corrects the responsibilities table row. The contract it describes is specified across five more places including a named cross-cutting concern (CC#6) that `precept-builder.md` and `proof-engine.md` both cite. | `grep -rn "CC#6" $CANON` | |
+| N25 | `evaluator.md:19`, `:56`, `:1644`, `:1648`, `:2179` | "compiler proofs are **intended to** eliminate runtime fault paths, leaving evaluator faults as defense-in-depth only"; the "Impossible-Path Failures (Defense-in-Depth)" section and its table row. | 165 | Re-scope. The section survives only for engine-invariant breaches (a bug in the compiler or builder), not for statically-preventable faults. | **New.** The distinction matters: want:165 removes *fault-prevention* checks, not a variant that classifies an engine bug. Correcting this row means separating the two, not deleting the section. | `grep -rn "Impossible-Path Failures (Defense-in-Depth)" $CANON` | |
+| R14 | `evaluator.md:1654` | "\| Division by zero \| `DivisionByZero` \| Guard `when Divisor != 0` or `nonzero` modifier \|" under "Impossible-Path Failures (Defense-in-Depth)". | 165 | Goes with N25. | The table lists the runtime traps by fault class. | `grep -rn "Impossible-Path Failures" $CANON` | |
+| N26 | `descriptor-types.md:106`, `:140`, `:172` | "`FaultSiteDescriptor` — planted by builder, read by evaluator backstops"; "uses `FaultSiteDescriptor` for backstop routing"; "**`FaultSiteDescriptor` as the proof/runtime link:** The connection between compile-time proof obligations and runtime backstops is reified as a first-class type." | 165 | The descriptor type goes from the runtime descriptor set. | **New.** `descriptor-types.md` was not in the 2026-07-19 sweep list at all, and it holds the type declaration the whole family rests on. | `grep -rn "FaultSiteDescriptor" $CANON` | |
+| R11 | `fault-system.md:248` | "1. Evaluator: `a / b` where `b == 0` → `Fail(FaultCode.DivisionByZero)`" — the divide-by-zero end-to-end example. | 165 | The example's evaluator step goes; the compile-time half survives. | want:165 names the divide-by-zero test specifically. | `grep -rn "Fail(FaultCode.DivisionByZero)" $CANON` | |
+| R12 | `fault-system.md:263` | "…`FaultCode.DivisionByZero` is defense-in-depth: it classifies a failure that should never occur … but must be handled if data arrives from external sources that bypassed compile-time checking." | 141, 165 | The clause goes. Restored data is trusted (want:141), so the "external sources" justification is gone too. | Both halves of the justification are removed by the want. | `grep -rn "bypassed compile-time checking" $CANON` | |
+| N27 | `fault-system.md:284`, `:286`, `:322`, `:30` | "### Defense-in-depth, not a primary error path" and its two near-identical paragraphs, plus the table-of-contents entry. | 165 | The section goes. | **New.** R12 corrects one sentence in a section whose heading and two paragraphs restate it. | `grep -rn "Defense-in-depth, not a primary error path" $CANON` | |
+| R13 | `fault-system.md:149`, `:153`, `:156` | `[StaticallyPreventable(DiagnosticCode.OutOfRange)]` at 149, `LengthBoundViolation,` at 153, `CountBoundViolation,` at 156. | 165 | **Read before editing.** These are declared-bound containment codes, which S11 re-classifies as rule preservation rather than faults. They come out of the fault enumeration with S11, not independently. | Correcting them separately would split a classification change across two rows and risk two different answers. | `grep -rn "LengthBoundViolation," docs/runtime/fault-system.md` | |
+| N28 | `runtime-api.md:660` | "3. **Defense-in-depth evaluator faults** — 15 `[StaticallyPreventable]` fault codes exist at evaluation time as a backstop." | 165 | The item goes from the runtime API's guarantee description. | **New.** A numbered item in the runtime API's own statement of what it guarantees; the sweep list did not cover it. | `grep -rn "fault codes exist at evaluation time as a backstop" $CANON` | |
+| N29 | `runtime-api.md:887`; `result-types.md:72`, `:117` | "an evaluator fault surfaces as the `EventOutcome.Faulted(Fault)` variant — a backstop for impossible-path bugs"; "Faults — errors the type checker should have prevented … surface as the single `EventOutcome.Faulted(Fault)` variant"; "\| `Faulted` \| Evaluator impossible path … \| Backstop \| Yes \|" | 165 | **Keep the `Faulted` variant, re-scope its population.** It classifies an engine-invariant breach, which want:165 does not remove. What goes is its population from `[StaticallyPreventable]` fault-prevention sites. | **New.** The one place in this family where the resolution is not deletion. Recording it as a deletion row would remove a variant the want document never asked to remove. | `grep -rn "errors the type checker should have prevented" $CANON` (expect the sentence to survive in re-scoped form — this row is verified by reading) | |
+| C1 | `proof-engine.md:346`; family `:107`, `:123`, `:342`, `:2210`, `:2243`, `:2435`, `:2667` | "The Precept Builder consumes these to plant `FaultSiteAnnotation` backstops — defense-in-depth runtime checks for operations that could not be proven safe." | 165 | The `FaultSiteLink` production responsibility and the residue that crosses the compile/runtime boundary both go. | An operation that could not be proven safe rejects the definition; there is nothing to plant. | `grep -rn "FaultSiteLink" $CANON` | |
+| C2 | `proof-engine.md:2446` | "…backstops are defense-in-depth — they should never fire if proof is correct. They exist for belt-and-suspenders safety…" | 165 | Goes with C1. | Same. | `grep -rn "belt-and-suspenders" $CANON` | |
+| C4 | `proof-engine.md:1731` | "There is no deferral to a runtime check (§0.7 prove-or-reject); **the runtime count-fault trap is a defense-in-depth backstop, unreachable for contract data**." | 165 | The first clause survives; the trap clause goes. | The no-deferral half agrees with want:171 exactly. | `grep -rn "the runtime count-fault trap" $CANON` | |
+| N30 | `proof-engine.md:1932`, `:1912` | The proof-flow diagram's "(defense-in-depth)" box and "No runtime check" branch. | 165 | The diagram loses the defence-in-depth branch. | **New.** A diagram is a design statement and survives a prose sweep. | `grep -rn "defense-in-depth" docs/compiler/proof-engine.md` | |
+| N31 | `primitive-types.md:658` | "Per Principle 10 (`precept-language-spec.md:110`), a fault-prone operation is proven safe or the definition is rejected — **a runtime trap is defensive redundancy, never the primary mechanism**." | 165 | The trap clause goes; the prove-or-reject half survives. | **New.** `docs/language/` type documents beyond the spec were outside the 2026-07-19 sweep list (recorded as coverage gap 2). | `grep -rn "defensive redundancy" $CANON` | |
+| N32 | `primitive-types.md:654`, `:655`, `:671` | "\| `+∞` \| Runtime fault — integer overflow \| Runtime fault — cannot round infinity \|" and "**Integer conversion overflow:** `floor(1e20)` … **This is a runtime fault**." | 165 | **Read before editing, and hold with the overflow deferral (§ 5).** These are the number-lane and conversion-overflow cases. Under walk item 15 overflow is deferred past the MVP with no compile-time guarantee, so the honest correction states the gap rather than claiming either prevention or a runtime trap. | **New.** The one place where deleting the runtime trap without the overflow ruling would leave a fault class with neither half of a guarantee and no disclosure. | `grep -rn "Runtime fault — integer overflow" $CANON` | |
+| N33 | `collection-types.md:766` | "The compiler proves emptiness safety or emits a diagnostic. **Runtime fault checks exist only as defensive redundancy for paths the compiler has already proven unreachable.**" | 165 | The second sentence goes. | **New.** Same coverage gap as N31 — a verbatim copy of S13's Principle 10 sentence living in a type document nobody swept. | `grep -rn "defensive redundancy for paths the compiler has already proven unreachable" $CANON` | |
+| N34 | `soundness-and-coverage.md:94`, `:199`, `:236` | "(The `[StaticallyPreventable]` evaluator traps are defense-in-depth for out-of-contract" / the `QualifierMismatch` row's runtime fault-identity collapse / "the runtime `FaultSiteLink` identity collapses to a single backstop code". | 165 | Go with C1. | **New.** The soundness document's coverage matrix encodes the backstop model in its column definitions, so the matrix's own shape changes. | `grep -rn "evaluator traps are defense-in-depth" $CANON` | |
+| N35 | `diagnostic-system.md:548` | "The proof engine keeps two pieces of policy as explicit code … and the **conservative backstop for proof-only obligation families that have no representable runtime fault of their own**." | 165 | The backstop policy goes. | **New.** | `grep -rn "conservative backstop for proof-only obligation families" $CANON` | |
+| N36 | `compiler-and-runtime-design.md:116`, `:151`, `:167`, `:370`, `:598`, `:629`, `:635`, `:645`, `:701`, `:706`, `:743`, `:763`, `:816`, `:825`, `:829`, `:866`, `:875` **WIDE** | Seventeen sites carrying the backstop model — "the evaluator's divide-by-zero trap is defense-in-depth"; "**Traps are defense-in-depth, for out-of-contract entry only**"; "The runtime receives only built fault-site residue for defense-in-depth"; the prevention/backstop chain; the builder-output and evaluator-input lists; the architecture diagram's `FAULT(["Fault backstops"])` node. | 165 | The whole chain goes from the architecture overview. `Fault` survives only as N29's engine-invariant classification. | **New, and the single densest concentration in the register.** This document was never read by the sweep and it is the file `CLAUDE.md` sends a reader to for the architecture. | `grep -rn "defense-in-depth" $CANON_WIDE` | |
+
+---
+
+# 4. The fault-gate classification of declared-bound containment
+
+**want:22** — "There is one constraint mechanism underneath — the premise classes above are spellings,
+not separate systems." **want:104** — faults get "the identical premise-and-certificate treatment."
+
+The prove-or-reject disposition is identical either way, so nothing weakens. What stops being true is
+that declared-bound containment is a *fault* rather than *rule preservation*.
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| S11 | `precept-language-spec.md:266` | "…cannot produce a runtime fault — no division by zero, no overflow, no empty-collection access, **no result outside a declared bound**. The compiler delivers it by discharging, at every fault-prone operation, an obligation that each operand *carries* a sufficient constraint…" | 22, 104 | Separate the true fault list from declared-bound containment, which is rule preservation. Restate the discharge model as proof by induction from the four premise classes rather than a per-operation carried-constraint test. The "there is no deferral" clause survives. **Second correction (walk item 15):** overflow may no longer be stated as currently prevented. | Fault-gate residue site 1 of 3. The carried-constraint framing is the pre-want model; want:16–19 replaces it with induction. | `grep -rn "no result outside a declared bound" $CANON` | |
+| S12 | `precept-language-spec.md:112` | "Every fault class that the evaluator can produce — type mismatch, division by zero, overflow, empty collection access, **constraint range impossibility** — is linked to a compiler diagnostic that prevents it. **Runtime fault checks exist only as defensive redundancy**, never as the primary enforcement mechanism." | 22, 165 | Drop "constraint range impossibility" from the fault enumeration. "Exist only as defensive redundancy" becomes "do not exist" — confidence comes from the certificate verified at load, not from redundant checks. **Second correction:** overflow. | Fault-gate residue site 2 of 3, plus a trap clause. | `grep -rn "constraint range impossibility" $CANON` | |
+| S13 | `precept-language-spec.md:110` | Principle 10: "**Runtime fault traps exist only as defensive redundancy for paths the compiler has already proven unreachable.**" | 165 | The trap clause goes. The rest of Principle 10 (prove safety or reject) is aligned. **Second correction:** overflow. | Fault-gate residue site 3 of 3. | `grep -rn "Runtime fault traps exist only as defensive redundancy" $CANON` | |
+| S14 | `precept-language-spec.md:258` | "(§0.7 fault-prevention: count is 'no result outside a declared bound', discharged by an author guard, never deferred to a runtime check)" | 22 | Re-anchor count containment to rule preservation when S11 is corrected. The "never deferred" clause survives. | Propagation site of the fault-gate residue. | `grep -rn "count is 'no result outside a declared bound'" $CANON` | |
+| SC-1 | `soundness-and-coverage.md:87` | "…only line that matters is whether an operand *carries a constraint the engine can discharge* — proof-…" | 22 | Superseded by the one-mechanism model. Restate as induction from the four premise classes. | A sixth committed canon edit; `e13b94cd`'s own commit message flagged it as a known defect. §1.1's heading has since changed to "Why prove-or-reject — the decision rationale" (now at `:55`); the sentence is unchanged at `:87`. | `grep -rn "carries a constraint the engine can discharge" $CANON` | |
+| N37 | `diagnostic-system.md:182` | "A fault-prone operation (division, overflow, non-negative, **out-of-range, bounded write**) carries a *containment obligation*…" | 22 | Re-classify: out-of-range and bounded-write are rule preservation, not fault-prone operations. Both still block. | **New.** The diagnostic system's own statement of what a fault-prone operation is; correcting the spec and leaving this makes the diagnostic document the operative classification. | `grep -rn "division, overflow, non-negative, out-of-range, bounded write" $CANON` | |
+| N38 | `diagnostic-system.md:163` | "The declared-bound value-safety codes are **`Proof`**: `NumericOverflow` (PRE0078) and `OutOfRange` (PRE0079)…" | 22 | Keep the `Proof` classification; re-word "value-safety" to rule preservation for the containment half. | **New.** Same family as N37. | `grep -rn "declared-bound value-safety codes" $CANON` | |
+| N39 | `compiler-and-runtime-design.md:132` **WIDE** | "Its coverage is emphatically **not** the short list that makes it look like a floor — division, overflow, empty-collection access, **bound containment** are *illustrations*…" | 22 | Same re-classification. | **New.** | `grep -rn "bound containment are \*illustrations\*" $CANON_WIDE` | |
+| N40 | `collection-types.md:627` | "A value introduced into the collection … must be provably within the element bound, the same containment obligation a `set` into a bounded field carries … `NumericOverflow`/`OutOfRange` for numeric." | 22 | Re-anchor with S14 to rule preservation. | **New.** The type-document propagation of the same classification; outside the 2026-07-19 sweep list. | `grep -rn "the same containment obligation a \`set\` into a bounded field carries" $CANON` | |
+
+---
+
+# 5. Overflow is deferred, and no document may state it as currently prevented
+
+**Walk item 15, ruled 2026-07-26**: the arithmetic overflow model is deferred past the MVP, with no
+compile-time guarantee in the meantime. **want:165** already removes the runtime guard. Both halves of
+the guarantee disappear.
+
+**Walk item 23 constrains the wording**: `philosophy.md` and the specification state the *target*, and
+the code is validated against them rather than the reverse. So these are **not** corrections down to
+current behaviour. The aspiration may stand; what may not stand is a claim that it holds today. Phase
+2 states the gap, it does not delete the goal.
+
+| ID | Site | Canonical text | Want / ruling | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| N41 | `precept-language-spec.md:104` | Principle 7: "Compile-time structural checking catches unreachable states, type mismatches, constraint contradictions, division by zero, **overflow**, empty collection access, and more … **A precept that compiles without diagnostics has no unproven evaluation faults.**" | walk 15 | Add the deferral disclosure in the spec's own voice, as `primitive-types.md:81` already does for the `integer` model. | **New.** The correction list has S11/S12/S13 for `:266`, `:112` and `:110` and never covered Principle 7, which makes the same claim. | `grep -rn "division by zero, overflow, empty collection access, and more" $CANON` | |
+| N42 | `precept-language-spec.md:110`, `:112`, `:266` | The overflow half of S11, S12 and S13. | walk 15 | The second correction the correction list's direction column does not mention: disclose the deferral on the same three sentences. | Carried from `sweep-correction-list.md` § "S11, S12, S13 — removing the fault traps is not the whole correction any more". Recorded as its own row so it cannot be lost inside a row whose direction column is about something else. | `grep -rn "no division by zero, no overflow" $CANON` | |
+| N43 | `primitive-types.md:197`, `:236` | ":197 "Overflow is a type error." / :236 "Stays in lane. **Overflow is an error.**"" | walk 15 | **Read before editing.** `:81` was corrected on 2026-07-14 to disclose the deferral while `:197` and `:203` were deliberately left "as the fixed-width end state". Under walk item 23 that is legitimate — but `:197`/`:236` are stated flatly, with no marker connecting them to `:81`'s disclosure. Add the cross-reference. | **New.** Not a contradiction of the 2026-07-14 ruling; a disclosure gap the ruling created. | `grep -rn "Overflow is a type error" $CANON` | |
+| N44 | `soundness-and-coverage.md:282`–`:286` | "…overflow behavior in the philosophy and spec state the *target end-state*, not the current build state — arithmetic-overflow enforcement is sequenced as GATE-O, after the MVP." | walk 15 | **CONFIRM AND STRIKE.** This is already exactly what walk item 23 and walk item 15 say, written before either. No edit. | The only place in canon that already handles the overflow gap correctly. Recorded so a later reader does not "fix" it into agreement with a sentence that is itself being corrected. | n/a — confirm by reading | |
+| P5 | `philosophy.md:53` **OWNER APPROVAL REQUIRED** | "Division by zero, arithmetic overflow, empty collection access — these are not risks managed at runtime. They are compile-time impossibilities." | walk 23 | **NOT A ROW — EXPLICITLY EXCLUDED.** `sweep-correction-list.md` § "`philosophy.md:53` is not on this list, and stays off it": walk item 23 closes it. Philosophy states the target. **Do not add it.** | Recorded here only so a re-runner who finds it by grep knows it was considered and ruled out, rather than missed. | n/a | |
+| P6 | `philosophy.md:61` **OWNER APPROVAL REQUIRED** | "**Compile-time structural checking.** The compiler catches structural problems — unreachable states, dead-end states, type mismatches, constraint contradictions, unsatisfiable guard combinations, division by zero, **overflow**, empty collection access…" | walk 23 | **NOT A ROW, same ruling as P5.** Same sentence shape, same document, same disposition. | Recorded for the same reason as P5, and because it is a *second* philosophy overflow site that the reconciliation section names only one of. | n/a | |
+
+---
+
+# 6. Structural defects that canon reports rather than rejects
+
+**want:151–155** — an unreachable state "is rejected"; a state you can enter but never leave "is
+rejected, unless the author deliberately marked it `terminal`"; a dead row "is unreachable … The ideal
+compiler rejects it with an explanation." **want:189** — "warnings where there should be errors" is
+dilution, not balance.
+
+**Walk item 22, ruled 2026-07-26**: three severities rise to Error — required-state dominance,
+unsatisfiable rule, contradictory rule. The plan assigns the failing tests to phase 10 and the code fix
+to phase 11; the **document** correction is phase 2's.
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| C7 | `graph-analyzer.md:457`; siblings `:271`, `:452`; `proof-engine.md:2147` | "**Severity:** Warning, not error. Dead-end states may be intentional … The author can suppress the warning by adding the `terminal` modifier." | 152 | Error. The `terminal` modifier is the author's declaration that the endpoint is intended — which is what want:152 says makes it not a defect — so the escape hatch survives as a *declaration*, not as warning suppression. | `diagnostic-system.md:186`/`:191` already state Error as the ruled target and mark the Warning as tracked drift. `graph-analyzer.md` still states Warning as the design. Two canonical documents, two answers. **INTRA-CANON** as well as want. | `grep -rn "Warning, not error" $CANON` | |
+| N45 | `graph-analyzer.md:271` | "The graph analyzer emits `DeadEndState` (**Warning**, code 108) for each dead-end state." | 152 | Error. | **New.** C7 covers `:457`'s rationale paragraph; this is the fact table that a reader building the analyzer would use. | `grep -rn "\`DeadEndState\` (Warning, code 108)" $CANON` | |
+| N46 | `diagnostic-system.md:518` | "→ Diagnostic(**Warning**, Graph, "UnreachableState", "State 'Archived' is unreachable from initial state 'Draft'", range)" | 151 | Error. | **New.** A worked example in the diagnostic document showing the severity the same document's `:191` calls tracked drift. **INTRA-CANON.** | `grep -rn "Diagnostic(Warning, Graph, \"UnreachableState\"" $CANON` | |
+| C6 | `diagnostic-system.md:189` | "The remaining structural diagnostics **report** (`Severity.Warning`) — they leave the entity inhabitable and are advisory signals, not prevention defects: rule/guard *redundancy* (`VacuousRule`, `TautologicalGuard`, **`UnsatisfiableGuard`** …)" | 155 | `UnsatisfiableGuard` moves to the blocking family. want:155 calls a guard that can never be true a structural defect and gives a worked case (a ratio compared against `75` instead of `0.75`) whose consequence is a silently unreachable path. `VacuousRule` and `TautologicalGuard` stay reports — an always-true construct leaves nothing unreachable. | The correction list left this "pending Q6". want:155 answers it: the test is not "is the entity still inhabitable" but "does a declared path silently never happen". | `grep -rn "UnsatisfiableGuard" docs/compiler/diagnostic-system.md` | |
+| N47 | `precept-language-spec.md:209` **INTRA-CANON** | §0.6 item 7: "the definition is **uninhabitable** … and the compiler **rejects the definition**." | 189 / walk 22 | **CONFIRM.** The spec already states rejection. What contradicts it is `diagnostic-system.md:191` and `proof-engine.md:2537`, not this. | **New.** Recorded so the correction goes in the right direction: the spec is right and the two compiler documents have drifted, which is the opposite of what a reader meeting `proof-engine.md:2537` first would conclude. | n/a — confirm by reading | |
+| N48 | `proof-engine.md:2537` **INTRA-CANON** | "…not by re-severitying a structural-soundness diagnostic (**the contradictory/vacuous/unsatisfiable-rule family stay `Warning` per §0.6 items 7/8 'reports'**)" | 189 / walk 22 | Correct: contradictory rule and unsatisfiable rule become Error per walk item 22 and per §0.6 item 7's own text. Vacuous rule stays a report per §0.6 item 8. | **New.** The parenthetical mis-cites §0.6: item 7 says "rejects the definition" and only item 8 says "report". One citation covering two items with opposite dispositions. | `grep -rn "stay \`Warning\` per §0.6 items 7/8" $CANON` | |
+| N49 | `diagnostic-system.md:191` | "where a flipped code (`UnreachableState`, `StructuralSinkState`, `DeadEndState`, `RequiredStateDoesNotDominateTerminal`, `ContradictoryRule`, `UnsatisfiableRule`) still emits `Severity.Warning` in `Diagnostics.cs`, **that is tracked drift**." | 189 / walk 22 | **CONFIRM AND KEEP** as the ruled severity model. It is the one place canon states the target correctly and names the gap honestly. Phase 10 owns the failing tests; phase 11 owns the code. | **New.** Recorded so it is not "corrected" into agreement with C7/N45/N46, which would invert the fix. | n/a — confirm by reading | |
+| N50 | `graph-analyzer.md:556` | "A field with no **reachable** write site emits `FieldNeverSet` (Warning)…" | 189 | **Read before editing; likely stays a report.** A field that only ever holds its default is a weaker specification, not an unreachable path — the same asymmetry want:129 draws about `DailyWithdrawalLimit`'s modifiers. | **New.** Recorded because a sweep of "Warning" in the graph analyzer would otherwise flip it by association. | n/a — confirm by reading | |
+
+---
+
+# 7. Proof by induction
+
+**want:16** — "What 'prove' means here is **proof by induction over reachable configurations**."
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| N51 | `proof-engine.md:2687`, `:2689`; TOC at `:83` | "### No Inductive Proof — The proof engine does not handle loop invariants, recursive definitions, or **inductive properties**. Precept does not have loops or recursion — the DSL is finite and event-driven." | 16–19 | Delete the section and replace it with the induction the want document specifies: a base case over the default configuration and the initial events, and an inductive step over every handler, from the four premise classes. The *reason* given for the exclusion — no loops, no recursion — survives as the reason the induction is **finite and tractable**, which is the opposite conclusion from the same fact. | **New, and the most direct contradiction in the register.** Canon states in a named design-decision section that the proof engine does not do the exact thing the want document says "prove" means. Nothing in the correction list touches it. If this is not corrected before phase 5, phase 5 writes the discharge procedure against a document that forbids its proof model. | `grep -rn "No Inductive Proof" $CANON` | |
+| N52 | **ADDITION** — nothing in `$CANON_WIDE` states the induction | Absence search § 4: `grep -rniE 'proof by induction\|inductive step\|base case.{0,40}(rule\|configuration)' $CANON_WIDE` returns nothing. | 16–19 | Write the induction into `precept-language-spec.md` §0.7 in the want document's own terms: base case, inductive step, four premise classes, symmetric obligations. | **New.** The compiler's promise is the want document's central claim and canon has no statement of it. Deleting N51 without this leaves a hole rather than a correction. | `grep -rn "proof by induction" $CANON` must return **more than zero** | |
+| N53 | **ADDITION** — the four premise classes are not named anywhere | Absence search: `grep -rniE 'premise class\|four premise' $CANON_WIDE` returns nothing. | 19 | Name the four premise classes as a closed set: field modifiers, arg constraints, the handler's guard, and all rules holding in the pre-state. | **New.** Phase 5's discharge procedure quantifies over them; phase 6 writes one argument per rule. A closed set that exists only in the want document cannot be closed by phase 5's closed-list rule. | `grep -rn "premise class" $CANON` must return **more than zero** | |
+| N54 | **ADDITION** — symmetric write-site obligations | want:20 — "A rule's obligations attach to every write site of *every* field the rule mentions — not just the field the author was thinking about." Canon's closest text is `graph-analyzer.md:556`, which uses write sites only for `FieldNeverSet`. | 20 | State the symmetric obligation rule in the spec, joined to §3A.4's writer enumeration. | **New.** want:103 and want:115 make this the case authors "naturally miss", and it is the reason `ReduceLimit` must be guarded. Canon does not say it. | `grep -rn "every write site of every field" $CANON` must return **more than zero** | |
+| N55 | **ADDITION** — the base case rests on an assumption stated nowhere | The plan's "Known risks": "Every constraint held before this operation" is *proven* for data that arrived through the contract and *assumed* for restored and host-injected data. The assumption lives inside a proof argument. | 18, 141 | State it in canon, in those words, next to the guarantee — that the induction's base case is assumed rather than proven for restored and host-injected data, which is what want:141's trusted restore buys. | **New**, carried from the plan rather than from a grep. A reader of the promise should not have to read a validity argument to find the assumption the promise rests on. | `grep -rn "assumed for restored" $CANON` must return **more than zero** | |
+
+---
+
+# 8. Solvers, non-linear rules, and the bounded strategy set
+
+**want:135** — a non-linear post-state condition "is proven only when a guard or arg constraint makes
+that condition directly checkable … It is never governed by a post-mutation sweep, and never deferred
+to a solver the compiler doesn't carry."
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| N56 | `graph-analyzer.md:790` **INTRA-CANON** | "\| **Guard satisfiability analysis** \| Guards contain arbitrary expressions. Determining whether a guard can be satisfied **requires the proof engine's SMT integration**, not graph-level analysis. \|" | 135 | Delete "SMT integration". Guard satisfiability is discharged by the bounded strategy set or the guard is not proven dead. | **New.** Contradicts `proof-engine.md:106` ("no general SMT solver"), `:148` ("No SMT solver, no SAT solver, no external libraries") and `:2410` ("No external solver") — and want:135. It also names a capability the compiler does not have as the reason a check is out of scope, which reads to a builder as "wait for the SMT integration". | `grep -rn "SMT integration" $CANON` | |
+| N57 | `proof-engine.md:2580` **INTRA-CANON** | "**Five strategies only**, each a simple predicate — not a solver framework." | — | Reconcile the count. | **New.** The same document says **six** at `:106`, `:142`, `:151` and `:2410`, and describes **eleven** at `:628` (seven catalog-driven, three requirement-dispatched, plus CollectionGrowth). `compiler-and-runtime-design.md:598` says **four**. Four different counts of a closed set, in two documents. The count is not the point — the point is that a closed list nobody can state cannot be closed, and phase 5's closed-list rule fires on exactly this. | `grep -rn "Five strategies only" $CANON` | |
+| N58 | `compiler-and-runtime-design.md:598`, `:161` **WIDE** **INTRA-CANON** | "proof is bounded — **four strategies only**, no general SMT solver". | — | Reconcile with N57. | **New.** | `grep -rn "four strategies only" $CANON_WIDE` | |
+| N59 | **ADDITION** — non-linear rules | want:135 draws the line "in the open": a non-linear post-state condition is proven only from a guard or arg constraint that states it directly; otherwise the compiler rejects and names the guard that would close it. Canon has no statement of this; `proof-engine.md:2145` says only that guard completeness "would require solver-grade analysis". | 135, 105, 123 | State the non-linear rule in `precept-language-spec.md` §0.6 or §0.7, with the rejection message shape. | **New.** want:123's mutation row ("no post-mutation sweep or solver stands behind it") is one of the fourteen must-not-compile cases, so phase 10 needs a canonical statement to write a test against. | `grep -rn "non-linear" $CANON` must return **more than zero** in a normative sentence | |
+
+---
+
+# 9. Where the guarantee's mechanism is decided by provenance
+
+**Walk item 16, ruled 2026-07-26 on a worked case** (`rule Balance >= -OverdraftLimit` with both values
+supplied from outside, and an event lowering the limit): **a declared premise decides
+prove-versus-govern, not where the value came from.** The compiler refuses the definition until the
+author writes the condition that makes it provable; it does not hand the rule to the runtime because
+the values arrived from outside. **want:173** — the guarantee is uniform, with no author-facing
+distinction. **The accepted cost**: more definitions are refused, and authors write guards they did
+not write before.
+
+| ID | Site | Canonical text | Want / ruling | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| N60 | `compiler-and-runtime-design.md:125` **WIDE** | "The compiler cannot know what value a caller will supply, so this rule is **not proven at compile time** — it is a `ConstraintKind.Invariant` constraint plan **governed at runtime** … where it is *proven* … versus *governed* … is decided by **provenance**, not by whether the rule involves a fault." | walk 16; 14, 173 | **Delete.** The plan states this explicitly: "Phase 2 deletes `compiler-and-runtime-design.md:125`, and the 2026-07-06 boundary ruling's central line goes with it." Phase 5 proves relational rules over externally-supplied fields. | The sample it reasons from (`saas-trial-to-paid.precept`) and the want document's `BankAccountInvariant` are the same shape, and the owner ruled the opposite disposition on the second. | `grep -rn "is decided by provenance" $CANON_WIDE` | |
+| N61 | `compiler-and-runtime-design.md:135` **WIDE** | "Calculation soundness and constraint governance are then two faces of the *same* declared constraints, **split only by where the value comes from**." | walk 16; 173 | Delete the provenance split. What survives is that a bound on a computed value has no ingress door — which is a statement about *where a check could sit*, not about *what gets proven*. | **New.** N60 deletes the worked case; this is the general principle the worked case illustrates, two paragraphs later. Deleting one without the other leaves the rule and removes its example. | `grep -rn "split only by where the value comes from" $CANON_WIDE` | |
+| N62 | `compiler-and-runtime-design.md:149`, `:165` **WIDE** | "The compile-time proof for an externally-sourced operand **relies on** the operand's *declared* constraint; ingress governance makes that constraint hold on the actual value." | walk 16; 26 | **Read before editing — mostly survives.** want:26 says the premises are what the runtime enforces, which is this seam exactly. What must go is only the implication that an externally-sourced *rule* is therefore governed rather than proven. | **New.** The composition seam is the one part of this document the want document endorses; a sweep that deletes provenance language wholesale would take it out. | n/a — confirm by reading | |
+| N63 | `soundness-and-coverage.md:75`; `compiler-and-runtime-design.md:171` (c) **WIDE** | "**A computed value has no external ingress to govern.** The governance thesis only coheres for values…" | walk 16 | Survives as an argument about computed values. Does not survive as a general division of labour. | **New.** | n/a — confirm by reading | |
+| N64 | `precept-language-spec.md:270` | "**Composition.** For a value supplied at runtime, the compiler's proof … rests on the structural fact that the value carries a declared constraint; governance makes that constraint true of the value at ingress." | 26 | **CONFIRM — aligned.** This is want:26 in canon's words. | Recorded so the §0.7 rewrite that corrects S9, S10, S11 does not take it out by association. | n/a — confirm by reading | |
+| N65 | `precept-language-spec.md:266` (second half) | "The compiler delivers it by discharging, at every fault-prone operation, an obligation that each operand *carries* a sufficient constraint … It proves a structural fact — that the operand carries its constraint — never the concrete runtime value." | 16–19 | Replaced by the induction (N52). The carried-constraint test is the pre-want model. | Folded with S11; recorded separately because S11's direction column is about the fault list and this is about the discharge model. | `grep -rn "carries a sufficient constraint" $CANON` | |
+
+---
+
+# 10. Certificates
+
+**want:199–211** — the compiler emits a certificate; one small checker with two call sites, one of them
+a load-time gate; the runtime refuses to govern under a definition whose certificate does not verify;
+the premise list **is** the runtime's validation surface; inspect cites provenance.
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| C5 | `proof-engine.md:2612`; siblings `soundness-and-coverage.md:134`, `:137`, `:48`, `:288` | "The MVP builds **no live re-checker** and **no checker-gated mint**…" / "**Deferred — not in the MVP.**" | 201–206 | The checker is in scope, including its runtime load-time half. The plan's "Ruled — do not reopen" table carries this: "**The certificate checker is in scope**, including its runtime load-time half" (phase 11). Remove the deferral. | want:206 — "Every step is re-verified; the figuring-out is never repeated." A deferred checker means the guarantee is rooted in trusting the engine, which want:204 explicitly refuses. | `grep -rn "no live re-checker" $CANON` | |
+| N66 | `soundness-and-coverage.md:127`–`:132` | "### 5a. Certificate format (MVP prerequisite) — *(Intent — fill per slice.)*" | 199 | Fill it, or record who does. Phase 4 drafts and counts the certificate step list; phase 5 closes it. | **New.** A stub section that phase 4 and phase 5 both depend on. Not a contradiction — a named gap with an owner, recorded so the register accounts for it. | n/a — routed to phases 4 and 5 | |
+| N67 | `precept-language-spec.md:225` | "…it emits a certificate drawn from a small, spec-enumerated vocabulary (**the `CertificateSteps` catalog**) that an independent checker can replay…" | 199 | **CONFIRM — aligned with the want.** The catalog does not exist (`catalog-system.md:103` says so in canon's own voice), but that is a phase 9 gap, not a phase 2 contradiction. | Recorded so the non-existence of the catalog is not mistaken for a canon-versus-want disagreement. | n/a — routed to phases 4, 5, 9 | |
+| N68 | **ADDITION** — zero certificate mentions in `docs/runtime/` | `grep -rniE 'certificat' docs/runtime --include=*.md` returns nothing, verified at `b93d1db1`. want:204 requires a load-time gate in the runtime that refuses to govern under a definition whose certificate does not verify. | 204 | Write the load-time gate into `runtime-api.md` — the failure mode when verification fails, and its place in the operation order. Carried as R5a's scope addition; given its own row here so it is not lost inside a sweep row. | **New (recorded as a scope addition in the correction list, never a row).** The runtime's whole justification for being lighter is a verification it performs itself. Nothing in seven runtime documents mentions it. | `grep -rni "certificat" docs/runtime` must return **more than zero** | |
+| N69 | **ADDITION** — the premise list as the runtime's validation surface | want:210 — "the premise list **is** the runtime's validation surface — which guards and constraints must run and can never be skipped — derived from the proof, never maintained in parallel." Canon's `ConstraintPlanIndex` (N10) is exactly the parallel structure this forbids. | 210 | State that the runtime's validation set is derived from the certificate. Resolve with N10 — the two rows are the same decision from opposite directions. | **New.** The strongest reason N10 cannot be resolved by deleting prose alone. | `grep -rn "derived from the proof" $CANON` must return **more than zero** | |
+| N70 | **ADDITION** — inspect cites provenance | want:211 — "'no check needed here — proven from these premises,' and refusals can cite the rule's `because`." | 211 | Add to `runtime-api.md` § Inspect and `result-types.md`'s inspection types. Resolve with R4. | **New.** R4 removes what inspect predicts and does not say what replaces it. | `grep -rn "proven from these premises" $CANON` must return **more than zero** | |
+| N71 | **ADDITION** — the three author-visible verdicts | **Walk item 11, ruled 2026-07-26**: a refusal reports the search, and the compiler's errors are honest about which kind of refusal they are — *proven safe*, *proven unsafe*, *unproven* — so an author can tell a counterexample from a case the compiler could not reach. Canon carries the three-verdict DU (`compiler-and-runtime-design.md:161`, `diagnostic-system.md:182`) as **internal** vocabulary. | walk 11; 177–179 | Make the three verdicts author-visible in the diagnostic wording contract. | **New.** The plan assigns the contract and message shapes to phase 4, but the *canonical statement* that the distinction is author-facing is a document change and belongs here. Detail: [`../phase-4/what-a-refusal-claims.md`](../phase-4/what-a-refusal-claims.md). | `grep -rn "author-visible" docs/compiler/diagnostic-system.md` must return **more than zero** | |
+
+---
+
+# 11. Defaults, and prove-or-reject on the base case
+
+**want:18** — "The default configuration satisfies every rule." **want:124** — changing the default to
+`20000.0` "must be a compile-time rejection".
+
+| ID | Site | Canonical text | Want | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|---|
+| S15 | `precept-language-spec.md:213` | "Only a provably-false fold rejects; **an unknown/unfoldable default never rejects** (per Proof philosophy #1–2)." | 18, 124 | A default that constitutes part of the initial configuration and cannot be proven to satisfy the rules leaves the base case open and must reject, with the unresolved-blocks treatment §0.6 #2/#5 already applies to bounded writes. Defaults a construction event provably overwrites are placeholders and are a designed exception. | The never-reject posture contradicts want:18's base case directly. Siblings must flip together. | `grep -rn "never rejects" $CANON` | |
+| C8 | `diagnostic-system.md:417` | "Like every default fold, an unknown/unfoldable default never rejects." | 18, 124 | Flips with S15. | Sibling; still word-for-word at HEAD. | `grep -rn "an unknown/unfoldable default never rejects" $CANON` | |
+| N72 | `proof-engine.md:483` | "An unknown/unfoldable default — a computed (`<-`) field, a non-constant default, an `UnknownSentinel` — folds to `null` and **never rejects**." | 18, 124 | Flips with S15. | **Reworded sibling**, recorded in the correction list's drift notes but never given a row. Same claim, different sentence, so C8's grep pattern does not find it. | `grep -rn "folds to \`null\` and never rejects" $CANON` | |
+| N73 | `proof-engine.md:483` (suppression clause) | "A precept with a construction (`initial`) event **suppresses the rule-vs-default fold entirely** … the residual coarseness is a rule over a field the construction event does not assign (whose default *is* still the initial value)." | 18 | **Read before editing.** The designed exception want:18 allows is narrower than a whole-precept suppression: a placeholder is a default the construction event *provably overwrites*. Canon suppresses the check for every field whenever any construction event exists, and says so. | **New.** Canon names the hole itself ("residual coarseness") and defers per-field precision as a future refinement. Under want:18 that hole is the base case going unproven, which is not a refinement. | `grep -rn "suppresses the rule-vs-default fold entirely" $CANON` | |
+
+---
+
+# 12. Canon contradicting canon
+
+Carried from `canon-contradictions-found-2026-07-14.md` plus two found by this phase's search. The
+four ruled on 2026-07-14 are **not** here — see § 14.
+
+| ID | Site | Canonical text | Resolution | Reason | Grep | Commit |
+|---|---|---|---|---|---|---|
+| N74 | `temporal-type-system.md:143` vs `:1182`, `:1208` **INTRA-CANON** | `:143` — the last row of the context-aware classification table: "\| (none) \| **Period path** \| **Duration path** \| TEMP005 compile error \| N/A \|". `:1182` — "\| No context / ambiguous \| **compile error** \| "Can't determine the type of `'3 days'` without context…" \|". `:1208` — the same for time units. | **The later and more specific section wins: no context is a compile error, for both calendar units and time units.** Correct `:143`'s `(none)` row to compile error in both columns. | **This is the fifth item from the 2026-07-14 block inventory — the one that was never ruled and is still live at HEAD.** One text says a bare `'3 days'` silently takes the period path; the other says it is a compile error. The type-resolution-rules section is later, more specific, and carries the author-facing message; the classification table is a summary. Choosing the summary would mean a typed constant acquires a type from nothing, which contradicts the want document's determinism and the language's own "does not guess" (`precept-language-spec.md:104`). The 2026-07-14 walk's own cells followed the later section. | `grep -rnF '(none) \| Period path \| Duration path' $CANON` | |
+| C3 | `proof-engine.md:1733` **INTRA-CANON** | "…the field already satisfies its band entering the chain — **§3A.4 swept prior state**…" — the seeding justification for the count-interval walk. | **Re-ground on the inductive hypothesis.** The count interval is seeded from the governed band because every constraint held before this operation (want:19 premise class (d)), not because a runtime sweep left it that way. The proof mechanics survive unchanged; only the justification moves. | Carried from the correction list's leads and never given a resolution there. **It is the sharpest single case in the register of why the sweep cannot be deleted from the runtime documents alone**: a compile-time proof premise is grounded on the runtime mechanism being removed. Deleting §3A.4's sweep paragraph (S1) without this leaves a live proof strategy citing a deleted sentence. | `grep -rn "§3A.4 swept prior state" $CANON` | |
+| N75 | `primitive-types.md:582` vs `proof-engine.md:2133` **INTRA-CANON** | `:582` — "\| `notempty` \| `string`; **also `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`** \| `.length > 0` on string; **`.count ≥ 1` on collections (equivalent to `mincount 1`)** \|". `proof-engine.md:2133` — "(`notempty` **is string-only** and no longer carries a `count > 0` satisfaction — it does not discharge collection non-emptiness; in inner-type position it constrains each element.)" | **`notempty` is string-only.** Collection cardinality stays single-sourced as `mincount`/`maxcount`. Correct `primitive-types.md:582` to drop the collection applicability and the `mincount 1` equivalence; check `collection-types.md`'s constraint catalog in the same pass. | **This is the disposition of the first *don't remember* item from the phase-1 walk (item 20b).** He did not remember ruling it, and the printed answer stood as derived. This phase's search found the documentary contradiction that makes it decidable without his time: two canonical documents disagree, and `proof-engine.md` is the one that names the consequence (a `notempty` collection would discharge non-emptiness through a second, parallel mechanism). Two spellings of one cardinality constraint is the parallel-definition failure the catalog rules forbid. | `grep -rn "\`.count ≥ 1\` on collections" $CANON` | |
+| N76 | `compiler-and-runtime-design.md:907` vs `:845` **WIDE** **INTRA-CANON** | See N18. `:907` "Persisted data is never trusted" against `:845` "`Restore` bypasses … constraint evaluation — trusted hydration". | Resolved by N18 — `:907` goes. | Recorded here as well so the intra-canon count is honest. | see N18 | |
+| N77 | `graph-analyzer.md:790` vs `proof-engine.md:106`/`:148` | See N56. | Resolved by N56. | Same. | see N56 | |
+| N78 | `precept-language-spec.md:1946` vs `:272` | See S8. The restoration outcome space against the trusted-restore sentence in the same document. | Resolved by S8. | Named in S8's reason column in the correction list; recorded here so it appears in the intra-canon list. | see S8 | |
+
+---
+
+# 13. Rows whose resolution needs a decision this phase may not take
+
+Each of these is a place where correcting the document requires answering a question the canonical
+documents do not answer. The plan is explicit: "a resolution that requires a new language decision …
+is a design question, not a contradiction, and it goes to 'Waiting on Shane' rather than being resolved
+inside this phase."
+
+| ID | Site | What is undecided | What is stalled |
+|---|---|---|---|
+| N79 | `runtime-api.md` § Inspect, `result-types.md` § inspection types (R4, N70) | What inspect reports once it no longer predicts a constraint verdict. want:211 gives the shape ("no check needed here — proven from these premises") but not the result type. | Phase 5's certificate contract, and the inspection result types. Not blocking phase 2's other rows. |
+| N80 | N10 — the `ConstraintPlanIndex` | Whether the index survives in reduced form (ingress governance of a field's declared contract, guards) or is replaced by a certificate-derived premise list per want:210. | Phase 5 and the runtime's shape. **This is the largest open consequence in the register.** |
+| N81 | N51/N52 — replacing "No Inductive Proof" | The induction itself has never been argued. The plan's "Known risks" carries this: over this language — state residency, computed fields, `omit` resets, entry and exit chains, first-match rows — the induction is not obvious and no argument for it exists anywhere. | Phase 5 writes it; phase 6 attacks it. Phase 2 states the model; it does not prove it. |
+| N82 | The same-basis periods ordering (walk item 19) | He ruled that same-basis periods order, against locked Decision 14. `temporal-type-system.md:1478` and `collection-types.md:533` reconcile to the ruling at phase 2 — but the ordering needs a qualifier-conditional trait that does not exist, which is **new language surface and goes through `/design`**, not into a phase-2 doc edit. | The document reconciliation is phase 2's; the trait is not. BUG-047 is re-checked. Recorded here so the split is explicit and phase 2 does not write the trait. |
+
+---
+
+# 14. Considered and excluded, with the reason
+
+Nothing here is a row. Each is recorded so a re-runner who meets the same text knows it was seen and
+ruled out rather than missed.
+
+## 14.1 Ruled on 2026-07-14, corrected in `90f0792f` — do not re-litigate
+
+From `canon-contradictions-found-2026-07-14.md`. `90f0792f` is inside phase 1's commit walk, so these
+arrive with a documentary verdict already attached.
+
+| Item | What it was | Where it stands at HEAD |
+|---|---|---|
+| Integer overflow, three incompatible claims | `primitive-types.md:81`, `:197`, `:203` | `:81` rewritten to fixed-width with the deferral disclosed. **N43 above adds a cross-reference gap, which is new, not a re-litigation.** |
+| `pow` with a negative exponent | `primitive-types.md:613` | Corrected to "`exp` must be non-negative — negative exponents break decimal-lane closure." |
+| Money minor-units and implicit rounding | `business-domain-types.md:1989` | Rewritten to explicit-only `maxplaces`, author-invoked rounding. |
+| A worked example its own rule rejects | `business-domain-types.md:1576` | Corrected to `field Score as quantity in 'each' max 100`. |
+
+## 14.2 The six readings the 2026-07-14 walk could not settle
+
+Each is dispositioned rather than made a row.
+
+| Item | Disposition |
+|---|---|
+| `primitive-types.md` — rounding edge values and decimal-vs-number arithmetic state produced *values*, not accept/reject | **Not a canon question.** A test-shape problem: checking these means comparing a produced value. Routed to **phase 10**. |
+| `proof-engine.md` — Pass 1.5 verdicts are warnings, recorded as rejections | **Is a canon question, and it is now rows C6, N47, N48, N49.** The 2026-07-14 walk was right to flag it. |
+| `proof-engine.md:110` — logarithmic units "outside the proof guarantee" with no stated outcome | **Canon gap, routed to phase 3.** Under want:189 an unproven case rejects, so the missing outcome has an answer — but naming the diagnostic is a statement of the language, which phase 3 owns. |
+| `proof-engine.md` — key-presence and index-bounds carry no diagnostic code | **Routed to phase 3** with the same reasoning. |
+| `temporal-type-system.md:1091`–`:1096` — DST resolution is a runtime value | **Not a canon question.** Routed to **phase 10**: a specified behaviour with nothing checking it. |
+| `temporal-type-system.md:262` — cites `PRECEPT0007` by a name that may not exist | **Document-against-catalog**, which this phase may not cite. Routed to **phase 9**. |
+
+## 14.3 Excluded by owner ruling
+
+| Site | Why excluded |
+|---|---|
+| `philosophy.md:53` (P5) | Walk item 23: philosophy states the target, and the code is validated against it. The correction list says explicitly: "Do not add it." |
+| `philosophy.md:61` (P6) | Same ruling, same sentence shape. |
+
+## 14.4 Not contradictions
+
+| Site | Why not |
+|---|---|
+| `README.md:8`, `:104`, `:117` | Mechanism-neutral guarantee claims; `:117` points at spec §0.7 and inherits whatever §0.7 says. Re-checked at `b93d1db1`; the 2026-07-19 finding of no corrections holds. |
+| `README.md:110` | Lists what the proof engine catches today with diagnostic codes. It is a status claim about the build, not a claim about the model, and `CLAUDE.md`'s documentation-sync rule already governs it. |
+| `precept-language-spec.md:1992`, `:2204` | Canon stating in its own voice that the writer enumeration is not enforced and that this is a soundness dependency. Not a disagreement — an admitted gap, closed by **phase 3**, which closes the write-site list. |
+| `precept-language-spec.md:172` (no separate compilation) | Agrees with want:193. |
+| `name-binder.md:92`, `:374` | "No cross-precept resolution" agrees with want:191–195. |
+| `philosophy.md:82` (sagas) | Positioning against MassTransit, not a claim about Precept's proof boundary. |
+| want:219, want:220 | Questions the want document itself declares open. Canon saying something about either is canon answering an open question, which goes to "Waiting on Shane", not into this register. |
+
+---
+
+# 15. Disposal of the two *don't remember* items from phase 1
+
+Finish-line condition 5: every *don't remember* item is disposed of — resolved as a row, or explicitly
+recorded as still open with what is stalled. **Both are disposed of. Undisposed = 0.**
+
+## Item 20b — "`notempty` is string-only"
+
+**Resolved as a row: N75.** He did not remember ruling it, and the phase-1 register recorded the
+printed answer as standing: string-only is right, collection cardinality stays single-sourced as
+`mincount`/`maxcount`.
+
+This phase's search made it decidable without his time, because it found the documentary
+contradiction: `primitive-types.md:582` says `notempty` also applies to seven collection types and is
+equivalent to `mincount 1`, and `proof-engine.md:2133` says it is string-only and no longer carries a
+`count > 0` satisfaction. Two canonical documents, opposite answers, both live at `b93d1db1`. That
+turns a memory question into a document question, which is what this phase is for. The resolution
+follows `proof-engine.md`, because it is the one that names the consequence — a `notempty` collection
+would discharge non-emptiness through a second mechanism parallel to `mincount`, which is the
+parallel-definition failure the project's own catalog rules forbid.
+
+**Nothing is stalled.** It is a row with a resolution and a reason.
+
+## Item 24 — ratification of the 2026-07-06 boundary ruling
+
+**Recorded as still open, and what is stalled is nothing.** Two separable things were marked:
+
+- **The ratification itself** — whether he ratified the 2026-07-06 boundary ruling and cleared the
+  2026-07-12 architecture gate. He does not remember, and the document's "pending Shane ratification"
+  footer stands. **This stays open.** It is a question about authority, not about text, and this phase
+  cannot settle it from documents. It does not need settling, because:
+- **The substance** — that provenance decides prove-versus-govern — **is settled the other way, and
+  more recently.** Walk item 16, ruled 2026-07-26 on a worked case, says a declared premise decides
+  prove-versus-govern and where the value came from does not. That is a later ruling on the same
+  question, given with a worked example in front of him, and it supersedes whatever the 2026-07-06
+  ruling's status was. The plan records the consequence in its own words: "Phase 2 deletes
+  `compiler-and-runtime-design.md:125`, and the 2026-07-06 boundary ruling's central line goes with
+  it."
+
+So the ratification question is open and **nothing waits on it**: the text it would have authorised is
+being deleted by rows N60 and N61 on the authority of a later ruling. If he later says he did ratify
+2026-07-06, N60 and N61 still execute, because walk item 16 is the more recent word on the same
+question.
+
+**No row is opened for the ratification**, and it is deliberately **not** added to "Waiting on Shane" —
+asking him to ratify a document whose central line is being deleted would be exactly the
+already-answered decision the plan's § 3 says to send back.
+
+---
+
+# 16. Counts, for the finish-line check
+
+Recount rather than trusting these:
+
+```bash
+grep -oE '^\| (S[0-9]+|P[0-9]+|R[0-9]+[ab]?|C[0-9]+|SC-1|N[0-9]+) \|' contradiction-register.md \
+  | tr -d '| ' | sort -u | wc -l          # 128 identifiers
+```
+
+**128 identifiers, 123 rows.** Five identifiers are deliberately not rows and are excluded from every
+count below: **P5** and **P6** are recorded in § 5 as *considered and excluded by owner ruling*, and
+**N76**, **N77**, **N78** are cross-reference entries in § 12 pointing at N18, N56 and S8 so the
+intra-canon list reads completely. Each of the five says so in its own resolution cell.
+
+| Measure | Count |
+|---|---|
+| Distinct rows | **123** |
+| Carried from `sweep-correction-list.md` § 1 (the 25 verified) | 25 |
+| Plus its clarity row `SC-1` | 1 |
+| Plus its § 2 leads (19 leads, `C5-sib` folded into `C5`) | 18 |
+| New, from this phase's search | 79 |
+| Cross-reference entries carrying no resolution of their own (N76, N77, N78) | 3, **not counted as rows** |
+| Rows marked `OWNER APPROVAL REQUIRED` (`docs/philosophy.md`) | 4 (P1, P2, P3, P4) — plus P5, P6 recorded as excluded, not rows |
+| Rows marked `ADDITION` (canon must gain text) | 9 (N52, N53, N54, N55, N59, N68, N69, N70, N71) |
+| Rows marked `INTRA-CANON` | 11 (N18, C3, C7, N46, N47, N48, N56, N57, N58, N74, N75) |
+| Rows marked **WIDE** (pattern must run against the wider file set) | 16 |
+| Rows that are confirm-only, no edit | 6 (R8, N44, N47, N49, N64, N67) |
+| Rows routed to "Waiting on Shane" rather than resolved here | 4 (N79, N80, N81, N82) |
+| Rows with a resolution and a reason, both non-empty | 123 — condition 1 met |
+| Rows naming the commit that executed them | 0 — **condition 2 is not met and cannot be met here, by design.** A different slice executes; that slice fills the column. |
+
+## The philosophy rows, unchanged and unexecuted
+
+| ID | Site | Canonical text | Want | Resolution | Reason |
+|---|---|---|---|---|---|
+| P1 | `philosophy.md:19` **OWNER APPROVAL REQUIRED** | "**Fire**: … The engine validates input arguments, selects a matching transition row via guards, executes mutations, **evaluates all applicable constraints against the resulting configuration, and commits only if every constraint holds**." | 215 | Fire's mechanism becomes: arg validation at ingress, guard evaluation, mutation, unconditional commit — the constraints hold because they were proven preserved, verified by certificate. | The want document itself names this sentence at want:215 as needing "a deliberate, owner-approved rewording". Walk item 23 neither authorises nor blocks it: this is a change of substance, not an honesty adjustment. |
+| P2 | `philosophy.md:51` **OWNER APPROVAL REQUIRED** | "Whether the rule is about what the entity *is* or what the operation *brings in*, **it evaluates atomically — the change and the check are the same act**." | 199 | The clause asserts per-operation runtime rule evaluation as the enforcement mechanism. Under the want, enforcement is compile-time proof plus ingress and guard premise checks. The surrounding guarantee ("no operation can produce a result that violates a declared rule") is aligned and survives. | Same as P1 — substance, not honesty. |
+| P3 | `philosophy.md:20` **OWNER APPROVAL REQUIRED** | "**Update**: edit a field directly. **The same constraint enforcement applies.**" | 199 | Rides on P1. Under the revised S1/R3 direction, an editable write is an ordinary write site the compiler discharges, with runtime governance upholding the field's own declared contract. | Owner-gated, same pass as P1. |
+| P4 | `philosophy.md:33` **OWNER APPROVAL REQUIRED** | "…but in either case, **the engine enforces it structurally on every operation where it applies**." | 199 | Wording-level. "Enforces on every operation" reads as runtime evaluation; under the want the enforcement is structural in a different sense — proven, not evaluated. | Owner-gated, same pass as P1/P2. The lightest of the four, and the one most likely to be judged fine as written. |
+
+**These four are never executed from this register.** The wording goes to Shane as a diff. If he
+declines any of them, the row stays with its resolution recorded and its commit column permanently
+empty, and the register says so rather than quietly dropping it.
