@@ -194,7 +194,7 @@ field Quantity as integer nonnegative default 0
 field Priority as integer min 1 max 10
 ```
 
-**Backing:** Exact whole number. No fractional part. Overflow is a type error.
+**Backing:** Exact whole number. No fractional part. Overflow is a type error — that is the end state this section describes, and it is not being weakened. The compile-time proof that would deliver it is deferred past the first release, exactly as the `integer` row of the approximation-stance table above records; see [Open Questions](#open-questions--implementation-notes) and `precept-language-spec.md` §0.7.
 
 **Operators:**
 
@@ -233,7 +233,7 @@ field Balance as decimal default 0
 
 | Expression | Result | Notes |
 |---|---|---|
-| `decimal + decimal` | `decimal` | Stays in lane. Overflow is an error. |
+| `decimal + decimal` | `decimal` | Stays in lane. Overflow is an error — the target, with the proof behind it deferred past the first release as for `integer` (see [Open Questions](#open-questions--implementation-notes)). |
 | `decimal - decimal` | `decimal` | |
 | `decimal * decimal` | `decimal` | |
 | `decimal / decimal` | `decimal` | Full 28-digit precision. Divisor safety applies. |
@@ -579,7 +579,7 @@ Authors who need an unbounded-end-of-range comparison on a fixed-format string c
 | `min N` | `integer`, `decimal`, `number` | Value ≥ N |
 | `max N` | `integer`, `decimal`, `number` | Value ≤ N |
 | `maxplaces N` | `decimal` only | At most N decimal places. Validation constraint, not auto-rounding. |
-| `notempty` | `string`; also `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P` | `.length > 0` on string; `.count ≥ 1` on collections (equivalent to `mincount 1`). See [collection-types.md §Constraint Catalog](collection-types.md#constraint-catalog). |
+| `notempty` | `string` only — including a collection's string inner type, where it binds each element (`set of string notempty`) | `.length > 0`. It says nothing about how many elements a collection holds: "the collection has at least one element" is `mincount 1`, and that is the only spelling of it. See [collection-types.md §Constraint Catalog](collection-types.md#constraint-catalog). |
 | `minlength N` | `string` only | `.length ≥ N` |
 | `maxlength N` | `string` only | `.length ≤ N` |
 | `ordered` | `choice` only | Enables ordinal comparison by declaration position |
@@ -651,11 +651,11 @@ Rounding and bridge functions must define behavior at boundaries:
 
 | Input | `floor` / `ceil` / `truncate` / `round` | `round(value, places)` |
 |-------|------------------------------------------|------------------------|
-| `+∞` | Runtime fault — integer overflow | Runtime fault — cannot round infinity |
-| `-∞` | Runtime fault — integer overflow | Runtime fault — cannot round infinity |
-| `NaN` | Runtime fault — NaN is not a number | Runtime fault — NaN is not a number |
+| `+∞` | Deferred with the arithmetic overflow model — no compile-time proof, and nothing at evaluation time either | Same deferral |
+| `-∞` | Deferred with the arithmetic overflow model — no compile-time proof, and nothing at evaluation time either | Same deferral |
+| `NaN` | Cannot arrive — prevented at compile time and at ingress (see below) | Cannot arrive — prevented at compile time and at ingress (see below) |
 
-Non-finite values cannot reach `decimal`-lane rounding (since `decimal` has no infinity/NaN representation). They can only occur in the `number` lane. The table above states what the runtime does if a non-finite value ever reaches a rounding function; it is not the enforcement model. Per Principle 10 (`precept-language-spec.md:110`), a fault-prone operation is proven safe or the definition is rejected — a runtime trap is defensive redundancy, never the primary mechanism.
+Non-finite values cannot reach `decimal`-lane rounding (since `decimal` has no infinity/NaN representation). They can only occur in the `number` lane. The table above is a disposition, not a description of a check the evaluator performs: per Principle 10 (`precept-language-spec.md:110`) a fault-prone operation is proven safe or the definition is rejected, and there is no runtime trap standing behind it. The two non-finite cases are dispositioned separately, and the section below says which is prevented and which is deferred.
 
 **How non-finiteness is prevented (owner ruling, 2026-07-21).** The two cases are separated because their entry paths differ.
 
@@ -668,7 +668,7 @@ Non-finite values cannot reach `decimal`-lane rounding (since `decimal` has no i
 
 The change to what a qualifier modifier establishes on the `number` lane is a modifier-semantics change and is designed before it ships; this section states the target.
 
-**Integer conversion overflow:** `floor(1e20)` produces a value outside `integer` range. This is a runtime fault — the value exceeds `long.MaxValue` / `long.MinValue`. The same applies to `ceil`, `truncate`, and `round` on very large `number` or `decimal` values. Statically preventable when the proof engine can bound the expression range.
+**Integer conversion overflow:** `floor(1e20)` produces a value outside `integer` range — it exceeds `long.MaxValue` / `long.MinValue`. The same applies to `ceil`, `truncate`, and `round` on very large `number` or `decimal` values. This is the conversion case of arithmetic overflow and it carries the same deferral: the target is a compile-time proof that bounds the expression range and rejects when it cannot, and until that ships neither the compiler nor the evaluator stands behind it (`precept-language-spec.md` §0.7).
 
 ### String functions
 

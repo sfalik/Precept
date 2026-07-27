@@ -140,7 +140,9 @@ The shared temporal parsing subsystem lives in `src/Precept/Language/Time/`. `Te
 |---|---|---|---|---|
 | `duration` | Converted to exact Duration (1 day = 24 h, 1 week = 168 h) | Normal Duration path | Accepted — all units become Duration | Compile error (TEMP007 — variable length) |
 | `period` | Normal Period path | Added to PeriodBuilder (hours/minutes/seconds components) | Accepted — all units become Period components | Normal Period path |
-| (none) | Period path | Duration path | TEMP005 compile error | N/A |
+| (none) | Compile error — no context, no type | Compile error — no context, no type | TEMP005 compile error | N/A |
+
+**No expected type is always a compile error.** The `(none)` row above agrees with the type-resolution rules further down (§ *Type resolution rules — context-dependent*, the `No context / ambiguous` rows): a temporal quantity written with no context does not silently acquire a type. `'3 days'` on its own is rejected with "Can't determine the type of `'3 days'` without context. Use it in an expression like `DueDate ± '3 days'` so the type is clear." The language does not guess (`precept-language-spec.md` §0.1 principle 7), and a typed constant that took its type from nothing would be exactly that.
 
 **Mixed-unit temporal quantities (F-LANG-TEMP-05):** `'1 day + 2 hours'` is valid when the target type is `period` (NodaTime Period supports mixed calendar+time components) or `duration` (both units convert to exact Duration). Without a target type, mixed units emit TEMP005.
 

@@ -210,7 +210,7 @@ public sealed record EventInspection(
 - `ArgErrors` — populated when provided args fail structural validation (type mismatch, unknown keys, etc.). When non-empty, guard/constraint evaluation is not invoked; the evaluator returns directly with `OverallProspect = Impossible`.
 - `CurrentFields` — pre-mutation snapshot of all fields, captured *once* before the row evaluation loop. This is the entity's current state at the time of inspection. Consumers use it alongside per-row `PostFields` to show before/after comparisons. (Renamed from `FieldSnapshots` to fix a latent bug where the value was overwritten per-row iteration.)
 - `Transitions` — empty list = undefined event (no rows/hooks for this event in current state).
-- `EventEnsures` — event-scoped `on<event>` constraint results. Currently passes empty array until the constraint plan index is wired for event-keyed inspection. **OQ-4 (pending):** whether `EventEnsures` should move inside `TransitionInspection` (per-row, evaluated against each row's post-mutation state) or remain event-level.
+- `EventEnsures` — event-scoped `on<event>` constraint results. Currently passes empty array until the constraint plan index is wired for event-keyed inspection. It stays **event-level**. OQ-4 used to ask whether it should move inside `TransitionInspection`, evaluated per row against that row's post-mutation state; that option describes a pipeline the language no longer has. An `on <Event> ensure` validates the caller's arguments at ingress, once, before any row is matched (spec §3A.1), so there is no per-row post-mutation state to evaluate it against and nothing to attribute to a row. What the array should *carry* now that execution has no constraint-evaluation phase is the open question recorded below under *what the `ConstraintResult` arrays mean now* — not where it lives.
 
 Returned by `Version.InspectFire(eventName, args?)`. Also nested inside `UpdateInspection.Events`.
 
@@ -372,7 +372,7 @@ public enum FieldAccessMode { Read, Write }
 | F# discriminated unions | Exhaustive match, per-case payload | Same pattern in C# via sealed records. |
 | K8s dry-run | Same response type as real operation, `managedFields` annotation | Commit and inspection share structural vocabulary. |
 | Terraform plan | Progressive resolution — known values vs. `(known after apply)` | `FieldSnapshot.IsResolved` and `ConstraintStatus.Unresolvable` follow this pattern. |
-| OPA `deny[msg]` | Collect-all violation set | ConstraintResult lists, not short-circuit. |
+| OPA `deny[msg]` | Collect-all violation set | Ingress validation reports every violation, not the first — `InvalidArgs` for event and construction arguments, `UpdateOutcome.ConstraintsFailed` for a patch. Collect-all applies at ingress only; there is no post-mutation evaluation left to collect from. |
 | DDD per-command results | Each command returns its own result type | Two families (EventOutcome, UpdateOutcome), not unified. |
 | gRPC status codes | FAILED_PRECONDITION / INVALID_ARGUMENT / ABORTED | Maps to Rejected / InvalidArgs / Unmatched. |
 

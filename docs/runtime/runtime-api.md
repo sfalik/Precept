@@ -270,7 +270,6 @@ RestoreOutcome outcome = precept.Restore(state: "Pending", fields: storedJsonEle
 Version version = outcome switch
 {
     Restored r                      => r.Result,
-    RestoreConstraintsFailed f      => HandleSchemaDrift(f.Violations),
     RestoreInvalidInput e           => throw new ArgumentException(e.Reason),
 };
 ```
@@ -279,7 +278,7 @@ Version version = outcome switch
 
 > ⚠️ **Design note:** The implementation uses `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — and returns a structured `RestoreOutcome` rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
 >
-> **`RestoreConstraintsFailed` is superseded** by the trusted-hydration decision (spec §0.7): Restore does not re-validate, so a constraint-failure outcome on restore no longer applies. It should be removed when the Restore API is finalized (`RestoreOutcome` may still carry parse / state-resolution failures); the example above is left until that API cleanup lands.
+> **There is no constraint-failure outcome on restore.** Restore does not re-validate — restored data is trusted as valid at the time it was persisted (spec §0.7) — so the only ways restore can fail are structural: an undefined state name, unknown fields, a type mismatch. `RestoreOutcome` carries those and nothing else.
 
 **Access modes are bypassed.** Fields that are `readonly` in the restored state were `editable` when previously written. `Restore` accepts all stored fields regardless of the current state's access declarations.
 
