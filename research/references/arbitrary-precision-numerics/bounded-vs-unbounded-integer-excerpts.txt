@@ -1,0 +1,280 @@
+Mirror of external excerpts on what arbitrary-precision integer representations cost, and on the
+wrap / trap / saturate choice for fixed-width ones.
+
+Collected 2026-07-26 for research/architecture/compiler/overflow-in-solver-free-interval-domains.md.
+Every excerpt below was extracted from the live page on that date; the URL and section are recorded
+with each one.
+
+
+================================================================================
+1. Java BigInteger — "arbitrary precision" still has a range, and leaving it throws
+================================================================================
+SOURCE: java.math.BigInteger, Java SE 21 API Specification, Oracle.
+URL: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/math/BigInteger.html
+Accessed 2026-07-26. Grade: Primary (official language platform specification).
+
+Class description:
+
+  "Immutable arbitrary-precision integers. All operations behave as if BigIntegers were represented
+  in two's-complement notation (like Java's primitive integer types). BigInteger provides analogues
+  to all of Java's primitive integer operators, and all relevant methods from java.lang.Math."
+
+  "Semantics of arithmetic operations exactly mimic those of Java's integer arithmetic operators,
+  as defined in The Java Language Specification. For example, division by zero throws an
+  ArithmeticException, and division of a negative by a positive yields a negative (or zero)
+  remainder."
+
+Supported range:
+
+  "BigInteger must support values in the range -2^Integer.MAX_VALUE (exclusive) to
+  +2^Integer.MAX_VALUE (exclusive) and may support values outside of that range. An
+  ArithmeticException is thrown when a BigInteger constructor or method would generate a value
+  outside of the supported range."
+
+Implementation Note:
+
+  "In the reference implementation, BigInteger constructors and operations throw ArithmeticException
+  when the result is out of the supported range of -2^Integer.MAX_VALUE (exclusive) to
+  +2^Integer.MAX_VALUE (exclusive)."
+
+
+================================================================================
+2. Python int — unbounded value, but a bounded-by-policy conversion, for a CVE
+================================================================================
+SOURCE: "Integer string conversion length limitation", The Python Standard Library — Built-in Types,
+Python 3.14.6 documentation, Python Software Foundation.
+URL: https://docs.python.org/3/library/stdtypes.html#int-max-str-digits
+reStructuredText source fetched from https://docs.python.org/3/_sources/library/stdtypes.rst.txt
+Accessed 2026-07-26. Grade: Primary (official language documentation).
+
+  "CPython has a global limit for converting between int and str to mitigate denial of service
+  attacks. This limit *only* applies to decimal or other non-power-of-two number bases. Hexadecimal,
+  octal, and binary conversions are unlimited. The limit can be configured."
+
+  "The int type in CPython is an arbitrary length number stored in binary form (commonly known as a
+  "bignum"). There exists no algorithm that can convert a string to a binary integer or a binary
+  integer to a string in linear time, *unless* the base is a power of 2. Even the best known
+  algorithms for base 10 have sub-quadratic complexity. Converting a large value such as
+  ``int('1' * 500_000)`` can take over a second on a fast CPU."
+
+  "Limiting conversion size offers a practical way to avoid CVE 2020-10735."
+
+  "When an operation would exceed the limit, a ValueError is raised"
+
+  Worked example from the docs:
+
+    >>> sys.set_int_max_str_digits(4300)  # Illustrative, this is the default.
+    >>> i = int('2' * 4300)
+    >>> len(str(i))
+    4300
+    >>> i_squared = i*i
+    >>> len(str(i_squared))
+    Traceback (most recent call last):
+    ...
+    ValueError: Exceeds the limit (4300 digits) for integer string conversion; use
+    sys.set_int_max_str_digits() to increase the limit
+    >>> len(hex(i_squared))
+    7144
+
+  "The default limit is 4300 digits as provided in sys.int_info.default_max_str_digits. The lowest
+  limit that can be configured is 640 digits as provided in
+  sys.int_info.str_digits_check_threshold."
+
+  "versionadded:: 3.11"
+
+Note on the worked example: the multiplication `i*i` itself succeeds. It is the *display* of the
+result that fails. The value is unbounded; what is bounded is a superlinear operation over it.
+
+
+================================================================================
+3. GMP — no limit but memory, and running out of memory terminates the process
+================================================================================
+SOURCE: The GNU Multiple Precision Arithmetic Library, home page and manual for GNU MP 6.3.0.
+URLs: https://gmplib.org/ and https://gmplib.org/manual/Custom-Allocation
+Accessed 2026-07-26. Grade: Primary (the library's own documentation).
+
+Home page, "What is GMP?":
+
+  "GMP is a free library for arbitrary precision arithmetic, operating on signed integers, rational
+  numbers, and floating-point numbers. There is no practical limit to the precision except the ones
+  implied by the available memory in the machine GMP runs on."
+
+Manual § 13 Custom Allocation:
+
+  "By default GMP uses malloc, realloc and free for memory allocation, and if they fail GMP prints a
+  message to the standard error output and terminates the program."
+
+  "There's currently no defined way for the allocation functions to recover from an error such as
+  out of memory, they must terminate program execution. A longjmp or throwing a C++ exception will
+  have undefined results. This may change in the future."
+
+
+================================================================================
+4. Rust — the four fixed-width overflow behaviours, each a named operation
+================================================================================
+SOURCE: The Rust Reference, § Operator expressions — Overflow; and the std library primitive type
+`i64` method documentation.
+URLs: https://doc.rust-lang.org/reference/expressions/operator-expr.html#overflow
+      https://doc.rust-lang.org/std/primitive.i64.html
+Accessed 2026-07-26. Grade: Primary (official language reference and standard library docs).
+
+Reference, § Overflow:
+
+  "Integer operators will panic when they overflow when compiled in debug mode. The -C
+  debug-assertions and -C overflow-checks compiler flags can be used to control this more directly.
+  The following things are considered to be overflow:
+   * When +, * or binary - create a value greater than the maximum value, or less than the minimum
+     value that can be stored.
+   * Applying unary - to the most negative value of any signed integer type, unless the operand is a
+     literal expression …
+   * Using / or %, where the left-hand argument is the smallest integer of a signed integer type and
+     the right-hand argument is -1. These checks occur even when -C overflow-checks is disabled, for
+     legacy reasons.
+   * Using << or >> where the right-hand argument is greater than or equal to the number of bits in
+     the type of the left-hand argument, or is negative."
+
+std, i64 methods:
+
+  checked_add:     "Checked integer addition. Computes self + rhs, returning None if overflow
+                    occurred."
+  wrapping_add:    "Wrapping (modular) addition. Computes self + rhs, wrapping around at the
+                    boundary of the type."
+                    assert_eq!(i64::MAX.wrapping_add(2), i64::MIN + 1);
+  saturating_add:  "Saturating integer addition. Computes self + rhs, saturating at the numeric
+                    bounds instead of overflowing."
+                    assert_eq!(i64::MAX.saturating_add(100), i64::MAX);
+                    assert_eq!(i64::MIN.saturating_add(-1), i64::MIN);
+  overflowing_add: "Calculates self + rhs. Returns a tuple of the addition along with a boolean
+                    indicating whether an arithmetic overflow would occur. If an overflow would have
+                    occurred then the wrapped value is returned (negative if overflowed above MAX,
+                    non-negative if below MIN)."
+
+
+================================================================================
+5. Temporal — leaving the representable calendar range
+================================================================================
+
+--- 5a. java.time.Instant ---
+SOURCE: java.time.Instant, Java SE 21 API Specification, Oracle.
+URL: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/Instant.html
+Accessed 2026-07-26. Grade: Primary.
+
+  Instant.MIN: "The minimum supported Instant, '-1000000000-01-01T00:00Z'. This could be used by an
+  application as a "far past" instant. This is one year earlier than the minimum LocalDateTime. This
+  provides sufficient values to handle the range of ZoneOffset which affect the instant in addition
+  to the local date-time. The value is also chosen such that the value of the year fits in an int."
+
+  Instant.MAX: "The maximum supported Instant, '1000000000-12-31T23:59:59.999999999Z'. …"
+
+  plus(TemporalAmount) throws:
+    "DateTimeException - if the addition cannot be made"
+    "ArithmeticException - if numeric overflow occurs"
+
+  plus(long amountToAdd, TemporalUnit unit) throws:
+    "DateTimeException - if the addition cannot be made"
+    "UnsupportedTemporalTypeException - if the unit is not supported"
+    "ArithmeticException - if numeric overflow occurs"
+
+  (The phrase "if the result exceeds the maximum or minimum instant" appears on plusSeconds(long),
+  plusMillis(long) and plusNanos(long) rather than on the two generic plus methods.)
+
+--- 5b. Noda Time Instant (the .NET comparator) ---
+SOURCE: Noda Time, NodaTime/Instant.cs, main branch.
+URLs: https://nodatime.org/3.1.x/api/NodaTime.Instant.html (API docs)
+      https://raw.githubusercontent.com/nodatime/nodatime/main/src/NodaTime/Instant.cs (source)
+Accessed 2026-07-26. Grade: Primary (the library's own source and documentation).
+
+API docs: Instant "Represents an instant on the global timeline, with nanosecond resolution."
+  Instant.MinValue documented value: -9998-01-01T00:00:00Z
+  Instant.MaxValue documented value:  9999-12-31T23:59:59.999999999Z
+  The `operator +` and `Add` API documentation say only "A new Instant representing the sum of the
+  given values" — the out-of-range behaviour is NOT documented on those members. It is visible only
+  in the source.
+
+Source, Instant.cs:
+
+    public static Instant operator +(Instant left, Duration right)
+        => FromUntrustedDuration(left.duration + right);
+
+    /// <summary>
+    /// Creates an Instant with the given duration, validating that it has a suitable
+    /// "day" part. (It is assumed that the nanoOfDay is okay.)
+    /// </summary>
+    internal static Instant FromUntrustedDuration(Duration duration)
+    {
+        int days = duration.FloorDays;
+        if (days < MinDays || days > MaxDays)
+        {
+            throw new OverflowException("Operation would overflow range of Instant");
+        }
+        return new Instant(duration);
+    }
+
+  Noda Time also carries explicit out-of-range sentinel values for the internal path, rather than
+  throwing, where the arithmetic is known to be recoverable:
+
+    /// <summary>
+    /// Adds the given offset to this instant, either returning a normal LocalInstant,
+    /// or <see cref="LocalInstant.BeforeMinValue"/> or <see cref="LocalInstant.AfterMaxValue"/>
+    /// if the value would overflow.
+    /// </summary>
+    internal LocalInstant SafePlus(Offset offset) { … }
+
+
+================================================================================
+6. Astrée (AbsInt product page) — what it detects, and its soundness claim
+================================================================================
+SOURCE: Astrée — Static Analyzer for Runtime Error Detection, AbsInt Angewandte Informatik GmbH.
+URL: https://www.absint.com/astree/index.htm
+Accessed 2026-07-26. Grade: Secondary (vendor product documentation).
+
+  Detected runtime errors: "division by zero, out-of-bounds array indexing, erroneous pointer
+  manipulation and dereferencing (NULL, uninitialized and dangling pointers), integer and
+  floating-point arithmetic overflow" — also "read access to uninitialized variables, data races,
+  inconsistent locking, invalid calls to operating system services, Spectre vulnerabilities, other
+  critical data and control-flow errors."
+
+  "Astrée is sound — that is, if no errors are signaled, the absence of errors has been formally
+  proved."
+
+  "thanks to its modularity and domain-awareness, Astrée can be made exceptionally precise, often to
+  the point of producing exactly zero false alarms."
+
+  The page does not distinguish defined wraparound from erroneous overflow; it lists "integer and
+  floating-point arithmetic overflow" as one category.
+
+
+================================================================================
+7. IKOS (NASA) — a shipping open solver-free analyzer with overflow checkers
+================================================================================
+SOURCE: IKOS (Inference Kernel for Open Static Analyzers), NASA Software V&V.
+URLs: https://github.com/NASA-SW-VnV/ikos and analyzer/README.md
+Accessed 2026-07-26. Grade: Primary (the tool's own documentation).
+
+  "IKOS (Inference Kernel for Open Static Analyzers) is a static analyzer for C/C++ based on the
+  theory of Abstract Interpretation."
+
+  "IKOS provides a generic and efficient implementation of state-of-the-art Abstract Interpretation
+  data structures and algorithms, such as control-flow graphs, fixpoint iterators, numerical
+  abstract domains, etc."
+
+  Checks (the -a option), among others:
+    -a=sio   "signed integer overflow analysis — checks for signed integer overflows"
+    -a=uio   "unsigned integer overflow analysis — checks for unsigned integer overflows"
+    -a=dbz   "division by zero analysis — checks for integer divisions by zero"
+    -a=boa   "buffer overflow analysis — checks for buffer overflows and out-of-bound array accesses"
+    -a=poa   "pointer overflow analysis — checks for pointer arithmetic overflows"
+    -a=sound "soundness analysis — checks for instructions that could make the analysis unsound"
+
+  Result categories: "Safe checks", "Definite unsafe checks", "Warnings", "Unreachable checks".
+
+  On what a warning means:
+
+  "warning may mean three things: (1) the statement results into an error for some executions, or
+  (2) the static analyzer did not have enough information to conclude (check dependent on an
+  external input, for instance), or (3) the static analyzer was not powerful enough to prove the
+  absence of errors."
+
+  Numerical abstract domains (the -d option), solver-free ones: interval, congruence,
+  interval-congruence, DBM, var-pack-dbm, var-pack-dbm-congruence, gauge,
+  gauge-interval-congruence. APRON-backed ones additionally offer octagon and polyhedra.

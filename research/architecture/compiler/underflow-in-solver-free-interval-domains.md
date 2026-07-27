@@ -26,6 +26,15 @@ They were in fact examined earlier, in
 Astrée. But that survey records *what they detect*, not *how they model rounding*, so the specific
 question was still open. This file closes it.
 
+**Companion file.** [`overflow-in-solver-free-interval-domains.md`](overflow-in-solver-free-interval-domains.md)
+asks the mirror question of the same comparators — how they prove a result never leaves the *top* of
+the representation, and what changes when the type has no maximum at all. The two are decided by the
+same interval endpoints, and Miné defines both conditions in one sentence, but the answers diverge on
+almost every point: underflow is in these analyzers' *tolerated* list and is never reported, while
+overflow is in their error list and is the thing they are built to reject. Read that file for
+widening with thresholds, the wrap-versus-trap-versus-saturate comparison, the alarm-as-assumption
+reporting model, and what arbitrary-precision integers do to the obligation.
+
 The framing is narrow on purpose. `docs/language/precept-language-spec.md:292` (§0.8) excludes SMT-style and
 theorem-prover-style proof artifacts, so SPARK, Dafny and Liquid Haskell describe what needs proving but
 reach it through machinery Precept has ruled out. The comparators whose method could transfer are the
@@ -537,6 +546,9 @@ composing arithmetic.**
 - **IEEE 754 floating-point standard.** **Not fetched — paywalled.** Its content is used only as restated
   by Miné (Primary) and by the internal decimal survey. Graded **Tertiary** as used here; see Threats to
   Validity.
+- `research/architecture/compiler/overflow-in-solver-free-interval-domains.md` — the companion survey,
+  same comparators and same interval endpoints, asking the mirror question about the top of the
+  representation. Internal, Cited.
 - `research/architecture/compiler/divisor-nonzero-under-finite-representation-survey.md` — the survey this
   extends. Internal, Cited.
 - `research/architecture/compiler/proof-engine-interval-arithmetic-survey.md` — internal, covers Frama-C
