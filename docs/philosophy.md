@@ -1,5 +1,10 @@
 # Precept philosophy
 
+**Status: Locked 2026-07-27** — approved by the owner. This document states what Precept is and what it
+guarantees; every design decision in the project is evaluated against it. It is not edited without the
+owner's explicit approval, and never as a side effect of implementation work. A change to the code that
+appears to contradict this document is a gap in the code, and is raised rather than resolved here.
+
 *This document states the guarantee Precept ships with — the commitments the project is built to keep. It is not a status report on the current build: where the compiler or runtime has not yet caught up to a commitment here, the commitment stands and the gap is tracked as work in progress in the compiler and runtime docs.*
 
 ---
@@ -20,7 +25,7 @@ Any of this can be previewed — every possible event, from any version of the e
 
 The set is closed because the guarantee requires it: an operation exists in the compiled engine only because the compiler proved every rule survives it, and an operation nobody declared has no such proof and no existence.
 
-The engine is deterministic: same definition, same data, same outcome, every time, anywhere. That is not a performance property — it is what makes the contract checkable, and it forbids things. No randomness. No evaluation that reaches outside the entity's own data — no lookup against another system, another entity, or the host's state in the middle of a rule. The one environmental value the language admits is the clock, and it is admitted honestly, not hidden: `now()` is the sole construct that reads the environment, an author who writes it into a rule is declaring in the open that the rule's correctness depends on when it is evaluated, and within a single operation the clock is one consistent value — same inputs, same outputs, always. Everything else the entity's rules can see entered through a declared operation, where the guarantee saw it arrive.
+The engine is deterministic: same definition, same data, same outcome, every time, anywhere. That is not a performance property — it is what makes the contract checkable, and it forbids things. No randomness. No evaluation that reaches outside the entity's own data — no lookup against another system, another entity, or the host's state in the middle of a rule. The one environmental value the language admits is the clock, and it is admitted honestly rather than hidden: a rule whose correctness depends on when it is evaluated says so in the definition, where anyone reading the file can see it. Everything else the entity's rules can see entered through a declared operation, where the guarantee saw it arrive.
 
 The engine is inspectable: at any point you can preview every possible operation and see not only what would happen but why, with the complete reasoning exposed. And it is honest about approximation. A contract is only trustworthy if it means what it appears to mean; silent approximation inside an exact-looking path destroys the ability to reason about outcomes. Where a value or operation is inherently approximate, the contract must say so — visibly, in the type system and the public API. Exact stays exact; approximation is declared, never disguised.
 
@@ -91,7 +96,7 @@ For the external evidence behind these positioning claims, see [Entity-First Pos
 
 The primary author of a `.precept` file is the person who owns the rules — a domain expert or business analyst, someone who thinks in terms of what the data means and what it is allowed to become. They may know SQL or structured data; they are not primarily software developers, and the language does not ask them to be.
 
-What makes that author plausible is the compiler's answer. Every defect this document names as impossible is one the author learns about while writing, in the moment it is introduced — and the refusal teaches. A rejection names the missing premise: cannot prove this rule survives this event; this guard would close the proof. The author learns how their own rules compose without ever learning to program.
+What makes that author plausible is the compiler's answer. Every defect this document names as impossible is one the author learns about while writing, in the moment it is introduced — and the refusal teaches. A rejection names the missing premise: cannot prove this rule survives this event; this guard would close the proof.
 
 The same answer reaches an AI agent. The compiler speaks to editors through a language server and to agents through an MCP server, and an agent authoring a precept meets the same refusal, with the same explanation, that a person does. Neither can produce a definition the compiler has not proven, because it is the same refusal — the guarantee does not weaken when an agent writes the rules.
 

@@ -89,7 +89,7 @@
 
 ## 2. Overview
 
-The proof engine is the fifth and final analysis stage before the Precept Builder — the compile-time half of Precept's structural safety guarantee. Its role: discharge statically preventable runtime hazards using a bounded, six-strategy set. If an operation is proven safe, no runtime check is needed. If proof fails, the compiler emits a diagnostic and the author must fix the source before an executable model is produced.
+The proof engine is the fifth and final analysis stage before the Precept Builder — the compile-time half of Precept's structural safety guarantee. Its role: discharge statically preventable runtime hazards using a bounded, closed strategy set — enumerated in § Proof Strategies, which is the only place a count can be read off. If an operation is proven safe, no runtime check is needed. If proof fails, the compiler emits a diagnostic and the author must fix the source before an executable model is produced.
 
 **Pipeline Position:**
 
@@ -148,7 +148,11 @@ The proof engine is **intentionally bounded** — a closed strategy set, no exte
 | External dependencies | 0 | No SMT solver, no SAT solver, no external libraries |
 | Determinism | 100% | Same input always produces same output — no solver timeouts or resource limits |
 
-> **The number of strategies is stated inconsistently across the documentation and is not settled here.** This document has said "six" in some sections and "five" in others, while § Proof Strategies enumerates eleven numbered strategies plus two requirement-dispatched paths that reuse another strategy's reporting tag; `compiler-and-runtime-design.md` says four. Every bare numeral in this document has been replaced by a pointer to § Proof Strategies, which is the enumeration and the only place a count can honestly be read off. No new number was chosen, because choosing one is a decision about whether the two tag-sharing paths are strategies — which no document answers.
+> **The number of strategies is not settled, and no number is chosen here.** This document used to say "six" in some places and "five" in others; every bare numeral has now been replaced by a pointer to § Proof Strategies, which is the enumeration and the only place a count can honestly be read off. `compiler-and-runtime-design.md` used to say "four" and now states no count at all — §1.1, §8 and §8's *Proof/fault chain* all say "bounded, non-extensible" and point here, and §8 says in its own words that it does not restate the count because the counts stated across the design documents disagree.
+>
+> What the enumeration itself contains: ten strategies carrying `#### Strategy N` headings, an eleventh (CollectionGrowth) described at § Proof Strategies but given no heading of its own, and two further requirement-dispatched paths (KeyPresence, IndexBounds) that reuse `ProofStrategy.GuardInPath` as their reporting tag rather than carrying tags of their own. Choosing a single number means deciding whether those two tag-sharing paths count as strategies, which no document answers.
+>
+> **A second disagreement, inside this document, is also left open.** The `ProofStrategy` enum in § 5 and the `#### Strategy N` headings in § Proof Strategies number the same strategies differently from 6 onward: the enum has `CompositionalConstraint = 6`, `IntervalContainment = 7`, `LengthContainment = 8`, `CountContainment = 9`, `DimensionalProduct = 10`; the headings have Dimensional Product at 6, Compositional Constraint at 7, and Interval, Length and Count at 8, 9 and 10. The prose outside the enum follows the headings. Which numbering is canonical is a decision about a code-facing identifier, so it is recorded rather than resolved.
 
 **Why a closed strategy set, not a general solver:**
 
@@ -1487,7 +1491,7 @@ Cancelling pairs (e.g. `kg × (1/kg)` → `count`) resolve to `DimensionVector.N
 
 **When it applies:** An obligation on a field's numeric range can be proven by compositional sign inference across all assignments to that field combined with the modifiers on the assigned values.
 
-**How it works:** For each field referenced in a proof obligation, Strategy 6 collects all assignments to that field across transition rows and event handlers. If ALL assignments are interpolated typed constants (string interpolations with typed values embedded), it extracts the magnitude or whole-value slot source from each interpolation. It then resolves the modifiers on those slot sources and checks whether the modifiers collectively satisfy the numeric requirement. Additionally, Strategy 6 reasons about sign propagation through arithmetic expressions — combining sign knowledge from modifiers and trusted constraint facts to infer whether a computed result satisfies a numeric bound.
+**How it works:** For each field referenced in a proof obligation, Strategy 7 collects all assignments to that field across transition rows and event handlers. If ALL assignments are interpolated typed constants (string interpolations with typed values embedded), it extracts the magnitude or whole-value slot source from each interpolation. It then resolves the modifiers on those slot sources and checks whether the modifiers collectively satisfy the numeric requirement. Additionally, Strategy 7 reasons about sign propagation through arithmetic expressions — combining sign knowledge from modifiers and trusted constraint facts to infer whether a computed result satisfies a numeric bound.
 
 **Examples:**
 
@@ -1510,7 +1514,7 @@ on AdjustPrice when Quantity > 0
     //    subtraction sign inference proves FinalPrice can be negative (fails proof)
 ```
 
-**Sign inference rules:** Strategy 6 maintains a `NumericSignSet` (a bitmask of possible signs: Negative, Zero, Positive). It infers sign sets for:
+**Sign inference rules:** Strategy 7 maintains a `NumericSignSet` (a bitmask of possible signs: Negative, Zero, Positive). It infers sign sets for:
 - **Literals:** exact sign (positive, zero, or negative)
 - **Field refs:** from declared modifiers (positive → Positive, nonnegative → Nonnegative, nonzero → Nonzero)
 - **Arithmetic:** combines operand signs via algebra rules:
@@ -1523,7 +1527,7 @@ on AdjustPrice when Quantity > 0
 - **Accessors:** reads `FixedReturnAccessor.ReturnNonnegative` flag (e.g., collection count is always nonnegative)
 - **Trusted rule facts:** incorporates numeric constraints from rule and ensure conditions scoped to the current context (state or event). For example, if a rule states `Quantity > 0` and applies to the current event, that fact refines the Quantity field's sign set to Positive during proof.
 
-**Constraint fact scoping:** Strategy 6 collects numeric facts from unresolved rules and ensures. A fact `X > 0` extracted from a rule condition is trusted (included in proof reasoning) only if:
+**Constraint fact scoping:** Strategy 7 collects numeric facts from unresolved rules and ensures. A fact `X > 0` extracted from a rule condition is trusted (included in proof reasoning) only if:
 1. The rule condition itself is unresolved (it has failed proof) — "if I'm uncertain about this rule, I can't use it as a trusted fact"
 2. The fact's scope (state or event anchor) matches the obligation's context (state-anchor facts apply to state hooks and transition rows from that state; event-anchor facts apply to transition rows and event handlers for that event)
 
@@ -1532,7 +1536,7 @@ This conservative gating prevents circular reasoning: a rule's condition can onl
 **Discharge predicate pseudocode:**
 
 ```csharp
-// Strategy 6: Compositional Constraint Proof — Discharge Predicate
+// Strategy 7: Compositional Constraint Proof — Discharge Predicate
 // Input: ProofObligation (from Pass 1)
 // Reads: SemanticIndex.TransitionRows[] + .EventHandlers[] (to find all assignments),
 //        Modifiers catalog (ProofSatisfactions on declared modifiers),
@@ -2234,7 +2238,9 @@ public sealed record ConstraintInfluenceMap(
 );
 ```
 
-Inverted index: given a field or arg that changed, which constraints might be affected? Used by the evaluator for constraint re-check and by AI agents for causal reasoning.
+Inverted index: given a field or arg, which constraints mention it? Used at ingress to route an entering value to the constraints declared on the slot it enters, and by AI agents and diagnostics for causal reasoning.
+
+**It is not a re-check index.** The runtime does not re-evaluate the definition's rules against a changed configuration — every handler was proven at compile time to preserve every rule, so there is no pass after the mutation for an index of affected constraints to drive (spec §0.7, §3A.4; `docs/runtime/evaluator.md` § Ingress Validation Guarantees). Whether ingress routing is served by this map or by the evaluator's own bucket index is the same open question the bucket index carries, and neither document answers it yet.
 
 **3. InitialStateSatisfiabilityResults (from `ProofLedger.InitialStateResults`)**
 
@@ -2246,7 +2252,7 @@ The builder reads `InitialStateResults` and, if any `IsSatisfiable == false`, pr
 |---|---|---|
 | `Obligations` | Not consumed by builder | Diagnostic-only (LS, MCP) |
 | `FaultSiteLinks` | Transforms to `FaultSiteDescriptor` per opcode | Runtime backstops |
-| `ConstraintInfluence` | Inverts to `ConstraintInfluenceMap` | Runtime constraint re-check index |
+| `ConstraintInfluence` | Inverts to `ConstraintInfluenceMap` | Field-and-arg → constraint index, read at ingress; not a re-check index |
 | `InitialStateResults` | Gate: blocks runtime model if unsatisfiable | Compile-time gate |
 | `Diagnostics` | Merged into `Compilation.Diagnostics` | Authoring-time feedback |
 

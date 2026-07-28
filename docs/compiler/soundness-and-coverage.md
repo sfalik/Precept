@@ -24,6 +24,13 @@
 > it across two files would force most future edits to touch both. **Part A — Mechanism** and **Part B —
 > Coverage & Scope** below each carry their own maturity line.
 
+> [!NOTE]
+> **What "the MVP" means in this document, and everywhere else in `docs/`.** The MVP is the first working
+> compiler — an internal build milestone marking when the prove-or-reject engine runs end to end. It is not
+> a release, and nobody outside the project receives it. So "post-MVP" and "after the MVP" place work later
+> in the build order; they never describe a gap the product is meant to carry, and nothing in these docs
+> should be read as saying a deferred item is missing from something a user gets.
+
 ---
 
 ## Part A — Mechanism
@@ -136,7 +143,7 @@ lands).
 
 ### 5a. Certificate format (MVP prerequisite)
 
-*(Intent — fill per slice.)* The format the MVP ships. A certificate is a small derivation: **premises**
+*(Intent — fill per slice.)* The format the MVP produces. A certificate is a small derivation: **premises**
 (each quoting an author declaration — a bound, guard, rule, or reject-row — by source span) and **steps**
 (each applying one primitive inference from the spec-enumerated `CertificateSteps` catalog, carrying its
 own recomputable conclusion). Built during discharge from values the folds already hold — bookkeeping,
@@ -163,7 +170,7 @@ re-verified and no step is re-discovered.
 
 **Not built.** No certificate is emitted and no checker exists, so today a `Proven` verdict is minted by
 the discharge cascade rather than by passing a replay first. That is a gap against the target, not the
-target. An earlier version of this section recorded the checker as deferred out of the first release; that
+target. An earlier version of this section recorded the checker as deferred out of scope; that
 deferral is withdrawn.
 
 ---

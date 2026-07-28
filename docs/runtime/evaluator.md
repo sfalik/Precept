@@ -737,6 +737,8 @@ UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
     // 2. Ingress governance (§3A.4 phase 1): each incoming value is held to the
     //    constraints declared on the field it is entering — and nothing wider —
     //    before it is applied and before anything derives from it (spec §0.7).
+    //    "Nothing wider" is disputed and is not settled canon — see the note in
+    //    spec §0.7, Governance. Do not build against this scope.
     //    Collect-all: every failing value is reported, not just the first.
     var violations = ValidateIngress(patch, precept.Fields, version.CurrentState);
     if (violations.Count > 0)
@@ -1381,6 +1383,8 @@ IReadOnlyList<ConstraintViolation> ValidateIngress(
 ```
 
 `Update` runs the same check over the patched field values, against the constraints declared on each field it writes — and nothing wider (spec §0.7, *Governance*).
+
+> **"Nothing wider" is disputed and is not settled canon.** See the note in spec §0.7, *Governance*. Do not build against this scope, and do not cite it as evidence.
 
 ```csharp
 void EvaluateConstraint(

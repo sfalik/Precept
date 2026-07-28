@@ -151,6 +151,8 @@ public abstract record UpdateOutcome
 
 **`UpdateOutcome.ConstraintsFailed` is an ingress failure, not a post-mutation one.** The constraints it reports are the ones declared on the fields the patch writes, checked as the values enter and before anything derives from them (spec §0.7, *Governance*). It upholds the declared contract of the slot the value enters and nothing wider — an editable field is an ordinary write site, and the rules that reach it through other fields were discharged by the compiler like any other write site's obligations. The variant name reads as though the check were a sweep over the finished working copy; it is not, and the name should be revisited when the `Update` API is next opened.
 
+> **"Nothing wider" is disputed and is not settled canon.** See the note in spec §0.7, *Governance*. Do not build against this scope, and do not cite it as evidence.
+
 ---
 
 ## Inspection Types

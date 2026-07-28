@@ -194,7 +194,7 @@ field Quantity as integer nonnegative default 0
 field Priority as integer min 1 max 10
 ```
 
-**Backing:** Exact whole number. No fractional part. Overflow is a type error — that is the end state this section describes, and it is not being weakened. The compile-time proof that would deliver it is deferred past the first release, exactly as the `integer` row of the approximation-stance table above records; see [Open Questions](#open-questions--implementation-notes) and `precept-language-spec.md` §0.7.
+**Backing:** Exact whole number. No fractional part. Overflow is a type error — that is the end state this section describes, and it is not being weakened. The compile-time proof that would deliver it is in scope and not yet implemented, its build sequenced after the MVP, exactly as the `integer` row of the approximation-stance table above records; see [Open Questions](#open-questions--implementation-notes) and `precept-language-spec.md` §0.7.
 
 **Operators:**
 
@@ -233,7 +233,7 @@ field Balance as decimal default 0
 
 | Expression | Result | Notes |
 |---|---|---|
-| `decimal + decimal` | `decimal` | Stays in lane. Overflow is an error — the target, with the proof behind it deferred past the first release as for `integer` (see [Open Questions](#open-questions--implementation-notes)). |
+| `decimal + decimal` | `decimal` | Stays in lane. Overflow is an error — the target, with the proof behind it in scope and not yet implemented, as for `integer` (see [Open Questions](#open-questions--implementation-notes)). |
 | `decimal - decimal` | `decimal` | |
 | `decimal * decimal` | `decimal` | |
 | `decimal / decimal` | `decimal` | Full 28-digit precision. Divisor safety applies. |

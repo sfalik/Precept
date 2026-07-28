@@ -124,7 +124,10 @@ written after the answer was known.
 # "the evaluator evaluates constraints" was invisible to it. Three runtime documents kept specifying
 # the removed model in the verb form and survived two full re-checks because of this. Every idea in
 # this procedure needs its verb, its noun and its passive spelling.
-grep -rnEi 'post-mutation|the sweep|sweep governs|swept|constraint (evaluation|plans? evaluated)|evaluat(e|es|ed|ing) (all |every |the |each )?constraints?|constraints? (are |is )?evaluat(e|es|ed|ing)' $CANON_WIDE --include=*.md
+# Widened again 2026-07-27, fourth pass. Three inflections were still one word short: proof-engine.md
+# specified the removed model twice as "constraint re-check", which matches none of them. An idea
+# needs its synonyms too, not only its inflections. This is the same test as the register's § 1.0.
+grep -rnEi 'post-mutation|the sweep|sweep governs|swept|constraint (evaluation|plans? evaluated)|evaluat(e|es|ed|ing) (all |every |the |each )?constraints?|constraints? (are |is )?evaluat(e|es|ed|ing)|re-?(check|evaluat|validat|verif|govern|prov)[a-z]*[^.]{0,60}(constraint|rule|ensure)|(constraint|rule|ensure)[a-z]*[^.]{0,60}re-?(check|evaluat|validat|verif|govern|prov)' $CANON_WIDE --include=*.md
 
 # A2 — W12, W13: runtime fault traps and defence-in-depth
 grep -rnEi 'backstop|defense-in-depth|defence-in-depth|defensive redundancy|belt-and-suspenders|fault trap|FaultSite' $CANON_WIDE --include=*.md
@@ -238,8 +241,9 @@ with what is stalled.
 
 ## 6. Known blind spots
 
-Nobody can prove this list complete and this procedure does not claim to. Five things it will miss,
-each stated so a re-runner knows what the coverage is not:
+Nobody can prove this list complete and this procedure does not claim to. Six things it will miss (numbered from 0),
+each stated so a re-runner knows what the coverage is not. **Two are now closed** — blind spots 2 and
+4 — and are kept in the list so nobody re-opens them.
 
 0. **Measured, not predicted: every grep in § 3 was written in the noun form of its idea.**
    `constraint evaluation`, `post-mutation`, `the sweep`. A document that says *evaluates
@@ -252,24 +256,38 @@ each stated so a re-runner knows what the coverage is not:
    The register's § 1.0 records the triage of `A1`'s hits line by line, so a second run can reproduce
    a first run's discards; no other grep's triage is recorded, which is blind spot 5.
 
+   **Measured again 2026-07-27, fourth pass: three inflections were still one word short.**
+   `proof-engine.md` specified the removed model twice as *constraint re-check*, which is neither the
+   noun nor the verb nor the passive form of *evaluate* and matched none of the widened terms. The
+   axis to widen along is **synonyms**, not only inflections — the other words a writer would reach
+   for. `A1` now carries `re-check`, `re-evaluate`, `re-validate`, `re-verify`, `re-govern` and
+   `re-prove` in both word orders. The same warning applies to `A2`–`A16`: a backstop is also a
+   *trap*, a *guard* and a *safety net*, and none of those synonyms is in `A2`.
+
 1. **A disagreement carried by prose that uses none of the vocabulary above.** Every grep is keyed to
    a word. A paragraph that describes the post-mutation sweep without using "sweep", "post-mutation",
    or "constraint evaluation" is invisible to this procedure. The only defence is that A1–A16
    over-return and their hits were read in context, which is a weaker defence than exhaustive reading.
-2. **The three excluded top-level documents.** `docs/README.md`, `docs/agent-onboarding.md` and
-   `docs/glossary.md` were not searched. The glossary in particular could carry a definition that
-   restates the sweep; the judgement taken is that a glossary entry is downstream of the spec and gets
-   corrected when the spec does. If that turns out to be wrong, the fix is to add them to `CANON_WIDE`
-   and re-run § 3, which costs about an hour.
+2. **The three excluded top-level documents. CLOSED 2026-07-27, third re-check.** `docs/README.md`,
+   `docs/agent-onboarding.md` and `docs/glossary.md` were searched for the whole removed-model
+   vocabulary — the sweep, the backstops, `never rejects`, provenance, re-governance — and returned
+   **zero hits in all three**. The judgement the procedure took, that a glossary entry is downstream
+   of the specification and gets corrected when the specification does, holds. This is no longer a
+   blind spot; it is kept in the list, closed, so a re-runner does not re-open it.
+
+   One thing in those files *is* wrong and is not this procedure's to fix: `docs/agent-onboarding.md:29`
+   and `CLAUDE.md` § Catalog System both cite `precept-language-spec.md:1992`, which phase 2's own
+   edits blanked. The statement they mean is now at `:2010`. Register row `N95` records it.
 3. **Code blocks inside the canonical documents.** The greps hit them and they were read, but a C#
    signature or a diagram that encodes the removed model — `ConstraintPlanIndex`, a pipeline arrow in
    an ASCII box — is a design statement that a prose-oriented read is likely to skim. Several were
    caught (`evaluator.md:505`, `precept-builder.md:283`); the honest position is that this class is
    under-searched.
-4. **Claim W20 is under-tested.** "The premise list is the runtime's validation surface" has no
-   canonical counterpart at all, so there is nothing to contradict — it registers as an absence, and
-   an absence search cannot tell the difference between "canon is silent" and "canon says it
-   somewhere in words this procedure did not guess."
+4. **Claim W20 is under-tested. CLOSED 2026-07-27, third re-check.** "The premise list is the
+   runtime's validation surface" no longer registers as an absence: `runtime-api.md:258` states it
+   directly — "The premise list *is* the set of runtime validations the proofs depend on — which
+   argument constraints and which guards must run — derived from the proof rather than maintained as
+   a parallel list alongside it." Kept in the list, closed.
 5. **The triage in § 3's four buckets is recorded for `A1` only.** Which hits a run discarded as
    vocabulary reuse, and why, is written down for `A1` in the register's § 1.0 and nowhere else. For
    `A2` through `A16` a second run cannot reproduce a first run's discards, so two runs can disagree
