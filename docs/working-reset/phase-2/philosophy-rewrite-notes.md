@@ -1,6 +1,8 @@
-# Notes on the philosophy rewrite — full pass, as committed in `20021deb`
+# Notes on the philosophy rewrite — full pass
 
-Nine rounds: one full rewrite, then eight rounds of owner-directed revision. These notes describe
+Committed at `20021deb`, with the three approved ninth-round changes applied on top of that commit
+(uncommitted at the time of writing). Nine rounds: one full rewrite, then eight of owner-directed
+revision, then the ninth described at the end. These notes describe
 the whole pass, not the first draft. The file went from 3,309 words at the old HEAD to roughly
 2,600, and every round kept the phase 2 substance intact: proof instead of re-checking, the four
 kinds of declared premise, values held to their constraints as they enter, and the runtime
@@ -31,7 +33,7 @@ verifying a definition's proof before governing under it.
   rule-activator, not a passive label" (redundant with the sentence before it).
 - **"There is no fifth thing."** It was false: restore is a fifth thing, named in the want document
   and the specification. The set is now scoped to the ways data *changes*, and restore is named —
-  it returns a committed configuration, trusted because it was governed when written.
+  it changes nothing, returning a configuration that was already committed.
 - **The deployment enumeration** ("not an unproven definition, not a tampered one, not one left
   over from an older version of the file"). An operational promise about a subsystem that does not
   exist yet, concrete enough for an architect to design a deployment around. The verification
@@ -66,15 +68,22 @@ verifying a definition's proof before governing under it.
 - **The headline guarantee carries no boundary**, while the specification now states one (data
   written around the engine is not re-governed). Explicitly reserved. Do not fix it in passing.
 
-## What I would change in a ninth round
+## The ninth round — proposed here, owner-approved, applied
 
-- **The verification paragraph now answers less than it should.** Cutting the enumeration was
-  right, but the cautious architect's question — verifies *against what?* — no longer has an answer
-  anywhere in the document, and the no-mechanism rule kept me from adding one. One clause saying
-  the proof travels with the definition would restore the answer without describing the checker.
-  I still think the cut was correct; the residue is a real gap all the same.
-- **The closed-set paragraph is now the longest in the opening.** Absorbing preview and restore
-  cost it its snap. I would split it: the three ways data changes in one tight paragraph, preview
-  and restore in a short one after.
-- **The closing section's final sentence** runs the hope/guarantee antithesis twice. The first pass
-  is the ending; the second is momentum. I would end it at the first dash.
+- **"Verifies against what?" now has its answer.** The verification paragraph opens: "The proof
+  travels with the definition, and before an engine will govern under it, it verifies that proof
+  for itself." One clause naming the artifact's existence — no format, no checker, no load step.
+- **The closed-set paragraph is split in three:** the ways data changes (with ingress), then
+  preview and restore, then the closing sentence — "an operation exists in the compiled engine
+  only because the compiler proved every rule survives it, and an operation nobody declared has no
+  such proof and no existence" — standing alone, with the room it earns.
+- **The ending stops at three beats.** "…worth more than a larger one in which every rule is a
+  hope." The final restatement ("the price of a guarantee that means what it says") is cut;
+  "expressiveness surrendered on purpose" and the author paying the cost both stand.
+
+## A tenth round
+
+Nothing. The one thing I weighed and left: the document now ends on the word "hope". The
+antithesis puts the rejected thing last, which is the classical shape, and the sentence's claim —
+the smaller language is worth more — lands where it should. I considered flipping the clause order
+and every flip read worse. I would change nothing.
