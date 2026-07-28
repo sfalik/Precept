@@ -23,9 +23,42 @@ a picture that was not true.
 
 ## 1. Where we are
 
-**Phase 1, slice 1.1 — not started. Last touched 2026-07-25.**
+**Phase 2 — in progress. Last touched 2026-07-28.**
 
-**Next:** slice 1.1 — walk `342e66db..327364f8` and build the decision register. Nothing blocks it.
+**This section was stale from 2026-07-25 to 2026-07-28**, saying phase 1 slice 1.1 had not started while
+phase 1 had been finished for two days and phase 2 had run five correction passes. Five commits updated
+the board at § 2 and left this section, the one the plan tells you to read first, describing work
+finished a week earlier. The rule that a slice is unfinished until its tracker row is updated covers § 2
+and this section equally.
+
+**Where phase 2 actually is.** The contradiction register holds **145 distinct rows**. 97 carry a commit
+hash and 14 more say "executed, uncommitted at the time of writing" and were never stamped once their
+pass landed, so about 111 are done. Three conditions are open.
+
+**Condition 2 fails** — those 14 rows do not name the commit that executed them, and every one of the
+three passes involved has since committed, so the hashes exist and nobody went back for them. Stamping
+them means checking each edit is actually in the commit its cell names, not trusting the label.
+
+**Condition 3** holds only as of a stated commit, for the reason written into the condition itself, and
+cannot pass while the fault-backstop rows stand.
+
+**Condition 6 fails on 22 rows.** Nineteen are the runtime fault-backstop family — `R9`, `N22`, `N23`,
+`R10`, `N24`, `N25`, `R14`, `N26`, `R11`, `R12`, `N27`, `R13`, `N28`, `N29`, `C1`, `C2`, `N30`, `N34`,
+`N35`, on register lines 292–315 — deferred by four passes because each owned two or three of the nine
+documents they span. **Deciding the model comes before executing them**, because the nineteen resolutions
+were themselves written two documents at a time and nobody has established that they compose; a first
+attempt at executing them directly was stopped after one document, having made four decisions about types
+that other documents declare. Two more are wording corrections in `docs/tooling/`, recorded by the fifth
+pass and left for a pass that takes that folder on deliberately.
+
+**The twenty-second is the one the board had never counted**: `N82`, same-basis period ordering. The
+owner ruled at the walk that periods pinned to the same basis order, against locked Decision 14. The row
+splits the work correctly — the mechanism is new language surface and goes through `/design`, the
+document reconciliation is this phase's — and the reconciliation never happened. The reason recorded in
+the row is also wrong: it says `temporal-type-system.md` was untouched by any pass, and it was touched
+twice, for other rows. Both sites still assert the opposite of the ruling, one of them in bold.
+
+Then Shane's sign-off on the register, which is the phase's actual finish line.
 
 **Landed ahead of phase 1, 2026-07-25.** Three files were pulled out of the cell bundle before slice 1.6
 deletes it, and they are now depended on: `block-inventory.workflow.js` with its
@@ -39,7 +72,7 @@ step 1 assumes all three already exist.
 |---|---|---|---|---|
 | 0 | Make the instructions true | **Done** 2026-07-25, `355d9b37` `89392acd` | 1 | — |
 | 1 | Work out what is actually decided, and by whom | **Done** 2026-07-26, `f813e709` `a240a788` `183c2569` `714c7e8d` `7e224b9a` (slice 1.6 disposal deferred to phase 8 and does not block) | 1 | — |
-| 2 | Settle every place canon and the want document disagree | **In progress** 2026-07-27 — 133 rows, ~101 executed. Conditions 1, 2, 5 pass; 3 and 4 failed the independent recheck and the gaps it named are closed, so both need re-running. Open: the fault-backstop family (19 rows, five files), and **Shane's** four philosophy rows | 1 | Phase 1 |
+| 2 | Settle every place canon and the want document disagree | **In progress** 2026-07-28 — **145 rows**; 97 carry a commit hash and 14 more are executed but were never stamped, so about 111 are done. **Condition 2 fails** on those 14. **Condition 6 fails** on 22: the 19 fault-backstop rows, 2 in `docs/tooling/`, and the same-basis period ordering row. **Condition 3** holds only as of a stated commit and cannot pass while the backstop rows stand. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed | 1 | Phase 1 |
 | 3 | Corrected statement of the language, and the catalog drift check | Not started | 0 | Phase 2 |
 | 4 | Draft the certificate step list and count it | Not started | 0 | Phase 3; ends on **Shane's** recorded word |
 | 5 | Settle the obligation families and the discharge procedure | Not started | 0 | Phases 3, 4 |
