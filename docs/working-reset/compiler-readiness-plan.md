@@ -694,6 +694,25 @@ different person running it reaches the same list.
    recorded in that row returns zero hits under `docs/language`, `docs/compiler`, `docs/runtime` and
    `docs/philosophy.md`. **The pattern is written by the same person doing the correction, so this is
    self-refereed** — it catches a forgotten file, not a resolution done wrong.
+
+   **Condition 3 holds as of a named commit, not permanently, and the reason is not sloppiness.** Each
+   pattern is a literal string test against a document that other corrections keep editing. Two patterns
+   broke on 2026-07-28 for exactly this reason: `3dbad40b` reworded "arrived through the contract" to
+   "arrived through a declared operation", and `fa4891d7` reworded an overflow disclosure from "deferred
+   past the first release" to "in scope and not yet implemented". Both corrections were right. Both
+   patterns quoted a sentence a later pass then rewrote, and neither pass re-ran the register afterwards,
+   so a row that was executed correctly reported failure. Every future correction can invalidate a pattern
+   written earlier, and nothing re-runs the register when canon changes.
+
+   So the condition is met by running every row's pattern at one commit and recording that commit
+   alongside the result. It establishes that at that tree, no row's superseded wording is still present in
+   the canonical set — which is worth having, because that is precisely the mistake of correcting four
+   files and forgetting the fifth. It does not establish that any resolution was the right one (the check
+   is self-refereed), and it does not establish anything about a later tree: a pattern passing at commit X
+   says nothing about commit Y. A re-runner treats a failing pattern as a question — *has the correction
+   been undone, or has the sentence been reworded underneath the pattern?* — and answers it by reading the
+   canonical text, not by trusting the grep. The cheap defence, and the one applied on 2026-07-28, is to
+   quote the least changeable words that carry the claim rather than the whole sentence.
 4. The search procedure, re-run at HEAD by somebody who did not write it, produces no disagreement that
    is not already a row. Check: run it, diff the output against the register.
 5. Every *don't remember* item from phase 1 is disposed of — resolved as a row, or explicitly recorded as

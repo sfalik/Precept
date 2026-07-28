@@ -200,7 +200,7 @@ field Priority as integer min 1 max 10
 
 | Expression | Result | Notes |
 |---|---|---|
-| `integer + integer` | `integer` | Stays in lane. Checked overflow. |
+| `integer + integer` | `integer` | Stays in lane. Overflow is an error — the target, with the proof behind it in scope and not yet implemented (see [Open Questions](#open-questions--implementation-notes)). |
 | `integer - integer` | `integer` | |
 | `integer * integer` | `integer` | |
 | `integer / integer` | `integer` | Integer division (truncates). Divisor safety applies. |
