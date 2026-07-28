@@ -1975,6 +1975,17 @@ All mutations execute on a working copy. If the operation runs to completion, th
 
 Externally-sourced values are validated against their declared constraints at **ingress** — as they enter, before the working copy derives any dependent value (governance, §0.7). That check upholds the declared contract of the slot the value enters and nothing wider; there is no second pass over the finished working copy. Restored state is not ingress at all: it is trusted as valid at persistence time, and no later operation re-governs it (§0.7).
 
+> **This scope is disputed and is not settled canon.** The words "and nothing wider" narrow ingress to the
+> constraints declared on the slot a value enters. `docs/Working/what-i-want-2026-07-16.md:143` says the opposite for an
+> editable-field write — that the applicable rules are evaluated there, and that this is "exactly the premise that closes
+> the editable write sites in the compiler's proof". The narrowing was written on 2026-07-27 on a reading of the owner's
+> walk item 16, and that item's recorded answer preserves want:143 rather than replacing it. No other document supports
+> the narrowing independently: every canonical sentence that agrees with it was written in the same pass. **Do not build
+> against this scope, and do not cite it as evidence.** The question — what discharges a relational rule's preservation
+> obligation when a field it mentions is edited — is open and goes to the owner. See
+> `docs/working-reset/phase-2/editable-write-cascade.md` and `editable-write-design-space.md`.
+
+
 This guarantee applies to all mutation surfaces: event-driven transitions, stateless event hooks, direct field updates, and state entry/exit actions. The working copy semantics are uniform — every path through the engine that can modify entity data uses the same all-or-nothing promotion/discard model.
 
 #### What can write during one operation
