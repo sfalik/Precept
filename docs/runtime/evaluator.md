@@ -112,7 +112,7 @@ The evaluator is the **pure plan executor** — it consumes prebuilt execution s
 Precept (executable model) + Version (entity instance) → Evaluator → EventOutcome / UpdateOutcome / EventInspection / UpdateInspection
 ```
 
-The evaluator's inner loop is: look up a prebuilt plan, walk its opcode array, evaluate constraints from prebuilt buckets, produce a structured outcome. This makes the evaluator the smallest it can be while being correct — a tight O(n) loop with no conditional branching on language features.
+The evaluator's inner loop is: look up a prebuilt plan, check each entering value against the constraints declared on the slot it enters, walk the opcode array, produce a structured outcome. Nothing evaluates the definition's rules against the finished configuration, because there is nothing left to find there — the compiler proved every handler preserves every rule before the engine existed (`precept-language-spec.md` §0.7). This makes the evaluator the smallest it can be while being correct — a tight O(n) loop with no conditional branching on language features.
 
 **Key design identity:** The evaluator is to execution what the parser is to syntax — it mechanically applies prebuilt structures without semantic interpretation. The Precept Builder encodes all language knowledge into dispatch indexes, constraint buckets, and execution plans. The evaluator reads these structures and executes them.
 
@@ -1704,7 +1704,7 @@ The only exception paths are truly exceptional: out-of-memory, corrupted `Precep
 | **Fault–diagnostic correspondence** | Every `Fault` produced by the evaluator carries a `FaultCode` with a `[StaticallyPreventable]` attribute. If the compiler emits no errors, the evaluator should never fault. |
 | **Inspection–commit agreement** | `InspectFire` and `Fire` execute the same plans. A row that `InspectFire` marks `Prospect.Certain` will be the winning row when `Fire` is called with the same inputs. |
 | **Ingress completeness** | Every constraint declared on an incoming value is checked as it enters. The evaluator does not short-circuit on first violation (it collects all violations for diagnostic completeness). |
-| **Access mode bypass for Restore** | `Restore` bypasses both access-mode checks and constraint evaluation — trusted hydration (spec §0.7; Decision 5 below). |
+| **Access mode bypass for Restore** | `Restore` bypasses both access-mode checks and ingress validation — trusted hydration (spec §0.7; Decision 5 below). |
 
 ### Slot Index Invariants
 
@@ -1797,7 +1797,7 @@ The bucket index survives the removal of the post-mutation pass because it still
 **Rationale:**
 - **Restoration is not a business transaction:** Data was committed when it satisfied the rules in effect at that time. The definition may have changed since. Constraint validation on restore would block all existing data on every schema change, making evolution impossible.
 - **Access modes are interactive controls:** They govern what the user can edit, not what values are structurally valid.
-- **Round-trip fidelity:** `precept.FromJson(version.ToJson())` must produce a semantically identical `Version`. Adding constraint evaluation would break this contract when the definition evolves.
+- **Round-trip fidelity:** `precept.FromJson(version.ToJson())` must produce a semantically identical `Version`. Adding ingress validation would break this contract when the definition evolves.
 
 **There is no facility for validating restored state, and that is deliberate.** Inspection is not one: it previews what an operation would do, and no operation evaluates the rules against a finished configuration. Restored data is trusted because it was governed when it was written (`what-i-want-2026-07-16.md:141`). A host that restores data written under an older definition, or injects values by some route other than the contract, has stepped outside the guarantee, and nothing inside the engine will notice (spec §0.7). Handling data written under an older definition is the post-MVP job of the restore path itself, through migration.
 
@@ -1805,7 +1805,7 @@ The bucket index survives the removal of the post-mutation pass because it still
 
 ### Decision 6: FromJson is the Evaluator's Inverse, Not a Pipeline
 
-**Decision:** `FromJson` is handled at the `Precept` API boundary, not by the evaluator. No constraint evaluation pipeline runs.
+**Decision:** `FromJson` is handled at the `Precept` API boundary, not by the evaluator. No ingress validation pipeline runs.
 
 **Rationale:**
 - No evaluation is needed — `FromJson` simply parses the envelope and populates slots directly from persisted values.
@@ -2170,7 +2170,7 @@ This matrix summarizes which constraints and access-mode checks each operation e
 | `Restore` | no (bypassed) | no | none — trusted hydration; computed fields recomputed |
 
 **Key rules:**
-- Restore bypasses both access-mode checks and constraint evaluation — trusted hydration (spec §0.7; Decision 5)
+- Restore bypasses both access-mode checks and ingress validation — trusted hydration (spec §0.7; Decision 5)
 - Inspection and commit paths execute the same prebuilt plans — disposition alone differs
 - The `always` / `from` / `in` / `to` buckets are still built and still index the constraint catalogs; they are simply not evaluated against entity data at runtime
 

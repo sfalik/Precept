@@ -20,7 +20,7 @@ Design documents for the Precept runtime — the boundary between compiled prece
 
 1. [runtime-api.md](runtime-api.md) — public surface and open decisions
 2. [precept-builder.md](precept-builder.md) — compile-to-runtime transformation
-3. [evaluator.md](evaluator.md) — plan execution and constraint evaluation
+3. [evaluator.md](evaluator.md) — plan execution and ingress validation
 4. [descriptor-types.md](descriptor-types.md) — descriptor type shapes
 5. [result-types.md](result-types.md) — how results flow back to callers
 6. [fault-system.md](fault-system.md) — failure classification

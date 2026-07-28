@@ -140,7 +140,7 @@ The builder executes six sequential transformation passes:
 | **Semantic analysis** | The type checker resolves names, types, and overloads. The builder reads resolved `TypedField`, `TypedState`, `TypedTransitionRow`, etc. |
 | **Graph analysis** | The graph analyzer computes topology, reachability, and dominance. The builder reads the `StateGraph` output. |
 | **Proof discharge** | The proof engine generates and discharges obligations. The builder reads `ProofLedger` results. |
-| **Operation execution** | The evaluator walks execution plans and evaluates constraints. The builder produces plans, not outcomes. |
+| **Operation execution** | The evaluator walks execution plans and checks each entering value against the constraints declared on the slot it enters. It does not evaluate the definition's rules against the finished configuration — the compiler proved every handler preserves them (`precept-language-spec.md` §0.7). The builder produces plans, not outcomes. |
 | **Incremental rebuild** | The builder runs once per `Compilation`. No incremental update path exists — a source change produces a new `Compilation`, which produces a new `Precept`. |
 
 ---
@@ -391,7 +391,7 @@ The slot layout is the evaluator's register file specification. Every entity ins
 
 > **Vocabulary:** These are **field slots** — runtime storage positions in the `PreceptValue[]` working-copy array, owned by `SlotLayout`, built during `Precept.From()`. They are distinct from **construct slots** (`ParsedConstruct.Slots` / `SlotValue`), which are compile-time parse positions owned by the Constructs catalog. The two concepts do not share lifecycle, representation, or owner. When discussion crosses layers, use these terms explicitly.
 
-**Computed slots:** Fields with `IsComputed == true` are collected into the `ComputedSlots` array. After every state transition, the evaluator walks this array and recalculates each computed field's value before constraint evaluation.
+**Computed slots:** Fields with `IsComputed == true` are collected into the `ComputedSlots` array. After every state transition, the evaluator walks this array and recalculates each computed field's value before the working copy is committed.
 
 ### Pass 3 — Dispatch Index Pass
 
@@ -795,7 +795,7 @@ For stateless precepts:
 
 **Decision:** Constraints are sorted into anchor buckets at build time, not at dispatch time.
 
-**Rationale:** Eliminates O(constraints) scan per operation. The evaluator reads the pre-built bucket — O(1) lookup, O(bucket size) evaluation. For a typical precept with 20 constraints across 5 states, this reduces per-operation overhead significantly.
+**Rationale:** The buckets are how the constraint catalogs are assembled (`Precept.Constraints`, `Version.ApplicableConstraints`) and how an incoming value is routed to the constraints declared on the slot it enters, without a scan. Sorting once at build time keeps both O(1) at execution time. The buckets are not walked to check the finished working copy — nothing does that (`evaluator.md` § 7.6, spec §0.7).
 
 **Implementation:** Pattern-match on `ConstraintMeta` DU subtypes (not on `ConstraintKind` enum values directly). The DU encodes the anchor family; the builder dispatches on subtype to route into buckets.
 
@@ -832,17 +832,21 @@ For stateless precepts:
 
 ## 12. Innovation
 
-### Dispatch-Optimized Constraint Indexes
+### Constraint Indexes, and What They Index Now
 
-Traditional constraint systems evaluate all constraints on every operation. Precept pre-sorts constraints into activation-anchor buckets:
+Traditional constraint systems evaluate every constraint on every operation, and make that cheap by narrowing which ones apply. Precept does not evaluate the definition's rules per operation at all: the compiler proved before the engine existed that every handler preserves every rule, so there is no pass over the finished configuration to make cheap (`precept-language-spec.md` §0.7). What the runtime does check is each value entering from outside — an event argument, a construction input, an edited field — against the constraints declared on the slot it enters, at the moment it enters. That check is anchored to the slot, not to a state or an event.
 
-- `always` — evaluated on every operation
-- `in <State>` — evaluated only when in that state
-- `from <State>` — evaluated only when leaving that state
-- `to <State>` — evaluated only when entering that state
-- `on <Event>` — evaluated only when firing that event
+The builder still sorts constraints into activation-anchor buckets, and the five anchors come from the language's own declaration forms:
 
-The evaluator never scans or filters — it reads the pre-built bucket for its context. For a precept with 50 constraints, a typical Fire operation might evaluate only 5–10 (the `always` bucket plus the relevant state/event buckets).
+- `always` — the constraint is declared with no anchor
+- `in <State>` — declared as resident in that state
+- `from <State>` — declared on leaving that state
+- `to <State>` — declared on entering that state
+- `on <Event>` — declared as a precondition of that event
+
+Two uses for the buckets survive the removal of the per-operation pass, and `evaluator.md` § 7.6 states which: they assemble the definition-level and state-level constraint catalogs (`Precept.Constraints`, `Version.ApplicableConstraints`), and they route an incoming value to the constraints declared on the slot it enters. The `Always`, `FromState` and `ToState` buckets are never walked against a finished working copy.
+
+> **Open — whether the index keeps this shape.** What remains undecided is not what the buckets are for but whether five state-and-event anchors are still the right shape for two uses that are anchored to a slot and to a catalog listing. The index could shrink to what ingress needs, or be replaced by a premise list derived from the definition's certificate. Nothing canonical answers that, and the buckets are described above as the builder produces them today. The same question reaches Pass 4 (§ 2), the `ConstraintPlanIndex` entry in § Downstream Consumers, and `catalog-system.md` § Evaluator-catalog integration pattern.
 
 ### Flat Evaluation Plans
 

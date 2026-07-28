@@ -406,7 +406,7 @@ Without this, the evaluator cannot distinguish field-only guards (fully resolvab
 
 ### Transitive unresolvability propagation
 
-When a `set` assignment references a missing arg, the working copy slot is marked unresolvable (not null). Derived fields computed from unresolvable inputs are transitively unresolvable. The recomputation loop must check for unresolvable inputs and propagate accordingly — otherwise constraints evaluated against the working copy will receive wrong values and produce spurious violations.
+When a `set` assignment references a missing arg, the working copy slot is marked unresolvable (not null). Derived fields computed from unresolvable inputs are transitively unresolvable. The recomputation loop must check for unresolvable inputs and propagate accordingly — otherwise expressions evaluated against the working copy will receive wrong values and report spurious results.
 
 The working copy data structure must carry an `IsResolved` flag per slot, mirroring the output `FieldSnapshot.IsResolved`.
 

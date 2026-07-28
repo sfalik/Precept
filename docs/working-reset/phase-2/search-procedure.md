@@ -67,6 +67,13 @@ Excluded from the search, and each for a stated reason:
 | `src/`, `tools/`, `test/`, `samples/`, the catalogs | Excluded by the plan's "what it may cite" rule. |
 | `.squad/`, `CLAUDE.md`, `CONTRIBUTING.md` | Operational and instruction files, corrected by phase 0. |
 
+**The four per-area READMEs are inside `$CANON` and are searched.** `docs/language/README.md`,
+`docs/compiler/README.md`, `docs/runtime/README.md` and `docs/tooling/README.md` sit inside the
+canonical folders, so `$CANON` reaches them and the row above excludes only `docs/README.md` at the
+top level. Both independent re-checks raised this as ambiguous, and both were right that the table
+did not say so. It says so now, because `docs/runtime/README.md:23` carried the removed model
+through two re-checks with no row against it (register `N88`).
+
 ## 2. Build the claim list from the want document
 
 The want document is 221 lines. Read it end to end — not grepped — and write down every sentence that
@@ -113,7 +120,11 @@ written after the answer was known.
 
 ```bash
 # A1 — W19, W12: the post-mutation constraint sweep
-grep -rnEi 'post-mutation|the sweep|sweep governs|swept|constraint evaluation' $CANON_WIDE --include=*.md
+# Corrected 2026-07-27, third pass. Every term below used to be a noun phrase, so a document saying
+# "the evaluator evaluates constraints" was invisible to it. Three runtime documents kept specifying
+# the removed model in the verb form and survived two full re-checks because of this. Every idea in
+# this procedure needs its verb, its noun and its passive spelling.
+grep -rnEi 'post-mutation|the sweep|sweep governs|swept|constraint (evaluation|plans? evaluated)|evaluat(e|es|ed|ing) (all |every |the |each )?constraints?|constraints? (are |is )?evaluat(e|es|ed|ing)' $CANON_WIDE --include=*.md
 
 # A2 — W12, W13: runtime fault traps and defence-in-depth
 grep -rnEi 'backstop|defense-in-depth|defence-in-depth|defensive redundancy|belt-and-suspenders|fault trap|FaultSite' $CANON_WIDE --include=*.md
@@ -201,7 +212,13 @@ complete.
 
 **5a. `sweep-correction-list.md`** — 25 verified rows plus one clarity-axis row, each with a per-file
 line number re-verified at HEAD `3f69b316`. Re-verify every line again at the current HEAD, because
-the canonical documents moved between `3f69b316` and now. Then, **before using any row's direction
+the canonical documents moved between `3f69b316` and now. **That baseline is stale and re-reading it
+as current is a trap**: eight commits have moved the canonical documents since `3f69b316`
+(`5e853c0e`, `c3a9be21`, `25894ae3`, `d32d8e26`, `4ca55318`, `20021deb`, `5e77865a`, `46734adc`,
+plus the third-pass corrections of 2026-07-27, uncommitted at the time of writing). The register's
+own numbers happen to hold because it was rebuilt at `b93d1db1`; `sweep-correction-list.md`'s do
+not. Resolve every line against `git rev-parse HEAD` at the moment you run, and record which HEAD
+that was. Then, **before using any row's direction
 column, read that file's final section, "Reconciliation against the 2026-07-26 owner rulings."** Four
 rows' stated direction is superseded: S1 and R3 (the wider editable-write ingress check is not the
 target), and S11/S12/S13 (removing the trap clause is no longer the whole correction — the overflow
@@ -221,8 +238,19 @@ with what is stalled.
 
 ## 6. Known blind spots
 
-Nobody can prove this list complete and this procedure does not claim to. Four things it will miss,
+Nobody can prove this list complete and this procedure does not claim to. Five things it will miss,
 each stated so a re-runner knows what the coverage is not:
+
+0. **Measured, not predicted: every grep in § 3 was written in the noun form of its idea.**
+   `constraint evaluation`, `post-mutation`, `the sweep`. A document that says *evaluates
+   constraints* was invisible to all sixteen. This is not blind spot 1 below — that is prose using
+   none of the vocabulary; this is prose using exactly the vocabulary, inflected differently. It
+   accounted for three of the eight disagreements the second independent re-check found, and for
+   five register rows whose recorded pattern could never return zero. `A1` was widened on 2026-07-27
+   to carry the verb and passive spellings alongside the noun. **Every other grep in § 3 still
+   carries only one inflection** and should be widened the same way before the procedure is re-run.
+   The register's § 1.0 records the triage of `A1`'s hits line by line, so a second run can reproduce
+   a first run's discards; no other grep's triage is recorded, which is blind spot 5.
 
 1. **A disagreement carried by prose that uses none of the vocabulary above.** Every grep is keyed to
    a word. A paragraph that describes the post-mutation sweep without using "sweep", "post-mutation",
@@ -242,6 +270,10 @@ each stated so a re-runner knows what the coverage is not:
    canonical counterpart at all, so there is nothing to contradict — it registers as an absence, and
    an absence search cannot tell the difference between "canon is silent" and "canon says it
    somewhere in words this procedure did not guess."
+5. **The triage in § 3's four buckets is recorded for `A1` only.** Which hits a run discarded as
+   vocabulary reuse, and why, is written down for `A1` in the register's § 1.0 and nowhere else. For
+   `A2` through `A16` a second run cannot reproduce a first run's discards, so two runs can disagree
+   without either being able to show where. Recording the triage per grep is what would close this.
 
 ## 7. Re-running it and diffing
 

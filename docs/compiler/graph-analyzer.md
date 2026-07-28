@@ -535,7 +535,7 @@ For each event e:
 
 **Diagnostic rules:**
 - **Partial coverage** (some states handle, some don't) — valid, intentional authoring. No diagnostic emitted. (CC#21 ruling: violates §0.6 principle 2 to flag this.)
-- **Zero coverage** (no state handles the event anywhere) — provably dead declaration. Emit `UnhandledEvent` (Warning).
+- **Zero coverage** (no state handles the event anywhere) — no state accepts the event. Emit `UnhandledEvent` (Warning). It reports rather than blocks: an event declared and deliberately handled nowhere is a supported design, not a defect, and the entity stays inhabitable either way. See `diagnostic-system.md` § Severity, which fixes the severity and gives that reason.
 
 > **Closed (CC#21):** The `optional` event modifier question is moot — with the old `UnhandledEvent` (partial-coverage) removed, there is nothing to suppress.
 
