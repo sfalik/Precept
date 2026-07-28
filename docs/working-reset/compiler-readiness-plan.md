@@ -39,17 +39,17 @@ pass landed, so about 111 are done. Three conditions are open.
 three passes involved has since committed, so the hashes exist and nobody went back for them. Stamping
 them means checking each edit is actually in the commit its cell names, not trusting the label.
 
-**Condition 3** holds only as of a stated commit, for the reason written into the condition itself, and
-cannot pass while the fault-backstop rows stand.
+**Condition 3** holds only as of a stated commit, for the reason written into the condition itself.
 
-**Condition 6 fails on 22 rows.** Nineteen are the runtime fault-backstop family — `R9`, `N22`, `N23`,
-`R10`, `N24`, `N25`, `R14`, `N26`, `R11`, `R12`, `N27`, `R13`, `N28`, `N29`, `C1`, `C2`, `N30`, `N34`,
-`N35`, on register lines 292–315 — deferred by four passes because each owned two or three of the nine
-documents they span. **Deciding the model comes before executing them**, because the nineteen resolutions
-were themselves written two documents at a time and nobody has established that they compose; a first
-attempt at executing them directly was stopped after one document, having made four decisions about types
-that other documents declare. Two more are wording corrections in `docs/tooling/`, recorded by the fifth
-pass and left for a pass that takes that folder on deliberately.
+**Condition 6's 22 rows were 22 until 2026-07-28; 21 of them are now executed and uncommitted.** Nineteen
+were the runtime fault-backstop family — `R9`, `N22`, `N23`, `R10`, `N24`, `N25`, `R14`, `N26`, `R11`,
+`R12`, `N27`, `R13`, `N28`, `N29`, `C1`, `C2`, `N30`, `N34`, `N35`, on register lines 292–315 — deferred
+by four passes because each owned two or three of the nine documents they span. Deciding the model came
+first, in [`phase-2/fault-backstop-model.md`](phase-2/fault-backstop-model.md), and the nineteen then ran
+as one pass across all nine documents: [`phase-2/fault-backstop-pass.md`](phase-2/fault-backstop-pass.md).
+The two `docs/tooling/` rows, `N103` and `N104`, went with them. **The condition is not yet satisfied**,
+because none of the 21 carries a commit hash — the edits are in the working tree and nothing has been
+committed. The twenty-second, `N82`, is unchanged and still needs its owner.
 
 **The twenty-second is the one the board had never counted**: `N82`, same-basis period ordering. The
 owner ruled at the walk that periods pinned to the same basis order, against locked Decision 14. The row
@@ -72,7 +72,7 @@ step 1 assumes all three already exist.
 |---|---|---|---|---|
 | 0 | Make the instructions true | **Done** 2026-07-25, `355d9b37` `89392acd` | 1 | — |
 | 1 | Work out what is actually decided, and by whom | **Done** 2026-07-26, `f813e709` `a240a788` `183c2569` `714c7e8d` `7e224b9a` (slice 1.6 disposal deferred to phase 8 and does not block) | 1 | — |
-| 2 | Settle every place canon and the want document disagree | **In progress** 2026-07-28 — **145 rows**; 97 carry a commit hash and 14 more are executed but were never stamped, so about 111 are done. **Condition 2 fails** on those 14. **Condition 6 fails** on 22: the 19 fault-backstop rows, 2 in `docs/tooling/`, and the same-basis period ordering row. **Condition 3** holds only as of a stated commit and cannot pass while the backstop rows stand. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed | 1 | Phase 1 |
+| 2 | Settle every place canon and the want document disagree | **In progress** 2026-07-28 — **145 rows**; 97 carry a commit hash, 14 more are executed but were never stamped, and 21 more (the 19 fault-backstop rows plus `N103` and `N104` in `docs/tooling/`) were executed on 2026-07-28 and are uncommitted — so about 132 are done. **Condition 2 fails** on the 14 unstamped rows and on the 21 uncommitted ones. **Condition 6** now fails on **1**: `N82`, same-basis period ordering. **Condition 3** holds only as of a stated commit. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed | 1 | Phase 1 |
 | 3 | Corrected statement of the language, and the catalog drift check | Not started | 0 | Phase 2 |
 | 4 | Draft the certificate step list and count it | Not started | 0 | Phase 3; ends on **Shane's** recorded word |
 | 5 | Settle the obligation families and the discharge procedure | Not started | 0 | Phases 3, 4 |
@@ -133,10 +133,17 @@ verbatim quotations phase 1 requires. Phase 1's walk removes any row you did not
 
 ## 4. Waiting on Shane
 
-**Eleven items. One blocks phase 5 outright, one blocks a canon correction in phase 2, and two reach
-phase 4; the rest stall named pieces of phase 5.** The first row predates
-the phase-1 walk. The rest were either raised by the walk of 2026-07-26 or were standing questions
-recorded in the walk file that had never been carried into this table.
+**Thirteen items. Two block a commit that is sitting in the working tree right now; one blocks phase 5
+outright, one blocks a canon correction in phase 2, and two reach phase 4; the rest stall named pieces of
+phase 5.** The first row predates the phase-1 walk. Most of the rest were raised by the walk of
+2026-07-26 or were standing questions recorded in the walk file that had never been carried into this
+table. **The two at the top were created on 2026-07-28 and are the only ones with work stopped behind
+them.**
+
+| What you are asked | Stalled until you answer | Reasoning |
+|---|---|---|
+| **Is "The engine does not fault" scoped or unqualified?** `philosophy.md:46` states it flat, and you approved it on 2026-07-28. The fault-backstop pass then left six canonical places saying that whether the evaluator detects an **engine defect** — a bug in Precept itself, not in the author's definition — is undecided: `compiler-and-runtime-design.md:826`, `fault-system.md:318`, `evaluator.md:1620`, `result-types.md:129`, `runtime-api.md:171`, `precept-language-spec.md:1963`. The sentence sits after three examples that are all about the author's data, so it can be read as scoped to those. As written it is not. Either it is scoped and the engine-defect question stays genuinely open, or it is unqualified and that question has one admissible answer. One sentence either way | **The fault-backstop commit**, which is executed and sitting uncommitted in the working tree | Found by the independent review of that diff, 2026-07-28 |
+| **Period ordering — ship the operator, or record Decision 14 as sound-but-refused?** Your ruling that same-basis periods order stands and is not reopened. What is open is whether it is worth a language change. It is **not** a pure readability question, and the design pass's first answer that it was is wrong: see § 5's third entry for the three cases, one of which the language currently accepts and cannot be made correct | **Phase 2's** reconciliation of `temporal-type-system.md:1478` and `collection-types.md:533`, which is register row `N82` and the last row failing condition 6 | [`phase-2/period-ordering.md`](phase-2/period-ordering.md), `docs/Working/period-ordering-design.md` |
 
 | What you are asked | Stalled until you answer | Reasoning |
 |---|---|---|
@@ -197,6 +204,27 @@ family phase 5 would have built and did not need.
 Every request for your word that is not a scheduled phase sign-off belongs here. The sign-offs are the
 four **Shane** rows on the board and each phase's *What you sign off* paragraph.
 
+## 5. Work that exists and has not started
+
+**Added 2026-07-28, because a single day produced more open work than the tracker was carrying and it was
+being held in a conversation rather than in this file.** Nothing here needs a decision from Shane unless
+the row says so. A row leaves this list when it is done or when it becomes a phase's stated scope.
+
+| What | Why it exists | Blocked on |
+|---|---|---|
+| **Fix the twenty-odd findings from the two reviews of the fault-backstop diff**, then commit it | Two independent reviews of the uncommitted 17-document diff. The substance held; both found a tail. The largest group is one pattern: the pass's vocabulary sweep returned zero for every exact term and missed the **paraphrases** — "fault-site links" hyphenated and spaced, "fault site taxonomy", "the runtime mirror", "the runtime-to-compiler linkage", "diagnostics/fault linkage". Also: a second reason for the reference-identity invariant on `ProofObligation.Site` was deleted while the replacement text says no reason was ever written; three documents now claim "Implemented" against code that disagrees; and both tracking files count 21 rows executed when 20 were edited and one was dispositioned without an edit | Nothing. The philosophy question above blocks the **commit**, not the fixes |
+| **Stamp fourteen register rows with their commits** | They say "executed, uncommitted at the time of writing" and were never revisited once their pass landed. Condition 2 fails on exactly these. Stamping means checking each edit really is in the commit its cell names, not trusting the label | Nothing |
+| **Send the period-ordering design back with the three cases** | Its recommendation turned on the claim that the operator only changes spelling. That is true of a single pinned unit and false of the other two cases, measured 2026-07-28 against the compiler: on `period in 'years + months'`, `A.months <= B.months` compiles clean and is **wrong** (`'1 year'` has `.months == 0`) while the hand-normalised `A.years * 12 + A.months <= …` compiles clean and is right, with nothing distinguishing them; on `period in 'months + days'`, `A.days <= B.days` compiles clean and **no arithmetic exists that makes it correct**, because a month has no fixed day count. So for two cases of three the language today accepts a comparison that is wrong or unfixable, with no diagnostic. The design is `Externally-Grounded`, not locked, so it is amendable | Nothing |
+| **File the six repairs the period-ordering design found**, four of which are not about periods | The one to read first: a declared qualifier does not constrain the value on the binding path — `dequeue Q into X` puts an arbitrary period into a `period in 'days'` field with no obligation raised, and it reproduces on `queue of money` into `money in 'USD'`. Also `.min`/`.max` dropping the element qualifier in both directions, `of 'date'` / `of 'time'` unenforced, and `date + '12 months'` raising an error that tells the author to write what they just wrote — which breaks the literal spelling of Decision 14's own prescribed workaround | Nothing |
+| **Record the code drift the fault-backstop pass created** | `src/Precept/Runtime/Descriptors.cs:60` declares `FaultSiteDescriptor`, `src/Precept/Pipeline/ProofLedger.cs` declares `FaultSiteLink` and carries `FaultSiteLinks`, `ProofEngine.Diagnostics.cs:452` builds them, and **`tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs:292` reads them** to find the obligation behind a squiggle — a behaviour `docs/tooling/language-server.md:607` documents. The documents now describe a shape the code does not have. `CLAUDE.md` requires drift to be fixed in the same pass and reported; it was not | Nothing. The removal itself is phase 11 |
+| **The trace** — a justification for every change to canon in this phase, taken from `git diff` rather than from the register, with the short list of hunks that trace to nothing Shane wrote or ruled | Five passes checked whether corrections were *made*. None checked whether each was *warranted*, and the register's bookkeeping has been wrong repeatedly while its corrections held. Taking ground truth from git removes the dependency on the bookkeeping. It is also what would let Shane sign the phase without reading nine hundred changed lines | The fault-backstop commit, so the diff is stable and the trace runs once |
+| **Reconcile the two period documents to the 2026-07-26 ruling** | Register row `N82`, the last row failing condition 6. `temporal-type-system.md:1478` and `collection-types.md:533` still assert the opposite of the ruling, one of them in bold | Shane's answer on period ordering, above |
+| **A cold read of the runtime and compiler documents** — one reader, the want document and canon, no register and no search procedure, listing every disagreement, then diffed against the register | Condition 4 asks for the search procedure to be re-run, and a procedure cannot find its own scope holes: the fifth pass widened fifteen patterns with synonyms and found nothing, while the thing actually missing was an unsearched folder. Scoped to the runtime and compiler documents because phase 3 rereads every language document and so provides a second net there, and none anywhere else | The fault-backstop commit |
+| **Two questions left open inside canon need owners that meet condition 6's bar** | Whether anything ever constructs a `Fault` is written as owned by phase 11, whose stated scope at `:1601` is building against red tests phase 10 wrote — an undecided design question cannot have a red test. And the reference-identity invariant's reason is routed to "whoever writes the certificate contract", which is a person nobody has named rather than a phase. Both are the pattern condition 6 exists to catch | Nothing |
+
+**Two things are also uncommitted in the working tree** and are not tracked anywhere else: the
+fault-backstop diff itself, and `docs/Working/period-ordering-design.md`.
+
 ---
 
 # How this plan is executed
@@ -229,12 +257,14 @@ rather than do a fifth of it. What a phase may not do is defer work to nobody.
 An item with none of those blocks the phase. Not as a formality: an open item with no owner is invisible
 the moment the phase closes, because nothing downstream reads a closed phase's open rows.
 
-**How this was found.** Phase 2 deferred the runtime fault-backstop family — nineteen rows across five
+**How this was found.** Phase 2 deferred the runtime fault-backstop family — nineteen rows across nine
 documents — because four correction passes each owned a subset and each correctly declined to do part of
-it. The reasoning was right every time and the result was that the specification says there are no
-evaluation-time fault traps while two other documents describe fifteen of them and say when they fire.
+it. The reasoning was right every time and the result was that the specification said there are no
+evaluation-time fault traps while two other documents described fifteen of them and said when they fire.
 Nothing in the plan would ever have picked that up: the register is not an input to any later phase, and
-phase 3, the nearest candidate, covers the language statement rather than the runtime documents.
+phase 3, the nearest candidate, covers the language statement rather than the runtime documents. The
+family was executed as one pass on 2026-07-28 and the contradiction is gone, but the rule this section
+states is what got it done and stands independently of it.
 
 **The exceptions, and they are exceptions rather than a category.**
 
@@ -786,9 +816,11 @@ different person running it reaches the same list.
    still open with what is stalled. Check: undisposed = 0.
 6. **Every open item carries an owner.** Each row not executed names either a later phase whose scope
    actually reaches it, or a ruling the owner has given that the work is not being done. Check: open rows
-   with neither = 0. See § No phase closes with an open deferral that has no owner. As of 2026-07-28 this
-   condition fails: the nineteen fault-backstop rows have no owning phase, and two rows found in
-   `docs/tooling/` on the fifth pass are recorded but unassigned.
+   with neither = 0. See § No phase closes with an open deferral that has no owner. As of 2026-07-28 the
+   nineteen fault-backstop rows and the two `docs/tooling/` rows are executed and uncommitted, so they are
+   no longer open items; the two questions that pass left open both name an owner — whether anything
+   constructs a `Fault` is owned by phase 11, and the reason behind the reference-identity invariant on
+   `ProofObligation.Site` is owned by whoever writes the certificate contract.
 
 The known starting point is the 25-row correction list phase 1 moved here, all rows verified against HEAD
 and none executed. Its largest single item is the post-mutation sweep: the want document rules that once
