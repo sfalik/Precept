@@ -4,6 +4,31 @@
 combines the two earlier phase-5 notes with the new finite-representation and solver-free-analysis
 research.**
 
+> ## Status: recommendation under active revision — not a locked design, and not a build authorization
+>
+> **Nothing in this document authorizes implementation, and its build items do not constitute an agreed
+> build order.** Before any of it is built it has to go through `/design` and come out the other side as a
+> locked design document — with the Philosophy Alignment matrix, the Language Design Grounding and
+> Architecture Grounding, stakes-classified decisions, and the four-leg rationale (rationale, alternatives
+> rejected, precedent, tradeoff accepted) on every decision that the design process requires and this
+> document does not carry. Read the eight build items as a description of the work the model implies, not
+> as a plan anyone has signed.
+>
+> **Several decisions in here are the owner's and are not taken.** They are listed in
+> [Work that would require owner consultation](#work-that-would-require-owner-consultation-before-it-is-built)
+> and it is the section to read before treating any part of this as settled. The overflow half in
+> particular sits behind the item-15 deferral and is described here as a target, not as scheduled work.
+>
+> **Corrections applied 2026-07-27 after review.** A citation error, a withdrawn claim, a self-contradiction
+> and two missing constructs were found and fixed; each correction says in place what it replaced and why.
+> The substantive corrections were: the not-`NaN` clause on the `number` lane is **derived and forced, not
+> an owner ruling**, and the modifier-semantics half of build item 8 goes through the pre-design
+> consultation gate rather than being catalog sync; the claim that the `rule` route does not reach the
+> `number` lane is **withdrawn** — it does, and what fails is spelling a fractional threshold there; the
+> underflow section is **preparation for a question reserved to the owner**, not an answer to it; `ensure`
+> is added as an eighth divisor form; and the `duration` lane is explicitly carved out so canon's
+> compound-divisor concession is not overturned by implication.
+
 **What this document is for.** It describes where the divisor and overflow model should end up, what an
 author should write to get there, and what has to be built in what order. It is not a report on the
 current compiler. Today's behavior appears only where it changes the size or the ordering of the work —
@@ -39,8 +64,9 @@ changes when the build items are scheduled but not what they should be.
 `decimal`, and asked for `Infinity` and `NaN` to be treated as hazards in their own right rather than as
 edges of the overflow question.** [The `number` lane](#the-number-lane) works through what the
 recommendation means on the approximate lane, and gives each of the two non-finite values its own
-treatment. Most of the recommendation carries over unchanged, and the underflow policy turns out to
-answer an open question canon had recorded against that lane and left unrouted.
+treatment. Most of the recommendation carries over unchanged, and the underflow policy routes an open
+question canon had recorded against that lane and left unrouted — routes it, rather than settles it; the
+cost half is reserved to the owner, see [Underflow policy](#underflow-policy).
 
 **The soundness finding is real, and it is stated plainly in the section rather than softened.**
 Precept's `!=` on `number` is IEEE comparison — the operation catalog says so in its own description of
@@ -49,17 +75,20 @@ which this document recommends for `decimal` as sound evidence, admits a `NaN` d
 lane. `decimal` has no `NaN`, so this has no counterpart there and the `decimal` recommendation is
 unchanged. The `abs()` magnitude guard is unaffected, because every ordered comparison against a `NaN` is
 false and so refuses it for free — which reverses the ordering the rest of the document gives between the
-two guard forms. The owner's non-finite ruling of 2026-07-21 anticipated the hazard and closed it for
-field modifiers; it did not close it for guards, and it has not yet been written into the catalog.
+two guard forms. Canon's non-finite position, recorded at `primitive-types.md:660` and dated 2026-07-21,
+anticipated the hazard and closed it for field modifiers; it did not close it for guards, and it has not
+yet been written into the catalog. That position is **derived and forced rather than owner-ruled** — see
+[What canon already fixes about `number`](#what-canon-already-fixes-about-number) for the provenance and
+for what follows from it.
 
 Three further things are different on that lane. Overflow produces `+∞` rather than refusing an
 operation, so the model has to describe what follows rather than the case that did not happen, and a
 single overflow can present four operations later as a zero or a `NaN`. Excluding a `NaN` is a claim no
 interval can carry, because a `NaN` satisfies no bound and violates none, so it needs a requirement
 family and a diagnostic of its own — today there is one code for the family, `NumericOverflow`, and it
-describes magnitude. And two of the seven divisor forms rest on `maxplaces`, which `number` does not
-have, so the `rule` form carries more weight there — while at HEAD the rule route reaches the `decimal`
-lane and not that one.
+describes magnitude. And two of the eight divisor forms rest on `maxplaces`, which `number` does not
+have, so the `rule` and `ensure` forms carry more weight there. (The rule route does reach that lane —
+verified at HEAD — and an earlier revision of this document said it did not.)
 
 ---
 
@@ -194,7 +223,7 @@ and most analyzers do not have one. Rarity plus a missing domain, not invalidity
 already yields `[0.005 .. 40000]` for the product. That interval excludes zero, so a `nonzero` claim on
 a field derived from that product is discharged by machinery already listed as build items 2 and 4. This
 is worked through as the second case of
-[form (c)](#the-seven-forms-and-what-each-one-contributes) below, and it is the answer to "what would the
+[form (c)](#the-eight-forms-and-what-each-one-contributes) below, and it is the answer to "what would the
 author have to change" for the great majority of real definitions: constrain the factors.
 
 **Signed factors with a hole around zero need the composition, and it needs three side conditions.** If
@@ -371,11 +400,19 @@ not determinism. Predicate abstraction is disqualified by the first requirement:
 calls a theorem prover, and the version of it with the prover taken out is a restatement of the guard
 narrowing Precept already does.
 
-**Do not pursue — anything that discharges through an SMT solver.** This is settled by canon rather than
-by this document; §0.6 #3 and §0.8 exclude opaque proof artifacts on principle. It is stated here because
-the divisor research reaches SPARK and SMT-LIB, and a reader could otherwise take their appearance in the
-evidence as a recommendation. They are cited for what their *reasoning* requires — a fact about the
-complete divisor, reasoned over the rounded result — not for how they reach it.
+**Do not pursue — anything that discharges through an SMT solver.** The ground is the second requirement
+above — a worst case that does not depend on the data — not a canonical ban. Canon has retired the ban:
+§0.6 Proof philosophy item 3 is titled "Legible certificates, not opaque solvers" and says *"The search
+procedure is unconstrained — a strategy may use any method to find a proof — but authority rests in the
+certificate, not the search."* Under that, an SMT-backed strategy that emitted a legible replayable
+certificate would be admissible in principle, and the four-criteria test is what it would have to pass.
+What canon does still exclude by name is the *artifact*: §0.8 item 4 excludes "SMT-style or
+theorem-prover-style proof artifacts". So the conclusion is unchanged and the reason is different — SMT is
+declined here because its cost depends on the data, and a proof outcome that varies with a time budget is
+not determinism. This is stated because the divisor research reaches SPARK and SMT-LIB, and a reader could
+otherwise take their appearance in the evidence as a recommendation. They are cited for what their
+*reasoning* requires — a fact about the complete divisor, reasoned over the rounded result — not for how
+they reach it.
 
 ### Which technique underlies which build item
 
@@ -698,14 +735,25 @@ backing, by the homogeneous-backing rule in `business-domain-types.md` D12, so `
 qualifiers change is the number that travels through the analysis, and in one case they change it by
 three orders of magnitude without the author writing a digit.
 
-**A quantity's declared bound is normalized before it is compared.** Interval containment converts both
-sides to UCUM base units before comparing them, which is what makes `max '5 kg'` correctly accept a
-value written as `'6 [lb_av]'` (`business-domain-types.md` § Qualifier compatibility on the bound). The
-base unit for mass is the gram, so a bound authored as `5 kg` is `5000` inside the analysis. That is
-sound and it is the right thing for the comparison, but it means the headroom a chain has depends on the
-unit the author chose to quote in, and the author was choosing a unit for readability. A calculation
-quoted in milligrams starts six orders of magnitude closer to the ceiling than the same calculation
-quoted in kilograms. This is the concrete version of the unit warning in pattern 3.
+**A quantity's declared bound is normalized before it is compared, and the unit still matters — but not
+for the reason an earlier revision of this section gave.** Interval containment converts both sides to
+UCUM base units before comparing them, which is what makes `max '5 kg'` correctly accept a value written
+as `'6 [lb_av]'` (`business-domain-types.md` § Qualifier compatibility on the bound). The base unit for
+mass is the gram, so a bound authored as `5 kg` is `5000` inside the analysis.
+
+That earlier revision concluded from this that a calculation quoted in milligrams "starts six orders of
+magnitude closer to the ceiling" than one quoted in kilograms. **Normalization is exactly what defeats
+that argument.** It happens on *both* sides of the comparison, so `5 kg` and `5000000 mg` both become
+5000 grams and the two spellings are indistinguishable at the point of comparison. The only effect
+normalization has on magnitude is a uniform factor of a thousand for every mass, because UCUM's mass base
+is the gram, and that factor does not depend on what the author wrote.
+
+The conclusion survives on a different argument, and it is the document's own central one. **The overflow
+ceiling applies to the stored value, not to the compared bound.** A field declared `in 'mg'` stores
+milligram numbers and carries milligram numbers through every operation it takes part in, and it is those
+intermediates that a representability obligation is stamped on. So the unit is a magnitude decision after
+all — through what gets stored and multiplied, not through how a bound is checked. This is the concrete
+version of the unit warning in pattern 3.
 
 **A price carries a unit in its divisor position, so multiplying a price by a quantity cancels the unit
 and leaves the magnitudes multiplied.** `price * quantity → money` is a genuine multiplication of two
@@ -724,10 +772,12 @@ thousands — that is a reason to declare `max` explicitly, not something the qu
 product needs below the point, which is a scale statement rather than a magnitude statement. It does not
 bound the product's magnitude and it does not help discharge a representability obligation. It is worth
 saying because scale and magnitude are both "size" in ordinary speech and the two obligations are
-genuinely different: on `System.Decimal` the coefficient and the scale share the same 96 bits, so a
-result needing many digits below the point *and* a large integer part can fail to fit even when neither
-alone would. The lane metadata in build item 4 is what lets the analysis see that; a scale declaration
-on its own does not.
+genuinely different: `System.Decimal` is 128 bits — a 96-bit integer coefficient plus a separate 32-bit
+flags word carrying the sign and a scale byte, so the scale costs none of the 96 bits. What the two
+obligations share is the coefficient itself: it must hold *every* significant digit, above and below the
+point together, within about 28–29 digits. So a result needing many digits below the point *and* a large
+integer part can fail to fit even when neither alone would. The lane metadata in build item 4 is what
+lets the analysis see that; a scale declaration on its own does not.
 
 ### What each overflow form contributes
 
@@ -844,6 +894,22 @@ discharge. The definition is refused and the author declares a bound.
 
 ## Underflow policy
 
+**What is settled here and what is not.** `the-walk.md:377–392` (item 14) splits the underflow question
+into two halves and this document can only answer one of them. The half that is closed: reasoning from
+the parts — non-zero times non-zero is non-zero — is unsound and cannot be the answer, because two
+non-zero operands can multiply to a stored zero. Both the walk and canon agree on that and the policy
+below is built on it. The half that is open is the **cost**: if a division may only discharge from
+something declared on the divisor itself, then an author who divides by a computed product must restate
+the constraint on the product, and the walk records that this cost "was never worked out or put to him."
+That item is a "Waiting on Shane" row, "to be prepared with worked examples before it is asked."
+
+**This document is that preparation.** The eight divisor forms, the four authoring patterns, the worked
+examples and the comparison tables exist to make the cost visible so the question can be put with real
+definitions attached rather than in the abstract. Read them as options with their prices marked. Nothing
+below decides the open half, and an earlier revision of this document overstated that by saying the
+underflow policy "settles" the open question canon recorded. It routes it; the routing is sound; the cost
+is the owner's call.
+
 ### Underflow should change the interval, not become a general rejection
 
 I do not recommend a general rule that every possible underflow rejects the definition.
@@ -956,6 +1022,41 @@ from Active on Calculate when BillingRate != 0
 The proof is about `BillingRate`. It establishes nothing about whether `RawRate` was non-zero or how
 far it was from zero. This is the same rule as for every divisor: test the final stored value after all
 representation effects.
+
+### The `duration` lane is carved out, and this recommendation does not reach it
+
+Everything in this section reasons about the numeric lanes. `duration` divisors are governed by canon
+already, on terms this document does not propose to change, and saying so explicitly matters because a
+strict reading of "prove the final stored divisor" would silently overturn one of them.
+
+`temporal-type-system.md:698–707` sets out the model. `duration / integer|number` and `duration / duration`
+both carry divisor safety, backed by `DivideByZeroException` in NodaTime rather than by an IEEE infinity —
+so the runtime consequence there is more severe than on `number`, not less. Canon names the proof sources
+directly, and the list is broader than this document's: a `positive` or `nonzero` constraint, an explicit
+`rule Field > 0` or `rule Field != 0`, a `when Field != 0` guard, `in State ensure Field > 0`, or
+`on Event ensure Arg > 0`. Two diagnostics carry it — **C92** for a literal zero divisor, **C93** for an
+unproven one.
+
+Three things follow, and none of them is a change this document proposes.
+
+- **Three of this document's eight forms do not exist on that lane.** `min` and `max` are compile errors
+  on `duration` — the constraint values are bare numbers rather than duration quantities — and there is no
+  `maxplaces`. So forms (c), (e) and (f) have nothing to attach to. What is left is the guard, the rule,
+  the `ensure`, and `nonzero` on the field, which canon already lists.
+- **Canon's compound-divisor concession stands, and this recommendation does not override it.**
+  `temporal-type-system.md:707` reads: *"Compound expressions: `duration / (Rate + 1)` assumes satisfiable
+  — no diagnostic (consistent with #106's Principle #8 conservatism)."* That is the opposite of
+  prove-or-reject, and a strict reading of this document's central rule would replace it with a refusal.
+  **It should not be read that way.** Changing a canonical concession is a decision, not a consequence, and
+  this document neither argues for it nor was written with that lane in view. If the numeric model
+  eventually makes the temporal concession look inconsistent, that is a reconciliation to run deliberately
+  against `temporal-type-system.md` with its own reasoning — not something to inherit by implication from
+  a document about `decimal` and `number`.
+- **`nonzero` on `duration` needs a type-aware desugar, and canon already says so.** `nonnegative` and
+  `nonzero` desugar to `Field >= 0` and `Field != 0` for numeric types, which would be type errors against
+  a duration; canon's implementation note requires comparisons against `Duration.Zero` instead. That is a
+  detail of the same establishment-and-preservation duty in build item 3, and it is recorded here so that
+  an implementer reading build item 3 does not assume the numeric desugar covers every lane.
 
 ### Do not require `maxplaces` on intermediates
 
@@ -1079,7 +1180,7 @@ field — form (c) below shows the same derived field being accepted once those 
 bounds. Everything below is about what the author writes next, and what the compiler should be able to
 make of it.
 
-### The seven forms, and what each one contributes
+### The eight forms, and what each one contributes
 
 **(a) Guard the division site on a magnitude.** The right form for a one-off division.
 
@@ -1311,11 +1412,29 @@ same build item 3:
 - **Preservation.** Every write that could falsify the rule must be proved not to. This is not built.
   Confirmed at HEAD: a file carrying `rule EffectiveRate >= 0.05` alongside a handler that does
   `set EffectiveRate = 0.0` compiles with no diagnostics at all, while the rule is simultaneously
-  consumed to discharge the divisor obligation elsewhere in the same file. The runtime would refuse that
-  handler when it fired, so no bad value is ever stored — but the definition contains a handler that can
-  never succeed, and the compiler should have said so. This is Shane's item-16 ruling applied to the
-  divisor case: the compiler refuses the definition until the author writes something that makes the rule
-  provable, rather than accepting it and leaving the runtime to sort it out.
+  consumed to discharge the divisor obligation elsewhere in the same file. This is Shane's item-16 ruling
+  applied to the divisor case: the compiler refuses the definition until the author writes something that
+  makes the rule provable, rather than accepting it and leaving the runtime to sort it out.
+
+  **What the runtime does in the meantime depends on the shape, and an earlier revision of this document
+  got it wrong.** It said the runtime refuses the handler when it fires "so nothing bad is stored," which
+  is only true in one of the two shapes:
+
+  - *Divisor written by a row action, divided elsewhere.* Row actions run at step **2e**, before computed
+    fields recompute at 2g and before rules evaluate at 2h. The rule does refuse the operation, nothing
+    commits, and the reassurance holds.
+  - *Divisor is itself a computed field, and the division is in another computed field.* Both recompute
+    at step **2g**. The division runs there, before any rule is consulted at 2h. Reproduced at HEAD:
+    `field UnitCost as decimal <- ShipmentCost / EffectiveRate` with `rule EffectiveRate >= 0.05`
+    compiles with zero errors and the obligation Proved via `CompositionalConstraint`, and at run time the
+    division faults before the rule can refuse anything. What the author gets is a divide-by-zero fault
+    rather than a clean constraint failure naming the rule they wrote.
+
+  This is the same 2g-then-2h ordering used three bullets above to establish that a rule *does* govern a
+  recomputed value, and both readings are correct — a rule checks a value produced at 2g, but it cannot
+  prevent the arithmetic that produced it. The consequence is that the missing preservation duty is a live
+  breach in the second shape rather than a hygiene gap, which is a further reason to build item 3 rather
+  than a reason to distrust form (g).
 
 So `rule abs(EffectiveRate) >= 0.05` over the freight product above is refused for the same reason form
 (b) is refused — a product of two possibly-tiny operands establishes nothing — and becomes provable by
@@ -1333,12 +1452,52 @@ rule-sourced fact path and from the default fold, not only from a transition-row
 spelling additionally needs the fact extractor to read a two-branch magnitude condition, which is a small
 extension of the same work rather than a separate rule.
 
-There is no eighth route worth listing. Guarding the operands for bare non-zeroness rather than the
-divisor is the reasoning the whole recommendation rejects. Note that form (c) case 2 is not an exception
-to this: it does not guard the operands, it declares intervals on them, and the interval of the divisor
-itself is what discharges the obligation. The rule stays "prove the final stored divisor" throughout —
-and form (g) is not an exception either, because a rule over the divisor field is a claim about the
-stored divisor and nothing else.
+**(h) State the floor as an `ensure`, scoped to the states or events where it holds.** Sound, named by
+canon as a proof source, and the one form that covers a floor holding on some paths and not others.
+
+```precept
+in Priced ensure abs(EffectiveRate) >= 0.05 because "a rate below five basis points is not a quotable rate"
+```
+
+An earlier revision of this document said there was no eighth route worth listing. That was wrong, and it
+was wrong against canon rather than against an opinion. `precept-language-spec.md:994–995` gives the
+grammar for all four `ensure` scopes; spec line 206 names "a rule, an ensure, or a guard" as the proof
+paths; line 247 names "an explicit rule or ensure" as the author's hand-written substitute; and
+`temporal-type-system.md:706` lists `in State ensure Field > 0` and `on Event ensure Arg > 0` by name
+among the facts that discharge a divisor obligation. The document searched for rules, modifiers and
+guards, found seven forms, and never looked for the fourth construct. The set is eight.
+
+**What it adds that nothing else reaches.** A `rule` is a claim about every configuration the entity can
+reach. Where a floor genuinely holds only in part of the lifecycle — a rate that is unconstrained while a
+quote is being assembled and bounded once it is priced — a rule cannot state it, because the rule would be
+false in `Draft`. This document's own answer at
+[when the domain has no defensible minimum](#when-the-domain-has-no-defensible-minimum) is to fall back to
+repeating a guard at every division site. `in Priced ensure abs(EffectiveRate) >= 0.05` states it once,
+scoped to exactly where the domain says it holds, with the reason attached — and every division reachable
+from that state reads it. A guarded rule (`rule ... when`) looks like it should do this and does not: it
+contributes no standing fact, for the reason given under form (g).
+
+**What it needs, and the duties it carries.** The same establishment-and-preservation duty as forms (f)
+and (g), which is build item 3 — with the scope narrowing what has to be proved rather than removing it.
+A state-scoped `ensure` must be established by every transition that *enters* the state and preserved by
+every write that happens *while in* it; writes in other states are exempt, which is a smaller obligation
+than a rule's and a differently-shaped one. Build item 3 should be read as covering **three** declaration
+forms, not two — modifier, rule, and ensure. The owner's item-7 ruling names five constraint forms, so
+three of five carry this duty.
+
+Two boundaries worth stating. An event-scoped `ensure` (`on Event ensure ...`) constrains one operation
+and so behaves like a guard rather than like a standing fact — useful at a division inside that event's
+own action chain, and contributing nothing elsewhere. And the `to`/`from` forms constrain a transition,
+not a resting configuration, so they establish a fact at a moment rather than across a region; only the
+`in State` form gives the standing, region-scoped fact this route is worth listing for.
+
+There is no ninth route worth listing, and that claim is now made having looked. Guarding the operands for
+bare non-zeroness rather than the divisor is the reasoning the whole recommendation rejects. Note that
+form (c) case 2 is not an exception to this: it does not guard the operands, it declares intervals on
+them, and the interval of the divisor itself is what discharges the obligation. The rule stays "prove the
+final stored divisor" throughout — form (g) is not an exception, because a rule over the divisor field is
+a claim about the stored divisor and nothing else, and neither is form (h), which is the same claim with a
+scope on it.
 
 ### The comparison, stated exactly
 
@@ -1354,6 +1513,7 @@ stored divisor and nothing else.
 | (e) `min 0.01 max 100` on the stored divisor | the stored value lies in `[0.01 .. 100]`, which excludes zero | yes | build item 2 |
 | (f) `nonzero maxplaces 4` on a field written by a guarded `set` | this field's stored value is always at least `0.0001` from zero, at every division by it | yes | build item 3, plus build item 1 if the establishing guard uses `abs()` |
 | (g) `rule abs(Rate) >= 0.05 because "…"` over the divisor field | this field is always at least `0.05` from zero, either sign, in every configuration, at every division by it | yes | build item 3 for the rule's own establishment and preservation, plus build item 1 reachable from the rule-sourced fact path |
+| (h) `in Priced ensure abs(Rate) >= 0.05 because "…"` | the same claim, scoped to the states where the domain says it holds, at every division reachable in those states | yes | build item 3 extended to the `ensure` form, plus build item 1 reachable from the ensure-sourced fact path |
 
 Rows (b), (c) and (f) declare the identical modifiers. The difference is entirely in where the value
 comes from and whether anything establishes the claim there. That is why the table separates them, and
@@ -1475,9 +1635,13 @@ must establish the rule at creation, and every write that could falsify it must 
 first half exists today: an unguarded rule is folded against the field defaults, and a definition whose
 defaults violate the rule is refused (`PRE0164`). The second half is build item 3, the same work that
 makes pattern 2 sound. Until it lands, a handler that drives the rate below the floor compiles clean
-while the rule is being used to discharge divisions elsewhere in the file — the runtime refuses that
-handler when it fires, so no bad value is stored, but the compiler has not yet told the author their
-handler can never succeed.
+while the rule is being used to discharge divisions elsewhere in the file. Where the divisor is written by
+a row action the runtime does refuse that handler when it fires, because actions run at step 2e and rules
+at 2h, so nothing is stored and what is missing is only the compiler telling the author their handler can
+never succeed. Where the divisor is itself a computed field and the division sits in another computed
+field, both recompute at step 2g and the division faults before any rule is consulted — so there the
+runtime is not a backstop at all, and the author meets a divide-by-zero fault instead of the constraint
+failure they wrote the rule to get. See form (g)'s preservation bullet for the reproduction.
 
 **Three things to know before choosing it.**
 
@@ -1546,7 +1710,7 @@ inputs move.
 ## The `number` lane
 
 Everything above this point reasons about `decimal`. The worked examples are rate cards and freight
-charges, the magnitude floor is `System.Decimal`'s `1e-28`, the ceiling is its `7.9e28`, and the seven
+charges, the magnitude floor is `System.Decimal`'s `1e-28`, the ceiling is its `7.9e28`, and the eight
 divisor forms lean twice on `maxplaces`, which only `decimal` has. That is a fair reflection of where
 Precept's business definitions live, and it is also a gap, because the question that started this whole
 line of work was asked about `number` and not about `decimal`. Canon records it at
@@ -1575,9 +1739,10 @@ is no `maxplaces` — a base-10 scale is not a property a binary float has, and 
 error.
 
 Two commitments in canon then decide the shape of everything below. The first is the spec's Totality
-principle, §0.6 #10: *every expression evaluates to a result — never silent `NaN`, `Infinity`, or
-`null`.* The second is the owner's non-finite ruling of 2026-07-21, recorded at `primitive-types.md:660`,
-which separates the two non-finite cases because their entry paths differ:
+principle, Design Principle 10 in §0.1 (`precept-language-spec.md:110`): *every expression evaluates to a
+result — never silent `NaN`, `Infinity`, or `null`.* The second is canon's non-finite position, recorded
+at `primitive-types.md:660` and dated 2026-07-21, which separates the two non-finite cases because their
+entry paths differ:
 
 - **`NaN` is prevented.** Its entry paths are enumerated and each is closed. `approximate()` cannot
   manufacture one, because `decimal` has no `NaN` and its whole range sits far inside binary64's. `sqrt`
@@ -1590,7 +1755,7 @@ which separates the two non-finite cases because their entry paths differ:
   case rather than the `NaN` one, and is deferred with it.
 - **Underflow is open**, quoted above, and unrouted.
 
-The ruling then states the consequence that this document has to answer for:
+Canon then states the consequence that this document has to answer for:
 
 > On the `number` lane the qualifier modifiers `nonzero`, `positive`, and `nonnegative` therefore
 > establish the predicate *and* not-`NaN`, checked where the value enters. Without the added clause the
@@ -1599,6 +1764,35 @@ The ruling then states the consequence that this document has to answer for:
 
 Canon saw the hazard and closed it for field modifiers. It did not close it for guards, and a guard is
 the form this document recommends first.
+
+#### Where the not-`NaN` clause comes from, stated precisely
+
+**It is derived and forced, not an owner ruling, and this document earlier said otherwise.** An earlier
+revision cited the clause six times as "the owner's non-finite ruling of 2026-07-21." That attribution
+was wrong. `the-walk.md:377–392` put this exact item to the owner as item 14; he marked it **not mine**,
+with the word "derived", and on a plain re-ask said the question had never been put to him. The walk
+records the clause as standing "as derived and forced."
+
+Nothing about the clause weakens under the correction, because what holds it up was never an
+attribution. The argument is one line and it is the walk's own: **`NaN != 0` evaluates true under IEEE
+comparison, so an unqualified `nonzero` on this lane establishes nothing a divisor proof can use — a
+`NaN` divisor would satisfy it and pass.** A modifier that admits the one value the obligation exists to
+exclude is not a weaker fact than intended; it is no fact at all. So the clause is forced by what the
+lane makes true, and it would be forced identically if nobody had ever written it down.
+
+What *does* change under the correction is scheduling, and it changes in one specific place. Requiring
+the not-`NaN` claim is forced and belongs with the proof work — that is item 5d, and it stays there.
+Changing what the modifiers `nonzero`, `positive` and `nonnegative` *mean* on this lane is a
+modifier-semantics change, and `primitive-types.md` says so in its own voice twelve lines below the
+heading quoted above: *"The change to what a qualifier modifier establishes on the `number` lane is a
+modifier-semantics change and is designed before it ships; this section states the target."* An earlier
+revision of this document scheduled it as mechanical catalog sync, which routed a modifier-semantics
+decision past the pre-design consultation gate on the strength of an attribution that did not hold. It is
+now carried as a design-queue item — see build item 8 and
+[Work that would require owner consultation](#work-that-would-require-owner-consultation-before-it-is-built).
+
+**The same item 14 governs the underflow half, and this document is its preparation rather than its
+answer.** See [Underflow policy](#underflow-policy).
 
 ### Can a `number` field hold one of these values today?
 
@@ -1610,7 +1804,8 @@ Canon is explicit that the representations exist. `primitive-types.md:650`: *IEE
 represent `+∞`, `-∞`, and `NaN`. Precept's `number` lane inherits these representations.* Not "excludes"
 — inherits. The lane is binary64 and it comes with binary64's full value set.
 
-Canon is equally explicit that they must not occur, through the spec's Totality principle, §0.6 #10:
+Canon is equally explicit that they must not occur, through the spec's Totality principle, Design
+Principle 10 in §0.1 (`precept-language-spec.md:110`):
 *every expression evaluates to a result — never silent `NaN`, `Infinity`, or `null`.* So the position is
 that these values are representable and forbidden, and something has to do the forbidding.
 
@@ -1715,7 +1910,8 @@ has something to say about them:
 | `0 * ∞` | the same |
 | a non-finite value arriving from outside the definition | ingress governance, and only where a modifier was declared |
 
-The 2026-07-21 ruling makes exactly this split, and it is why canon calls `NaN` prevented while calling
+Canon's non-finite position makes exactly this split, and it is why canon calls `NaN` prevented while
+calling
 infinity deferred: three of the paths were already closed by obligations Precept has, the fourth is a
 boundary question, and every remaining path runs through an infinity and therefore belongs to the other
 case. The split is sound. What it means in practice is that **the `NaN` case is only as closed as the
@@ -1723,10 +1919,14 @@ infinity case is**, and the infinity case is deferred.
 
 **Why it is worse than a too-large finite value.** Three properties compound:
 
-- **It propagates through everything and never recovers.** Any arithmetic operation with a `NaN` operand
-  produces a `NaN`. There is no operation that brings a computation back — where an infinity can return
-  to finite territory through `1 / ∞`, a `NaN` cannot return at all. One `NaN` early in a definition
-  makes every value derived from it a `NaN`.
+- **It propagates through nearly everything and never recovers.** Almost any arithmetic operation with a
+  `NaN` operand produces a `NaN`. There are documented IEEE exceptions — `pow(NaN, 0)` is `1.0`, and
+  `Functions.cs` declares a `pow` overload with a `number` base and an `integer` exponent that would
+  reach it — so the propagation is not literally universal. It is close enough to universal to be
+  treated as such, and the exceptions make the hazard smaller rather than larger. There is no operation
+  that brings a computation back the way an infinity can return to finite territory through `1 / ∞`. One
+  `NaN` early in a definition makes essentially every value derived from it a `NaN`, and the property the
+  argument actually rests on is the next bullet, which has no exceptions.
 - **No bound detects it.** `x <= max` is false for a `NaN` and `x > max` is also false. It satisfies no
   upper bound and violates none, so it is neither inside a declared interval nor outside one. Every
   mechanism Precept has for constraining a numeric value works by comparison, and comparison is precisely
@@ -1806,19 +2006,21 @@ there. On `number` it does not, and a `!= 0`-shaped divisor guard cannot be trus
 something separately establishes that the divisor is not a `NaN`. That is build item 8 for the modifier
 and requirement metadata, and item 5d for the obligation itself.
 
-The consequence for the seven forms is direct. Form (a), the direct `!= 0` guard at the division site —
-the form
+The consequence for the eight forms is direct, and it is worth naming the shapes rather than the letters,
+because the bare `!= 0` guard is not one of the eight at all. **The direct `!= 0` guard at the division
+site** — the form
 [when the domain has no defensible minimum](#when-the-domain-has-no-defensible-minimum) recommends as the
-honest one — does not exclude `NaN` on the `number` lane. Form (b), the `abs(x) >= k` magnitude guard,
+honest one — does not exclude `NaN` on the `number` lane. **Form (a), the `abs(x) >= k` magnitude guard**,
 does, and it does so for free, without any test being added, because the comparison it is already written
-in returns false for `NaN`. The same holds for a plain `> 0` guard.
+in returns false for `NaN`. The same holds for a plain `> 0` guard. **Form (b)**, `nonzero` declared on a
+derived field, is unaffected on this point, because it is not a route to a proof on either lane.
 
 That reverses the ordering this document gives elsewhere. On `decimal` the choice between `!= 0` and
 `abs(x) >= k` is a question of whether the domain has a defensible minimum, and if it does not, the bare
 disequality is the honest form. **On `number` the magnitude guard is the sounder form regardless**,
 because it discharges more of the obligation than it was written for. Where the domain genuinely has no
 minimum, the honest form on this lane is a disequality *plus* something that establishes finiteness —
-either a `nonzero` declaration on the field, which by the 2026-07-21 ruling carries the not-`NaN` clause,
+either a `nonzero` declaration on the field, which under canon's derived not-`NaN` clause carries it,
 or an explicit `x == x` test, which is the standard idiom and which Precept can already express.
 
 Two grounding notes, because they change scope rather than direction. First, both forms are recognized at
@@ -1882,10 +2084,11 @@ non-zero operands, is a binary floating-point constant; Astrée and Frama-C EVA 
 the transfer of that model to a fixed-scale base-10 type was the inferential step the underflow research
 flagged as its own weakest point. On `number` there is no inferential step. The model applies directly.
 
-That also settles the open question quoted at the top of this section. Canon recorded that `nonzero` on
-every operand does not yield a non-zero product and left it unrouted. The routing is the one this
-document already recommends for `decimal`: the claim belongs to the stored divisor, not to the operands,
-and the arithmetic that produced it is allowed to admit zero.
+That routes the open question quoted at the top of this section, and routing is a smaller claim than
+settling — see the note below. Canon recorded that `nonzero` on every operand does not yield a non-zero
+product and left it unrouted. The routing is the one this document already recommends for `decimal`: the
+claim belongs to the stored divisor, not to the operands, and the arithmetic that produced it is allowed
+to admit zero.
 
 The subnormal range does introduce one thing `decimal` does not have. A value can be non-zero, finite,
 and carry only a handful of significant digits, so a magnitude guard at `1e-320` is technically satisfied
@@ -1894,25 +2097,54 @@ the division is well defined and the result is finite — and it is not somethin
 should be asked to police. It is worth saying plainly in author-facing documentation for the lane, and
 nothing more.
 
-### The rule route does not reach this lane
+### The rule route reaches this lane; spelling a fractional threshold does not
 
 The revision that added form (g) — a declared unguarded `rule` over the divisor field, standing in for a
 threshold `maxplaces` cannot express — matters more on `number` than on `decimal`, because `maxplaces`
 does not exist here at all. Forms (c) and (f) and the whole of authoring pattern 2 are `decimal`-only by
 construction. The rule is what is left for an arbitrary threshold.
 
-At HEAD it does not work. The identical definition, differing only in the lane, gives opposite results: a
-`decimal` field with `rule Baseline >= 0.05` discharges the divisor obligation through
-`CompositionalConstraint`, and a `number` field with the same rule leaves the obligation unresolved and
-the division refused. There is a second, smaller wrinkle in front of it — `rule Baseline >= 0.05` on a
-`number` field is a type error, because the fractional literal resolves to `decimal` and the two lanes do
-not mix, so the threshold has to be spelled in exponent form as `5e-2`. That one is a literal-typing
-question in rule position rather than anything to do with proofs.
+**An earlier revision of this section claimed the rule route does not reach this lane, and that the build
+item carrying rule-sourced facts therefore had an uncosted lane dimension. Both claims were wrong and are
+withdrawn.** They rested on a comparison in which the two cells differed by more than the lane. Six cells
+run against HEAD:
+
+| Lane | Threshold as written | Result |
+|---|---|---|
+| `decimal` | `0.05` | Proved, `CompositionalConstraint` |
+| `decimal` | `5e-2` | Unresolved, PRE0083 |
+| `decimal` | `5.0e-2` | Unresolved, PRE0083 |
+| `number` | `0.05` | PRE0018 type error; obligation Unresolved |
+| `number` | `5e-2` | no diagnostic on the literal; obligation Unresolved |
+| `number` | `1` | **Proved, `CompositionalConstraint`** |
+
+The last row is decisive. A `rule` over a bare `number` field discharges the divisor obligation through
+the same `CompositionalConstraint` strategy the `decimal` lane uses. **The rule route works on `number`
+today.** There is no lane gap in the proof engine here and nothing extra for that build item to carry.
+
+What is real, and narrower, is that **there is currently no way to spell a fractional threshold on the
+`number` lane at all.** Both spellings fail, for unrelated reasons:
+
+- `rule Baseline >= 0.05` on a `number` field is PRE0018, *"Expected a number value here, but got
+  'decimal'"*. The fractional literal resolves to `decimal` and the two lanes do not mix. That is a
+  literal-typing question in rule position, it is genuine, and it is separate from anything about proofs.
+- `rule Baseline >= 5e-2` type-checks and is **silently wrong**. Exponent notation is not parsed anywhere
+  in the language: in `TypeChecker.Expressions.cs`, a literal without a `.` goes to `long.TryParse` and a
+  literal with one goes to `decimal.TryParse` under `NumberStyles.AllowDecimalPoint`, which excludes
+  `AllowExponent`. Both discard the boolean result, so every exponent literal becomes the value **0**
+  everywhere downstream. `5e-2` and `5.0e-2` both do this. The author has written `rule Baseline >= 0`
+  and nothing tells them so — the only diagnostic is PRE0083 pointing at the division, which says nothing
+  about the rule. On a field declared `positive` the degenerate rule does trip PRE0154 ("governs
+  nothing"), which is a partial rescue and only where the vacuity happens to be provable.
+
+The second of those is a defect in the language, not in this recommendation, and it is not confined to
+rules — any `1e6` written anywhere in a guard, rule, ensure or expression is currently the value zero. It
+is filed in `docs/Working/bugs.md`. **Until it is fixed, no document should recommend exponent notation as
+a workaround for anything**, and an earlier revision of this one did exactly that.
 
 This is a scope note rather than a change of direction. The rule route is the right route on this lane
-too, and it needs no new syntax. But the build item that carries rule-sourced facts into the proof has a
-lane dimension nobody had costed, and on `number` it has more weight to carry than on `decimal`, because
-there is no `maxplaces` route beside it.
+too, it works, and it needs no new syntax. What it needs is a spelling, and supplying one is the
+fractional-literal typing question above rather than proof-engine work.
 
 ### The interval cannot hold this lane
 
@@ -1928,8 +2160,9 @@ with the one confusion that the largest representable value and "no bound" are t
 | `decimal`, and so the interval | `1e-28` | `7.9e28` |
 
 Everything above `7.9e28` and everything below `1e-28` — which is to say the entire subnormal range, the
-entire range where underflow actually happens, and eleven orders of magnitude of ordinary scientific
-values above the top — has no representation in the domain that is supposed to be reasoning about it.
+entire range where underflow actually happens, and about 279 orders of magnitude of ordinary scientific
+values above the top (`7.9e28` to `1.8e308`), with roughly 295 below the floor — has no representation in
+the domain that is supposed to be reasoning about it.
 The lane's own maximum, the number an overflow obligation has to compare against, cannot be written down.
 
 The catalog does already treat this lane distinctly in one place, which is worth crediting: the `number`
@@ -1944,8 +2177,8 @@ it is just that on this lane the endpoint type has to change before the transfer
 | | On `number` |
 |---|---|
 | Prove the final stored divisor, not its operands | Transfers unchanged. |
-| Underflow admits zero into the interval; refuse at the division | Transfers unchanged, and answers the open question canon recorded at `primitive-types.md:667`. |
-| A `rule` over the divisor field discharges the obligation | Right route, more weight to carry, not reaching this lane at HEAD. |
+| Underflow admits zero into the interval; refuse at the division | Transfers unchanged, and routes the open question canon recorded at `primitive-types.md:667`. The cost half stays open. |
+| A `rule` over the divisor field discharges the obligation | Transfers unchanged. Verified at HEAD: `rule Baseline >= 1` on a bare `number` field proves through `CompositionalConstraint`. Carries more weight here because `maxplaces` does not exist on this lane. |
 | Establishment and preservation duty on any declared fact | Transfers unchanged. |
 | `abs(x) >= k` magnitude guard | Transfers, and is *stronger* here — it excludes `NaN` for free. |
 | Declared interval on the divisor field | Transfers unchanged; unbuilt on both lanes. |
@@ -2074,8 +2307,8 @@ contract and should be written as the `abs()` guard.
 This is the one authoring recommendation in the document that is lane-specific. On `decimal` the bare
 disequality is the honest form and excludes every value that makes the division fail. On `number` it does
 not, because `NaN != 0` is true, and the honest form there is either the `abs()` guard, which refuses
-`NaN` by construction, or the disequality alongside a `nonzero` declaration on the field, which by the
-2026-07-21 ruling carries a finiteness clause the guard does not.
+`NaN` by construction, or the disequality alongside a `nonzero` declaration on the field, which under
+canon's derived not-`NaN` clause carries a finiteness clause the guard does not.
 
 ## What is convention, what is build work, and what would need design
 
@@ -2103,9 +2336,13 @@ not, because `NaN != 0` is true, and the honest form there is either the `abs()`
   operands, never on the result: a rule over the result of a multiplication is a claim about a value that
   only exists if the multiplication already succeeded. See
   [Why a rule over the result cannot carry an overflow claim](#why-a-rule-over-the-result-cannot-carry-an-overflow-claim).
-- Treat the unit a `quantity` is quoted in as a magnitude decision. Bounds are normalized to UCUM base
-  units before they are compared, so a figure quoted in milligrams travels through every operation six
-  orders of magnitude larger than the same figure in kilograms.
+- Treat the unit a `quantity` is quoted in as a magnitude decision. A field declared `in 'mg'` *stores*
+  milligram numbers and carries them through every operation, so the same physical mass quoted in
+  milligrams travels through the analysis six orders of magnitude larger than in kilograms — and it is
+  the stored intermediate that the representability obligation is stamped on. (Bound normalization is not
+  the mechanism: it converts both sides of a comparison to UCUM base units, so it makes the spellings
+  equivalent rather than different. See
+  [What money and quantity change](#what-money-and-quantity-change).)
 
 No new syntax is needed for these practices.
 
@@ -2134,18 +2371,24 @@ were declined, is in
    Extend the fact extractor to read the sign-explicit spelling
    `rule Rate >= 0.05 or Rate <= 0.0 - 0.05` in the same pass; it is the same magnitude claim written
    without the function call, it discharges nothing today, and reading it is a small addition to the same
-   code rather than separate work.
+   code rather than separate work. One duty rides with it: recognizing the disjunction as the magnitude
+   claim is an equivalence between two differently-written expressions, and the owner's item-13 ruling
+   requires such an equivalence to carry a written argument. This one is short — the disjunction is a
+   direct case split on the sign of the author's own expression rather than an algebraic rewrite of it —
+   but it is owed and should be written rather than assumed.
 
-   **This item has a lane dimension that has not been costed.** Two of the three places are `decimal`-only
-   at HEAD. A `number` field carrying `rule Baseline >= 5e-2` leaves the divisor obligation unresolved,
-   where the identical `decimal` definition discharges it through `CompositionalConstraint`; and
-   `rule Baseline >= 0.05` on a `number` field is a type error before the proof is even attempted,
-   because the fractional literal resolves to `decimal` and the lanes do not mix, so the threshold has to
-   be written `5e-2`. Both need fixing here, and they matter more on that lane than this one, because
-   `maxplaces` does not exist there and the rule is the only route to an arbitrary threshold. Guard
-   narrowing also has to know which comparison shapes exclude a non-finite value and which do not:
-   `abs(x) >= k` and `x > 0` are false for `NaN` and so refuse it, while `x != 0` is true for `NaN` and
-   admits it. See [The `number` lane](#the-number-lane).
+   **What this item does *not* have to carry, corrected.** An earlier revision claimed an uncosted lane
+   dimension here — that rule-sourced facts do not reach the `number` lane. That is wrong: `rule Baseline
+   >= 1` on a bare `number` field discharges the divisor obligation through `CompositionalConstraint`,
+   verified at HEAD. The rule route works on both lanes and this item carries no extra lane weight. What
+   is true, and separate, is that a *fractional* threshold cannot currently be spelled on `number` at all
+   — `0.05` is a type error and `5e-2` silently parses to zero through a language-wide exponent-literal
+   defect filed in `docs/Working/bugs.md`. Neither is proof-engine work. See
+   [The rule route reaches this lane](#the-rule-route-reaches-this-lane-spelling-a-fractional-threshold-does-not).
+
+   **What this item does have to carry on that lane** is which comparison shapes exclude a non-finite
+   value and which do not: `abs(x) >= k` and `x > 0` are false for `NaN` and so refuse it, while `x != 0`
+   is true for `NaN` and admits it. See [The `number` lane](#the-number-lane).
 
 2. **Let the divisor rule read the interval that is already calculated.** A field declared
    `min 0.01 max 100` already gets an interval containment obligation carrying `[0.01 .. 100]`; the
@@ -2180,16 +2423,23 @@ were declined, is in
    machinery either way. What changes is that this item should be scheduled as the way reuse is meant to
    be written, not only as a correction to an unsound acceptance.
 
-   **Declared rules are in scope for this item, not a separate one.** A `rule` consumed as a premise at a
-   division site owes exactly what a modifier owes. The creation half already exists — an unguarded rule
-   is folded against the field defaults and the definition refused if they violate it (`PRE0164`). The
-   preservation half does not: confirmed at HEAD, a file carrying `rule Rate >= 0.05` and a handler doing
-   `set Rate = 0.0` compiles with no diagnostics while that same rule discharges a division elsewhere in
-   the file. The runtime does refuse the handler when it fires — rules are evaluated after mutation and
-   before commit, so nothing bad is stored — but the definition contains a handler that can never
-   succeed and the compiler should say so. This is Shane's item-16 ruling in the phase-1 walk applied to
-   the divisor case, and it is what makes pattern 3 sound. It should be built as one duty covering both
-   declaration forms rather than as two mechanisms that drift.
+   **Declared rules and `ensure`s are in scope for this item, not separate ones.** A `rule` consumed as a
+   premise at a division site owes exactly what a modifier owes, and so does an `in State ensure`. The
+   creation half already exists for rules — an unguarded rule is folded against the field defaults and the
+   definition refused if they violate it (`PRE0164`). The preservation half does not: confirmed at HEAD, a
+   file carrying `rule Rate >= 0.05` and a handler doing `set Rate = 0.0` compiles with no diagnostics
+   while that same rule discharges a division elsewhere in the file. Whether the runtime catches it
+   depends on the shape — a row action is refused at step 2h, but a computed field dividing by another
+   computed field faults at 2g before any rule is consulted, so in that shape there is no backstop at all.
+   This is Shane's item-16 ruling in the phase-1 walk applied to the divisor case, and it is what makes
+   pattern 3 sound.
+
+   It should be built as **one duty covering three declaration forms** — modifier, `rule`, and
+   `in State ensure` — rather than as three mechanisms that drift. The owner's item-7 ruling names five
+   constraint forms, so this is three of five. A state-scoped `ensure` narrows what has to be proved
+   rather than removing it: established by every transition entering the state, preserved by every write
+   occurring within it, and exempt elsewhere. See
+   [form (h)](#the-eight-forms-and-what-each-one-contributes).
 
 4. **Make interval transfers representation-aware.** Operation metadata must state how each numeric lane
    rounds, underflows, overflows, and admits special values. The proof engine then calculates intervals
@@ -2284,28 +2534,37 @@ were declined, is in
    reason — see
    [What Precept should adopt](#what-precept-should-adopt).
 
-8. **State the divisor requirement per lane, and teach the modifiers the clause canon already gave
-   them.** The divisor requirement is declared once in the operation catalog and reused across lanes; for
-   the `number` lane it reads `NotEquals, 0m`, the same comparison against the same `decimal` constant
-   that the `decimal` lane uses. On `decimal` that is exactly the property that makes division safe. On
-   `number` it is not, because `NaN != 0` is true, and because division by zero on that lane produces an
-   infinity rather than failing. The property that keeps a `number` division inside the spec's Totality
-   principle is that the divisor is finite, non-zero and not `NaN`, and the requirement should say so.
-
-   The second half is the modifier metadata. The owner's non-finite ruling of 2026-07-21
-   (`primitive-types.md:660`) states that on the `number` lane `nonzero`, `positive` and `nonnegative`
-   establish the predicate *and* not-`NaN`, checked where the value enters, and gives the reason: without
-   the added clause the modifier establishes nothing usable, since a `NaN` passes a `≠ 0` test. The
-   ruling is a decision that has not yet been written into the catalog. The `Nonzero` entry in
-   `Modifiers.cs` declares one satisfaction, `SelfValue ≠ 0` against a `decimal` constant, with no lane
-   distinction and no finiteness clause, and there is no handling of `NaN` or infinity anywhere in the
-   compiler or the runtime. This item is the catalog work that closes the distance between the ruling and
-   the metadata.
+8. **State the divisor requirement per lane.** The divisor requirement is declared once in the operation
+   catalog and reused across lanes; for the `number` lane it reads `NotEquals, 0m`, the same comparison
+   against the same `decimal` constant that the `decimal` lane uses. On `decimal` that is exactly the
+   property that makes division safe. On `number` it is not, because `NaN != 0` is true, and because
+   division by zero on that lane produces an infinity rather than failing. The property that keeps a
+   `number` division inside the spec's Totality principle is that the divisor is finite, non-zero and not
+   `NaN`, and the requirement should say so.
 
    This is smaller than items 4 and 5 and it is not behind the item-15 deferral, because it is about what
-   the obligation claims rather than about proving a range. It is also the piece that makes the guard
-   forms honest on that lane, so it belongs beside item 1 rather than after it. See
+   the obligation claims rather than about proving a range. It is also what makes the guard forms honest
+   on that lane, so it belongs beside item 1 rather than after it. See
    [The `number` lane](#the-number-lane).
+
+   **What this item no longer contains, and why.** An earlier revision folded a second half into this
+   item: teaching `Modifiers.cs` that `nonzero`, `positive` and `nonnegative` establish not-`NaN` on the
+   `number` lane, presented as mechanical catalog sync closing the distance between a ruling and the
+   metadata. Two things were wrong with that. The attribution was wrong — the clause is derived and
+   forced, not owner-ruled (see
+   [Where the not-`NaN` clause comes from](#where-the-not-nan-clause-comes-from-stated-precisely)). And
+   the work is not mechanical: `primitive-types.md` states twelve lines below the passage in question that
+   *"The change to what a qualifier modifier establishes on the `number` lane is a modifier-semantics
+   change and is designed before it ships; this section states the target."* Scheduling it here routed a
+   modifier-semantics decision past the pre-design consultation gate.
+
+   The observation that motivated it stands and is worth keeping as evidence for whoever designs it: the
+   `Nonzero` entry in `Modifiers.cs` declares one satisfaction, `SelfValue ≠ 0` against a `decimal`
+   constant, with no lane distinction and no finiteness clause, and there is no handling of `NaN` or
+   infinity anywhere in the compiler or the runtime. So canon's target and the catalog are apart. Closing
+   that distance is now listed under
+   [Work that would require owner consultation](#work-that-would-require-owner-consultation-before-it-is-built)
+   rather than here.
 
 ### Work I do not recommend now
 
@@ -2360,8 +2619,15 @@ Three overflow-specific decisions are the owner's rather than this document's, a
 syntax question:
 
 - **Lifting the item-15 deferral.** Overflow is an authorized exemption from prove-or-reject for the MVP,
-  ruled 2026-07-26 with the consequence stated. Build items 4 and 5 describe where the model should end
-  up; scheduling any of them is a decision to close the exemption, and that is the owner's to make.
+  ruled 2026-07-26 with the consequence stated. Build item 5 describes where the model should end up;
+  scheduling any of it is a decision to close the exemption, and that is the owner's to make. **Build
+  item 4 is not in this bullet**, and an earlier revision wrongly put it here. Item 4 is the
+  interval-representation change, and the divisor half depends on it directly: form (c) case 2 discharges
+  `nonzero` through items 2 and 4, its soundness argument is representation-aware (the floor `0.005` sits
+  far above `decimal`'s smallest magnitude of `1e-28`, so underflow cannot pull the product to zero), the
+  underflow policy's first requirement is item 4's transfer, and final-judgment item 1 is stated in terms
+  of representation-aware intervals. Routing item 4 through the overflow exemption would have blocked the
+  divisor work behind a decision the divisor work does not depend on.
 - **The `integer` representation.** Fixed-width 64-bit under prove-or-reject, or arbitrary precision,
   which removes the obligation and replaces it with a bound on time and memory that nothing in the
   surveyed field proves. Recorded as open in `primitive-types.md` § Open Questions and unchanged by this
@@ -2374,6 +2640,26 @@ syntax question:
   a division by zero or as a `NaN` that no declared bound rejects. The exemption is the owner's to keep
   or lift either way; it is a larger exemption on that lane than on this one. See
   [The `number` lane](#the-number-lane).
+
+Two further decisions belong here, and both were previously presented in this document as settled when
+canon and the phase-1 walk record them as open:
+
+- **What `nonzero`, `positive` and `nonnegative` establish on the `number` lane.** The *requirement* that
+  a `number` divisor be finite and not `NaN` is forced and stays as build items 5d and 8. Changing what
+  the three modifiers establish is a different thing, and `primitive-types.md` says of it in its own
+  voice: *"The change to what a qualifier modifier establishes on the `number` lane is a
+  modifier-semantics change and is designed before it ships; this section states the target."* It
+  therefore goes through the pre-design consultation gate and then `/design`, not through catalog sync.
+  The evidence is assembled in build item 8 and in
+  [The `number` lane](#the-number-lane); the decision is not this document's to take.
+- **What the strict divisor rule costs authors, on the underflow question.** `the-walk.md:377–392`
+  (item 14) records the underflow half as unsettled, and records precisely which half: reasoning from the
+  parts — non-zero times non-zero is non-zero — is unsound and cannot be the answer, but *what it costs an
+  author to restate the constraint on the divisor* "was never worked out or put to him," and the item is
+  a "Waiting on Shane" row "to be prepared with worked examples before it is asked." This document is that
+  preparation. The eight forms, the four authoring patterns and the worked examples are the author-cost
+  material the walk asked for. They are options with their costs attached, not a ruling. See
+  [Underflow policy](#underflow-policy).
 
 And one that *is* a language question, flagged rather than answered: **temporal arithmetic has no premise
 to reason from.** `instant ± duration` can leave the representable calendar range, and the overflow
@@ -2441,6 +2727,25 @@ the one requirement on the list that needs its own family. The techniques that w
 declined, and the requirements that decided each, are in
 [The proof techniques the research surveyed](#the-proof-techniques-the-research-surveyed-and-which-ones-precept-should-use).
 
-The recommendation is ready to inform phase-5 design, but it is not a locked decision. The immediate
-compiler work uses existing author syntax. Any later proposal that changes field syntax or the numeric
-contract must first be discussed with Shane under the pre-design consultation rule.
+The recommendation is ready to inform phase-5 design, but it is not a locked decision and it is not a
+build authorization. The immediate compiler work uses existing author syntax. Any later proposal that
+changes field syntax or the numeric contract must first be discussed with Shane under the pre-design
+consultation rule.
+
+**What has to happen before any of this is built.** This document goes through `/design` and comes out as
+a locked design document. That process supplies what a recommendation does not carry: the Philosophy
+Alignment matrix, the Language Design Grounding and Architecture Grounding, decisions classified by
+stakes, and the four legs — rationale, alternatives rejected, precedent, tradeoff accepted — on every
+decision that ends up locked. Until that has happened, the eight build items describe implied work rather
+than agreed work, and their stated orderings are untested claims.
+
+**Two things the 2026-07-27 review named that this document cannot close, recorded so they are not lost.**
+First, **nobody has estimated what this recommendation would cost authors** — how many real definitions it
+would refuse — and no honest method exists, since counting sample files establishes nothing and a refused
+definition is the only evidence such a rule generates. That is the half of the underflow question reserved
+to the owner (see [Underflow policy](#underflow-policy)), and it is the largest open question against the
+document. Second, **the central rule has survived attack but has never been independently re-derived.** A
+reader briefed to reach the answer from the underlying evidence without following this document's
+reasoning produced only disagreements; there is no record of it arriving at "prove the final stored
+divisor" on its own and confirming it. Surviving attack is a weaker thing than being reproduced, and the
+strongest claim here rests on the weaker of the two.

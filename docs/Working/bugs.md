@@ -27,6 +27,47 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-067: Every exponent-notation numeric literal silently evaluates to `0`
+
+- **Discovered**: 2026-07-27, reviewing the phase-5 divisor and overflow recommendation. **Confirmed at HEAD through `precept_compile`** — the six cells below were run, not reasoned about.
+- **Affected**: every numeric literal written in exponent notation, in any expression position — rules, guards, ensures, computed-field expressions, action right-hand sides, defaults. Both the `decimal` and `number` lanes. Not confined to any one construct.
+- **Symptom**: the literal parses and type-checks without complaint, and carries the value **0** everywhere downstream. No diagnostic names the literal. The author sees only whatever downstream consequence follows from having written zero — commonly `PRE0083` at a division, pointing at the division rather than at the rule that was supposed to protect it.
+- **Root cause**: `src/Precept/Pipeline/TypeChecker.Expressions.cs`, `ResolveNumericLiteral`. Both branches drop exponent notation and both discard the parse result:
+  - a literal containing no `.` goes to `long.TryParse(lit.Text, CultureInfo.InvariantCulture, out var intVal)` — `"5e-2"` is not a valid `long`, the boolean is discarded with `_ =`, and `intVal` stays `0`;
+  - a literal containing a `.` goes to `decimal.TryParse(..., NumberStyles.AllowDecimalPoint, ...)`, and `AllowDecimalPoint` does **not** include `AllowExponent`, so `"5.0e-2"` fails identically and `decVal` stays `0`.
+- **Measured behaviour**:
+
+  | Lane | Threshold as written | Result |
+  |---|---|---|
+  | `decimal` | `0.05` | obligation **Proved**, `CompositionalConstraint` |
+  | `decimal` | `5e-2` | obligation **Unresolved**, PRE0083 — literal became `0` |
+  | `decimal` | `5.0e-2` | obligation **Unresolved**, PRE0083 — literal became `0` |
+  | `number` | `0.05` | PRE0018 *"Expected a number value here, but got 'decimal'"* (a separate, real issue — see below) |
+  | `number` | `5e-2` | no diagnostic on the literal at all; obligation **Unresolved** |
+  | `number` | `1` | obligation **Proved**, `CompositionalConstraint` |
+
+- **Why it is a bug and not a missing feature**: the lexer accepts the token, the type checker accepts the expression, and the compiler reports the resulting rule as `Right = TypedLiteral { ResultType = Integer, Value = 0 }`. Silently substituting zero for a value the author wrote is the failure mode Precept exists to prevent — a rule reading `Baseline >= 5e-2` governs nothing while appearing to state a floor. Either exponent notation is supported and parsed, or the lexer rejects it; accepting it as zero is the one outcome that must not stand.
+- **Partial existing mitigation**: on a field declared `positive`, the degenerate `>= 0` comparison trips `PRE0154` *"is always true under the declared constraints — it governs nothing"*. That is a warning, and it fires only where the vacuity happens to be provable from other declarations. It does not fire on a bare field.
+- **Second, separate issue observed in the same probes** (worth its own decision, recorded here so it is not lost): a fractional literal in a `number`-lane comparison resolves to `decimal` and fails with `PRE0018`, so **there is currently no way to write a fractional threshold on the `number` lane at all** — `0.05` is a type error and `5e-2` is silently zero. Fixing this bug closes half of that; the literal-typing half is a language question about fractional-literal resolution in `number` context.
+- **Consequence for documentation**: no document should recommend exponent notation as a workaround while this stands. `docs/working-reset/phase-5/recommendation-overflow-and-divisor-nonzero-2026-07-26.md` did so and has been corrected.
+- **Workaround used**: none authored. On the `decimal` lane, write the plain fractional form (`0.05`). On the `number` lane there is no correct spelling for a fractional threshold today.
+- **Fix complexity**: trivial for the parsing itself — add `NumberStyles.AllowExponent` (with `AllowDecimalPoint` and `AllowLeadingSign`) and route exponent-bearing literals to the decimal branch regardless of whether they contain a `.`. Small once the discarded `TryParse` results are also handled, which they should be: a literal that fails to parse must produce a diagnostic rather than a zero.
+- **Priority**: blocks shipping. It is silent, it is not confined to one construct, and it produces a wrong answer rather than a refusal.
+- **Repro**:
+  ```precept
+  precept ExponentLiteral
+
+  field Baseline as decimal editable
+  field Amount as decimal editable
+  field Ratio as decimal <- Amount / Baseline
+
+  rule Baseline >= 5e-2 because "the domain floor"
+
+  state Active initial
+  state Closed terminal
+  ```
+  Expected: the rule states a floor of `0.05` and discharges the divisor obligation, as the identical definition spelled `0.05` does. Actual: the rule states `Baseline >= 0`, the obligation is Unresolved, and `PRE0083` reports *"Division is unsafe: 'Baseline' can be zero"* with nothing said about the literal.
+
 ### BUG-066: A computed field may be declared over a non-configuration expression (`<- now()`), and nothing rejects it
 
 - **Discovered**: 2026-07-24, adversarial review of the establishment/preservation weakest-precondition work. **Confirmed at HEAD via a direct `Compiler.Compile` harness.**
