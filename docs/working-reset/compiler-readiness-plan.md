@@ -178,6 +178,40 @@ is, and names what they are looking at. It does not get dressed up in language t
 This is the priority for the whole plan. The difficulty this project has had is work with no way to
 know it was finished.
 
+## No phase closes with an open deferral that has no owner
+
+**Added 2026-07-28, after phase 2 nearly closed with three.** A phase may defer work — that is often the
+right call, and a slice that meets a problem spanning five documents when it owns two is right to decline
+rather than do a fifth of it. What a phase may not do is defer work to nobody.
+
+**The rule.** A phase closes only when every item it leaves open carries, in writing, one of three things:
+
+1. **A later phase that owns it**, named — and that phase's own scope must actually reach it. "Phase 5
+   will sort it out" is not an owner unless phase 5's stated scope covers the thing. Check the phase, do
+   not assume.
+2. **A decision the owner has taken**, recorded, that the work is not being done. Not "deferred pending
+   his ruling" — a ruling he has actually given.
+3. **A named exception below.**
+
+An item with none of those blocks the phase. Not as a formality: an open item with no owner is invisible
+the moment the phase closes, because nothing downstream reads a closed phase's open rows.
+
+**How this was found.** Phase 2 deferred the runtime fault-backstop family — nineteen rows across five
+documents — because four correction passes each owned a subset and each correctly declined to do part of
+it. The reasoning was right every time and the result was that the specification says there are no
+evaluation-time fault traps while two other documents describe fifteen of them and say when they fire.
+Nothing in the plan would ever have picked that up: the register is not an input to any later phase, and
+phase 3, the nearest candidate, covers the language statement rather than the runtime documents.
+
+**The exceptions, and they are exceptions rather than a category.**
+
+- **Arithmetic overflow.** Ruled by the owner: the model is in scope and its build is sequenced after the
+  MVP. It is not owned by a phase because it is not being built yet, and that is a decision rather than an
+  oversight. Every document that names it says so.
+
+Anything else claiming exception status gets added here, with the ruling that made it one. An exception
+nobody wrote down is an unowned deferral wearing a better name.
+
 **Some phases write code, deliberately.** Phases 3, 5 and 9 each produce a build check as well as a
 document, and phase 6 produces the counterexample search. Building does not start at phase 11. The code
 in those phases is what makes their finish lines checkable rather than declared, and their sizes have
@@ -717,6 +751,11 @@ different person running it reaches the same list.
    is not already a row. Check: run it, diff the output against the register.
 5. Every *don't remember* item from phase 1 is disposed of — resolved as a row, or explicitly recorded as
    still open with what is stalled. Check: undisposed = 0.
+6. **Every open item carries an owner.** Each row not executed names either a later phase whose scope
+   actually reaches it, or a ruling the owner has given that the work is not being done. Check: open rows
+   with neither = 0. See § No phase closes with an open deferral that has no owner. As of 2026-07-28 this
+   condition fails: the nineteen fault-backstop rows have no owning phase, and two rows found in
+   `docs/tooling/` on the fifth pass are recorded but unassigned.
 
 The known starting point is the 25-row correction list phase 1 moved here, all rows verified against HEAD
 and none executed. Its largest single item is the post-mutation sweep: the want document rules that once
