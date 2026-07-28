@@ -1,5 +1,7 @@
 # Precept philosophy
 
+*This document states the guarantee Precept ships with — the commitments the project is built to keep. It is not a status report on the current build: where the compiler or runtime has not yet caught up to a commitment here, the commitment stands and the gap is tracked as work in progress in the compiler and runtime docs.*
+
 ---
 
 ## What Precept is
@@ -12,13 +14,15 @@ That holds whether or not the entity has a lifecycle. A loan application moves t
 
 A `.precept` file declares the entity's **fields** — scalar values and typed collections — its **states**, when lifecycle matters, the **events** that move it, the **rules** that must hold about its data, unconditionally or under a declared condition, and the **ensures** that must hold in specific states or on specific events. Every rule carries a mandatory reason: the language will not accept a constraint without its rationale. One file, complete rules — there is no second place to look, and no scattered logic to bypass.
 
-Only a closed set of operations can ever change a governed entity's data. It is created in its initial state with its declared defaults. An event moves it, carrying typed arguments. A field its definition declares editable is edited. Every way the data can change is declared in the definition, and every value that enters from outside — an event argument, an edited field — is held to its declared constraints at the moment it enters.
+Only a closed set of operations can ever change a governed entity's data. It is created in its initial state, from the values construction supplies and the defaults its definition declares. An event moves it, carrying typed arguments. A field its definition declares editable is edited. Every way the data can change is declared in the definition, and every value that enters from outside is held to its declared constraints at the moment it enters.
 
-Any of this can be previewed — every possible event, from any position — without executing anything. And an entity comes back from storage by restore, which changes nothing: it returns a configuration that was already committed.
+Any of this can be previewed — every possible event, from any version of the entity you hold, live or restored — without executing anything. And an entity comes back from storage by restore, which changes nothing: it returns a configuration that was already committed.
 
 The set is closed because the guarantee requires it: an operation exists in the compiled engine only because the compiler proved every rule survives it, and an operation nobody declared has no such proof and no existence.
 
-The engine is deterministic — same definition, same data, same outcome — and inspectable: at any point you can preview every possible operation and see not only what would happen but why, with the complete reasoning exposed. And it is honest about approximation. A contract is only trustworthy if it means what it appears to mean; silent approximation inside an exact-looking path destroys the ability to reason about outcomes. Where a value or operation is inherently approximate, the contract must say so — visibly, in the type system and the public API. Exact stays exact; approximation is declared, never disguised.
+The engine is deterministic: same definition, same data, same outcome, every time, anywhere. That is not a performance property — it is what makes the contract checkable, and it forbids things. No randomness. No evaluation that reaches outside the entity's own data — no lookup against another system, another entity, or the host's state in the middle of a rule. The one environmental value the language admits is the clock, and it is admitted honestly, not hidden: `now()` is the sole construct that reads the environment, an author who writes it into a rule is declaring in the open that the rule's correctness depends on when it is evaluated, and within a single operation the clock is one consistent value — same inputs, same outputs, always. Everything else the entity's rules can see entered through a declared operation, where the guarantee saw it arrive.
+
+The engine is inspectable: at any point you can preview every possible operation and see not only what would happen but why, with the complete reasoning exposed. And it is honest about approximation. A contract is only trustworthy if it means what it appears to mean; silent approximation inside an exact-looking path destroys the ability to reason about outcomes. Where a value or operation is inherently approximate, the contract must say so — visibly, in the type system and the public API. Exact stays exact; approximation is declared, never disguised.
 
 The engine embeds in a .NET application as an ordinary library. Where the entity is stored and how it is presented remain the application's business; what its data is allowed to become is Precept's.
 
@@ -26,7 +30,7 @@ The engine embeds in a .NET application as an ordinary library. Where the entity
 
 ## Prevention, not detection
 
-Every adjacent tool detects: it checks data at a boundary, when called, and reports what it finds. Precept prevents. Business logic cannot produce a result that violates a declared rule; a business process cannot contain an unreachable step, a position with no way out, or a route around a mandatory stage. No approval that contradicts policy, no claim paid against lapsed coverage, no loan funded without ever passing underwriting. The rule-owner's pain has never been the absence of a rule — it is the gap between declaring a rule and having it hold on every path. Precept closes that gap structurally.
+Every adjacent tool at the code layer detects: it checks data at a boundary, when called, and reports what it finds. (Database constraints genuinely prevent — at the storage layer, with the costs described below.) Precept prevents where the business logic runs. Business logic cannot produce a result that violates a declared rule; a business process cannot contain an unreachable step, a position with no way out, or a route around a mandatory stage. No approval that contradicts policy, no claim paid against lapsed coverage, no loan funded without ever passing underwriting. The rule-owner's pain has never been the absence of a rule — it is the gap between declaring a rule and having it hold on every path. Precept closes that gap structurally.
 
 Two guarantees close it — one about the entity's data, one about the process it moves through.
 
@@ -79,7 +83,7 @@ Precept does not replace workflow orchestrators, event sourcing, or persistence 
 - **Event sourcing (Marten, EventStoreDB, Axon):** A storage architecture — auditability and replay. Precept governs the entity before a command is sourced; the event log records what the governed entity did.
 - **ORM persistence (Entity Framework, Dapper):** The ORM is the persistence boundary. Precept governs the entity in memory; the ORM writes the governed result. Precept is storage-agnostic.
 
-For the external evidence behind these positioning claims, see [Entity-First Positioning Evidence](research/philosophy/entity-first-positioning-evidence.md).
+For the external evidence behind these positioning claims, see [Entity-First Positioning Evidence](../research/philosophy/entity-first-positioning-evidence.md).
 
 ---
 
@@ -98,6 +102,8 @@ A developer embeds the compiled engine in a .NET application and connects it at 
 ## What Precept refuses to do
 
 Precept has no escape hatch. No way to suspend a rule in production, no annotation that says trust me, no construct that compiles with its obligations unproven, no warning where an error belongs, no approximation hidden inside a path that looks exact. A definition the compiler cannot prove is refused.
+
+Precept's guarantee has one precondition, and it is worth stating plainly: data must not be tampered with between the moment it is persisted and the moment it is restored. Every value in a committed configuration entered through a proven operation, which is why restoring it needs no re-checking. Change it behind the engine's back and it is no longer the configuration that was proven — nothing the compiler established about it still applies. That is a condition on how the data is kept, not a gap in what the engine promises: the engine's own API offers the declared operations and nothing else, with no privileged write path and no back door for the caller that promises to be careful.
 
 The refusal has a cost, and the author pays it: some things that can be written in another tool cannot be written here at all, and the language admits less than its grammar suggests. That is expressiveness surrendered on purpose — wherever keeping a construct would mean a rule the compiler could not prove, the construct goes and the rule stays. A rule that holds on the paths somebody tested is a hope. A rule that cannot be violated is a guarantee. A smaller language in which every rule is a guarantee is worth more than a larger one in which every rule is a hope.
 
