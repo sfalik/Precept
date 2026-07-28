@@ -281,7 +281,7 @@ The compiler delivers both by proof over the reachable configurations, from four
 > the narrowing independently: every canonical sentence that agrees with it was written in the same pass. **Do not build
 > against this scope, and do not cite it as evidence.** The question — what discharges a relational rule's preservation
 > obligation when a field it mentions is edited — is open and goes to the owner. See
-> `docs/working-reset/phase-2/editable-write-cascade.md` and `editable-write-design-space.md`.
+> `docs/working-reset/phase-5/editable-write-cascade.md` and `editable-write-design-space.md`.
 >
 > The same narrowing is stated at §3A.4 and in five runtime and architecture documents:
 > `runtime/runtime-api.md` § Update, `runtime/evaluator.md` § Update ingress (twice),

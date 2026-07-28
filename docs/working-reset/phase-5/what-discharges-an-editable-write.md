@@ -1,7 +1,7 @@
 # What discharges a rule's obligation when a field it mentions is edited?
 
 **Prepared for Shane, 2026-07-27. This is section 6 of
-[`phase-2/editable-write-cascade.md`](../phase-2/editable-write-cascade.md), where five independent
+[`phase-5/editable-write-cascade.md`](../phase-5/editable-write-cascade.md), where five independent
 readings all agreed the obligation exists and disagreed entirely about what discharges it. It blocks the
 disputed scope note now sitting in the spec at §0.7 and §3A.4, and phase 5's premise set.**
 
