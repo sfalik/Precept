@@ -299,3 +299,34 @@ index d69f4ef..c591cf3 100644
 +- **Pure state machines (XState, Stateless):** These govern transitions and lifecycle position. They have no declared field model and no data integrity enforcement — an entity can pass through every valid transition and still hold corrupted field values. That is the failure mode: a `CancelledOrder` in the right state but with `Total > 0` because no rule required otherwise. Precept combines the lifecycle structure of a state machine with the data enforcement of a constraint engine — a transition that could leave the entity's data invalid is either refused by its guard when it is attempted, or refused by the compiler before the definition ever becomes an engine.
  - **Rules engines (Drools, NRules, InRule):** Rules engines execute logic reactively — you present facts and the engine infers conclusions or fires matching rules. They are powerful for complex decision logic and forward chaining. But rules are written external to the entity model, and the engine cannot verify at compile time that all rule conditions are satisfiable or non-contradicting. Precept's rules are declarations bound to specific entity configurations — compile-time verified as complete and consistent, structurally enforced on every operation, not inferred from rule evaluation.
 ```
+
+---
+
+## Both reserved questions, closed 2026-07-27
+
+**The headline guarantee stays unqualified.** Ruled by the owner. `philosophy.md:11` and `:59` keep
+"invalid configurations are structurally impossible" with no caveat attached, and the precondition
+paragraph carries the condition on its own — that data must not be tampered with between the moment it is
+persisted and the moment it is restored.
+
+The reasoning that settled it: a precondition is not an exception, and a headline carrying a caveat whose
+explanation sits four sections away is worse than either version. It gives a reader the doubt without the
+resolution. The precondition paragraph states the condition once, in a place with room to say why
+restoring is nonetheless safe.
+
+**Overflow needs no note, and the question should never have reached him.** It rested on a wording error
+of the assistant's. His ruling at walk item 15 defers the arithmetic overflow model **past the MVP**. The
+phase-2 correction pass rendered that as "past the first release" in four places in the specification —
+`:104`, `:110`, `:112`, `:272`. He does not intend to release the MVP, so the two are not the same claim:
+a thing absent from a release is a gap you ship with, and a thing not yet in the first working compiler is
+simply not built.
+
+Read correctly, overflow is in scope and not yet implemented, which is exactly the arrangement walk item
+23 already covers — the specification and philosophy state the target, and the code is validated against
+them. So philosophy keeps overflow among the compile-time impossibilities, unqualified, and change 5 of
+this document is **withdrawn rather than refused**: it answered a question that only existed because of
+the error.
+
+`docs/compiler/soundness-and-coverage.md:226` already had the right wording in the tree the whole time —
+overflow marked **"in-scope, not-yet-implemented"** — in a document nobody consulted when the four
+specification sites were written.
