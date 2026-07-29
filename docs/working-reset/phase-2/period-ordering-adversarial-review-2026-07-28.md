@@ -614,3 +614,114 @@ With those six closed, my adversarial objections are exhausted. The proposal is 
 hazard the owner feared: the thing NodaTime left out is still left out — Precept would
 be building the narrower thing NodaTime's designers could not express in their type
 system, in the way Precept already builds everything else.
+
+---
+
+## 8. Follow-up: does this need a new catalog, or new entries in existing catalogs?
+
+**The owner's question:** § 7 recommends building the operators. Does the implementation
+actually require a brand-new catalog, or is this just new entries in the catalogs that
+already exist — the same `Operations` catalog money/quantity/choice-ordered live in,
+plus a new or extended obligation in the existing `ProofRequirement` file?
+
+### What the design document actually proposes
+
+Its § Inventory / Catalog subsection proposes, quoted:
+
+- *"`src/Precept/Language/QualifierRelation.cs` — **new**. A discriminated union base
+  plus four sealed subtypes: `ExactValue` (currency, timezone),
+  `SameDimensionConvertible` (quantity), `ComponentSubset` (the period assignment rule),
+  `SameSingleComponent` (the period comparison rule)."*
+- *"`src/Precept/Language/Type.cs` — new `OrderingCondition` discriminated union ...
+  `TypeTrait.Orderable` removed."*
+- *"`OperationKind.cs` and `Operations.cs` — four new members and four new entries."*
+- *"`ProofRequirement.cs` — `QualifierCompatibilityProofRequirement` gains a `Relation`
+  member. 32 construction sites ... get their relation written out."*
+
+And its doc-update table says `catalog-system.md` gains *"the new `QualifierRelation`
+and `OrderingCondition` catalogs."* So the design does propose two new catalog
+constructs, not just entries.
+
+### How the precedents are structured today
+
+- **Money:** `OperationKind.cs:241-:243` declares `MoneyLessThanMoney` etc.;
+  `Operations.cs:1018` gives each entry a
+  `QualifierCompatibilityProofRequirement(..., QualifierAxis.Currency, "Operands must
+  have matching currency qualifiers")`. Quantity is identical in shape at
+  `Operations.cs:1074-:1092` on `QualifierAxis.Unit`.
+- **Choice-ordered:** `OperationKind.cs:199-:201` + `Operations.cs:866`, with a
+  `ModifierRequirement(..., ModifierKind.Ordered, ...)` instead — a different existing
+  requirement subtype, same file.
+- **The requirement record** (`ProofRequirement.cs:113`) carries two subjects, an
+  `Axis`, and a description — **and nothing naming the discharge relation.** The
+  relation (exact value for currency, conversion-aware for dimension, subset for the
+  period assignment basis) lives today as axis-identity branches in pipeline code
+  (`ProofEngine.Qualifiers.cs:126`, `:141` per the design's own citations) — which is
+  the pattern `CLAUDE.md § Catalog System` forbids.
+- **Precedent for adding a requirement shape:** `DimensionProofRequirement`
+  (`ProofRequirement.cs`, alongside `:113`) was added as a new sealed record subtype in
+  the existing file when the `of 'date'`/`of 'time'` checks needed a shape the existing
+  ones didn't have. Adding a subtype to this file is an established move, not a new
+  catalog.
+
+### What period ordering strictly requires
+
+**(a) Operations entries — yes, and they are just entries.** Four new `OperationKind`
+members and four `Operations.cs` entries on `period × period → boolean`, exactly the
+shape of `Operations.cs:1018`. Existing catalogs.
+
+**(b) The proof obligation — a new shape in an existing file, not a new catalog.** The
+existing `QualifierCompatibilityProofRequirement` cannot be reused unmodified, for the
+reason the design's Decision 3 gives: the `TemporalUnit` axis already needs a *different*
+relation on the assignment path (subset, per `business-domain-types.md` D14), so
+"relation is implied by axis" breaks down here — one axis, two relations by position.
+Two honest ways to fix that, both inside `ProofRequirement.cs`: add a new sealed subtype
+(the `DimensionProofRequirement` precedent — smallest change, touches nothing existing),
+or add the design's `Relation` member to the existing record (32 mechanical edits, and
+in exchange the currency/unit/subset relations stop living as forbidden axis-identity
+branches in `ProofEngine.Qualifiers.cs`). Either way: **new entry or member in an
+existing catalog file.**
+
+**(c) A brand-new catalog — no, not for the operators.** The owner is right. The two
+new constructs the design proposes are not required by Decision 1 (the ordering rule);
+they are required by Decisions 2 and 4 — the **collection half** and the cleanup:
+
+- `OrderingCondition` exists to replace the flat `TypeTrait.Orderable` flag, because a
+  flag cannot express "orderable when qualified" and that is what `.min`/`.max` on
+  `set of period in 'days'` needs (§ 5). Even this is not a new catalog in substance —
+  it is a new property on every entry of the **existing `Types` catalog**
+  (`Types.cs`), replacing a flags-enum member with a richer shape.
+- `QualifierRelation` is the vocabulary that property and the requirement member would
+  share. Whether it sits in its own file or inside `Type.cs` is a file-layout choice;
+  calling it "a new catalog" overstates it either way — it is a discriminated union used
+  as metadata *by* the existing `Types` and `ProofRequirement` catalogs, the same way
+  `PeriodDimension` (`ProofRequirement.cs:74`) already serves `DimensionProofRequirement`
+  without anyone calling `PeriodDimension` a catalog.
+
+The design itself concedes the minimal path in Decision 2's counter-evidence leg:
+*"Four operations plus a broadened analyzer suppression plus a `TemporalUnit` branch
+delivers scalar period ordering in roughly a hundred lines without touching the other
+three types"* — with the caveat that the bare `TemporalUnit` branch would be one more
+axis-identity dispatch of the kind the catalog rules forbid, which is why the honest
+minimum includes the new requirement shape rather than a pipeline branch.
+
+### Direct answer
+
+**No new catalog is needed. Shane is right, with one sizing note.**
+
+- **Scalar operators (Decision 1):** four new `OperationKind` members, four
+  `Operations.cs` entries, and one new requirement shape (subtype or member) in the
+  existing `ProofRequirement.cs`. All additions to catalogs that already exist —
+  structurally the same commit shape as adding money comparison was.
+- **Collection half (§ 5, Decisions 2/4):** requires the `Types` catalog to say
+  "orderable when qualified," which means replacing the `TypeTrait.Orderable` flag with
+  the richer `OrderingCondition` property — an *extension of the existing `Types`
+  catalog*, plus a shared vocabulary type. New metadata shapes, still no new catalog.
+- **Correcting the record:** the design's Inventory and doc-update table present
+  `QualifierRelation` and `OrderingCondition` as "new catalogs" required by this
+  feature. That framing overstates both their novelty (they are new shapes inside, or
+  serving, existing catalogs) and their necessity (Decision 1 alone needs neither). The
+  design should re-title them as extensions of the `Types` and `ProofRequirement`
+  catalogs, and mark them as required by the collection half specifically — which also
+  makes the scalar-first shipping option (Open question 5) visibly cheaper than the
+  Inventory currently suggests.

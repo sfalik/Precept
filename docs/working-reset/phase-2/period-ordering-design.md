@@ -1,7 +1,7 @@
 ---
-status: Externally-Grounded — 2026-07-28. Not locked. Five owner decisions are open, and the design's own first-draft recommendation was refuted by its red-team pass; § The short version carries the corrected one.
-phase-target: Document reconciliation is phase 2 (readiness-plan row `N82`). The repairs in § Ship now are unassigned bug-fix work that needs no phase gate. The ordering operator has no build phase and § Open questions explains why one cannot be assigned yet.
-comparable-systems-research-status: partial — NodaTime 3.3.3 surveyed to Stage-1 depth by reflection against the shipped assembly and its XML documentation, plus an original measurement of `Period.CreateComparer` over 170,000 pairs. Rust and PostgreSQL cited from primary documentation, accessed 2026-07-28. java.time and Joda-Time are asserted from general knowledge and are **not** verified in this pass. Python `dateutil`, Rust `chrono`, Go and ECMAScript Temporal are unsurveyed. `research/INDEX.md:48` already registers this gap and calls a broader survey a prerequisite for any irreversible temporal-surface decision. That gate is not satisfied; § Open questions item 4 carries it.
+status: Externally-Grounded — 2026-07-28; owner rulings recorded 2026-07-29. **Not locked** — the lock is the owner's to set and no agent may set it. Four of the five open questions are now closed, two by the rulings in § Owner rulings, one by the owner amending the alignment directive in canon, and one because it turned out to be a defect rather than a question. § Open questions carries the disposition of each. The design's own first-draft recommendation was refuted by its red-team pass; § The short version carries the corrected one.
+phase-target: Document reconciliation is phase 2 (readiness-plan row `N82`) and is **done**, 2026-07-29 — see [`period-ordering-reconciliation.md`](period-ordering-reconciliation.md). The repairs in § Ship now are unassigned bug-fix work that needs no phase gate. The ordering operator's mechanism now has a phase — `compiler-readiness-plan.md` § 1 and § 4 record it as folded into phase 5.
+comparable-systems-research-status: partial, and **the gate is waived for this decision** — see § Owner rulings, ruling 2. NodaTime 3.3.3 surveyed to Stage-1 depth by reflection against the shipped assembly and its XML documentation, plus an original measurement of `Period.CreateComparer` over 170,000 pairs and the adversarial review's independent re-run over 407,972. Rust and PostgreSQL cited from primary documentation, accessed 2026-07-28. java.time and Joda-Time are asserted from general knowledge and are **not** verified in this pass. Python `dateutil`, Rust `chrono`, Go and ECMAScript Temporal are unsurveyed. `research/INDEX.md:48` registers that gap and calls a broader survey a prerequisite for any irreversible temporal-surface decision; the owner waived it here on the ground that those systems are not comparators for this decision, because Precept ships NodaTime's `Period` rather than choosing between temporal models. The gap itself stays open in `research/INDEX.md`.
 sources-consulted:
   - docs/philosophy.md — the guarantee, the refusal, and who authors a precept
   - docs/language/precept-language-spec.md § 0.1 — the eleven design principles
@@ -64,11 +64,45 @@ sources-consulted:
 
 ## How to read this document
 
-It is long because the question turned out to have three answers underneath it, and separating them is most of the work. If you read only part of it, read § The short version, then § Ship now, then § What the adversarial review found, then § Open questions.
+It is long because the question turned out to have three answers underneath it, and separating them is most of the work. If you read only part of it, read § Owner rulings, then § The short version, then § Ship now, then § What the adversarial review found, then § Open questions.
+
+**§ Owner rulings comes first for a reason.** Everything after it was written before the owner ruled, and two of its sections — § The short version's "The recommendation, in two parts" and "The case against building it, at its strongest", and § Open questions items 2 and 5 — put a choice to him that he has since made. That working is kept rather than rewritten, because the argument on both sides is the useful part and a reader should see what was weighed. But it is no longer the document's recommendation, and reading it as though the question were still open would be reading the document backwards.
 
 Two documents in this project both have a locked decision numbered 14 about `period`, and they say different things. Wherever one is meant, this document names the file. `temporal-type-system.md` Decision 14 is the ordering refusal. `business-domain-types.md` D14 is the assignment rule for the `in` qualifier. They are unrelated.
 
 **This document's first draft recommended building the ordering operator, on the argument that closing the unsound workaround would leave authors with no way to compare two periods. Its red-team pass refuted that argument by compiling the counterexample, and the recommendation below is the corrected one.** The refutation is reproduced in full at § The claim that was wrong, because it is the most useful thing this pass produced and the owner should see the working, not just the conclusion.
+
+---
+
+## Owner rulings
+
+Two rulings, given 2026-07-29, recorded in the owner's words with the reasoning he gave. A ruling whose reason is written down wrongly gets re-litigated, so the reasoning below is his and is marked where it differs from what an agent recommended.
+
+**Neither ruling locks this document.** The status field is unchanged and the lock is the owner's to set. § Open questions now records the disposition of all five questions, and § Is this lockable states what a lock would be locking.
+
+### Ruling 1 — build both halves
+
+He was asked plainly whether he wanted ordered collections of pinned periods, with the two halves separated: the scalar comparison already compiles today as `A.days <= B.days` and computes the identical predicate, while `.min` on a `set of period in 'days'` is closed with no workaround an author can be asked to rely on. His answer: **"build both."**
+
+That settles two of the open questions. Item 2 — whether the operator ships at all — is answered yes. Item 5 — scalar only, or scalar and collection — is answered both. The full path is authorised.
+
+**What that pulls in.** The collection half is what forces Decision 2, because the piece it needs is keyed on expression shape rather than on type: `.min`/`.max` legality is a trait of the element type itself, so the flat `TypeTrait.Orderable` flag has to become a qualifier-aware condition on the type entry, with the blast radius across `period`, `money`, `quantity`, `price` and `choice` that Decision 2 records. Decision 4 rides on the same change. The "smaller answer" sketched in § Open questions item 2, and the scalar-only option in item 5, are both closed.
+
+**The question he answered was the capability question, not the readability one.** § The claim that was wrong establishes that for two scalar fields the operator changes a spelling. The adversarial review's § 5 establishes that for a collection there is no other route at all — Precept has no element-wise projection, so the trait can never be satisfied from outside the element type, and the only workaround that compiles is a `queue of period in 'days' by integer` whose correctness invariant lives in the author's head. The review's own § 5 conclusion is that the collection half is not an add-on to the scalar operator but the thing that decides whether the operator matters, and that the wrong outcome is the middle — ordering pinned periods internally while withholding the spelling. "Build both" is the outcome that avoids the middle.
+
+### Ruling 2 — the comparator-survey gate is waived, and the reason is not the one the review gave
+
+`research/INDEX.md:48` records a known gap: *"`temporal-type-strategy.md` engages NodaTime heavily but lacks survey-grade comparator engagement with Joda-Time / java.time / Python datetime / Rust chrono. A broader survey is a Phase 11 prerequisite for any irreversible temporal-surface decision."*
+
+He waived it. His words: **"waive it, we're built on noda."**
+
+**His argument is not the review's, and the difference matters.** The adversarial review's § 7.3 recommended waiving on the ground that the direct measurement is stronger evidence for this specific rule than a comparator survey would be. That is a fine argument about evidential weight, and it is not the one that carries. The gate exists because *comparators* have not been surveyed — and for this decision they are not comparators. Precept does not choose between temporal models. It ships NodaTime's `Period` as the runtime representation of `period`, with the dependency pinned at `src/Precept/Precept.csproj:15`. What Joda-Time, java.time, Python `dateutil`, Rust `chrono`, Go or ECMAScript Temporal does with its own period type has no bearing on whether Precept can order the value it actually holds. The evidence that decides this rule is what NodaTime's `Period` does — and that is the one thing this pass surveyed to depth, by reflection against the shipped 3.3.3 assembly, plus the original measurement and the adversarial review's independent nine-calendar re-run.
+
+**What the waiver does not do.** It is a waiver for this decision, on this type, on that reason. It does not close the gap recorded at `research/INDEX.md:48`, and it does not carry to a future temporal decision where Precept would be picking a model rather than exposing NodaTime's — there the comparators would be comparators, and the gate would apply on its own terms.
+
+### Where that leaves the five open questions
+
+Item 1 is closed as well, but not by these rulings: the owner amended alignment directive item 4 in canon, and the amended text is live at `temporal-type-system.md:244`. Item 3 turned out to be a defect rather than a question. § Open questions carries all five with their dispositions, and § Is this lockable states what remains.
 
 ---
 
@@ -143,17 +177,18 @@ Two further first-draft claims fell with it, and are struck: that the worked exa
 2. **The `zoneddatetime ± period` refusal is cited as the precondition it is** for the claim that this design takes no position on whether a day is 24 hours, together with what would fail for the time units if that refusal ever moved. § What was measured, plus a second re-verification trigger in § Operational dimensions.
 3. **§ The short version's "a change of spelling, not a change of capability" is scoped to scalar comparisons**, and the collection case — where the accessor route structurally cannot reach, because `.min`/`.max` legality is a trait of the element type and Precept has no element-wise projection — is stated in the summary rather than left to Decision 4 and § Open questions item 5.
 
-**Routed to the owner, and deliberately not resolved here.**
+**Routed to the owner — and since resolved by him, 2026-07-28 and 2026-07-29.**
 
-4. **The amendment to alignment directive item 4** at `temporal-type-system.md:244`. The review drafts proposed wording, keyed on NodaTime's stated obstacle being inapplicable to the restricted case rather than on Precept wanting the feature, so that `zoneddatetime` stays refused for its own separate reason — two total orderings exist and canon declines to pick one. That draft is a proposal awaiting the owner. It has been written into no canonical document, and nothing here shortcuts § Open questions item 1.
-5. **The verdict on the comparator-survey gate.** The reviewer's view is to waive it, on the grounds that the direct measurement is stronger evidence for this specific rule than a survey would be, and that PostgreSQL — the one surveyed system that does order intervals — agrees with Precept's canon about why the components cannot be merged. That is a recommendation, not a waiver. § Open questions item 4.
+4. **The amendment to alignment directive item 4** at `temporal-type-system.md:244`. The review drafted proposed wording, keyed on NodaTime's stated obstacle being inapplicable to the restricted case rather than on Precept wanting the feature, so that `zoneddatetime` stays refused for its own separate reason — two total orderings exist and canon declines to pick one. **The owner amended the directive, in his own shorter wording, and the amended text is live in canon**: *"4. When NodaTime has no natural ordering on a type, Precept has no natural ordering on that type. One exception: a `period` pinned to a single unit orders against the same single unit — see Decision 14."* The exception names no exclusions because a named exception needs no fence — a composite is not pinned to a single unit, a mixed pair is not the same single unit, and `zoneddatetime` is not a `period`. Recorded with the rest of the reconciliation in [`period-ordering-reconciliation.md`](period-ordering-reconciliation.md) § 1. § Open questions item 1 is closed.
+5. **The verdict on the comparator-survey gate.** The reviewer's view was to waive it, on the grounds that the direct measurement is stronger evidence for this specific rule than a survey would be, and that PostgreSQL — the one surveyed system that does order intervals — agrees with Precept's canon about why the components cannot be merged. **The owner waived it, on a different reason**: those systems are not comparators here, because Precept ships NodaTime's `Period` rather than choosing between temporal models. § Owner rulings, ruling 2, carries his reasoning; § Open questions item 4 is closed.
 
-**Still open as build work.** The review lists six blockers before this design could lock, in dependency order. Two of them are the documentation corrections applied above. **Three are code, and none of the three is done here.** The sixth is item 4 above and is the owner's.
+**Still open as build work.** The review lists six blockers before this design could lock, in dependency order. Two of them are the documentation corrections applied above and are done. The sixth is item 4 above and is done. **Three are code, and none of the three is done here** — each is an implementation obligation with an acceptance criterion, not an unanswered question; § Is this lockable works through why that distinction decides the lock.
 
-- **Code.** § Ship now item 1 — the binding path where a declared qualifier does not constrain the value — must land first, because the whole correctness argument reads a declared qualifier and assumes it holds. Items 2, 3 and 4 of § Ship now travel with it.
-- **Code.** The mixed-unit and composite refusals must be compile errors carrying the new messages (`PRE0165`, `PRE0166`), never a silently computed answer, with `PRE0018`'s incoherent message replaced in the same change.
-- **Code.** Decision 6's type gate on the relational-fact path ships with the operators, not after.
-- **Owner.** The directive amendment is recorded before or with the Decision 14 rewrite.
+- **Code.** § Ship now item 1 — the binding path where a declared qualifier does not constrain the value — must land first, because the whole correctness argument reads a declared qualifier and assumes it holds. Items 2, 3 and 4 of § Ship now travel with it. § Acceptance criteria 1–4.
+- **Code.** The mixed-unit and composite refusals must be compile errors carrying the new messages (`PRE0165`, `PRE0166`), never a silently computed answer, with `PRE0018`'s incoherent message replaced in the same change. § Acceptance criteria 7, 9, 10.
+- **Code.** Decision 6's type gate on the relational-fact path ships with the operators, not after. § Acceptance criterion 15.
+
+**One review finding is not yet reflected above and is applied elsewhere in this document**: the review's § 8 corrects this design's Inventory and doc-update table for calling `QualifierRelation` and `OrderingCondition` "new catalogs". They are new metadata shapes inside, and serving, the existing `Types` and `ProofRequirement` catalogs. § Inventory and § Doc-update enumeration now say so.
 
 **One correction the review made to its own reading**, kept here because it is why its recommendation reversed partway through: its first pass leaned on "the operator adds legibility, not capability" and preferred the smaller answer; probing the collection case refuted that premise for collections. It is the mirror of this document's own first-draft error. The first draft claimed a capability gap where there was only a spelling gap; the review's first pass claimed only a spelling gap where there is a real capability gap. Both were found by compiling the case rather than reasoning about it.
 
@@ -428,8 +463,10 @@ The comparator confirms the *placement*, not the mechanism, and it is honest to 
 
 ### Catalog
 
-- `src/Precept/Language/QualifierRelation.cs` — new. A discriminated union base plus four sealed subtypes: `ExactValue` (currency, timezone), `SameDimensionConvertible` (quantity), `ComponentSubset` (the period assignment rule), `SameSingleComponent` (the period comparison rule). Each carries a `SubjectNoun` and an `ExampleDeclaration` in author words, so diagnostics and MCP output read off the catalog.
-- `src/Precept/Language/Type.cs` — new `OrderingCondition` discriminated union: `AlwaysOrdered`, `NeverOrdered`, `OrderedWhenModified(ModifierKind)`, `OrderedWhenQualified(QualifierAxis, QualifierRelation)`. `TypeTrait.Orderable` removed.
+**No new catalog is created.** Every item below is an entry, a member or a metadata shape inside a catalog that already exists — `Types`, `Operations`, `OperationKind`, `ProofRequirement`. An earlier draft of this section called `QualifierRelation` and `OrderingCondition` "new catalogs"; the adversarial review's § 8 corrected that, and it is corrected here. `QualifierRelation` is a discriminated union used as metadata *by* the `Types` and `ProofRequirement` catalogs, the same way `PeriodDimension` (`ProofRequirement.cs:74`) already serves `DimensionProofRequirement` without being a catalog itself. `OrderingCondition` is a new property on every entry of the existing `Types` catalog, replacing a flags-enum member with a richer shape. Both are required by the collection half — Decisions 2 and 4 — which the owner's ruling puts in scope; Decision 1 alone would need neither.
+
+- `src/Precept/Language/QualifierRelation.cs` — a new file holding shared metadata vocabulary, not a new catalog. A discriminated union base plus four sealed subtypes: `ExactValue` (currency, timezone), `SameDimensionConvertible` (quantity), `ComponentSubset` (the period assignment rule), `SameSingleComponent` (the period comparison rule). Each carries a `SubjectNoun` and an `ExampleDeclaration` in author words, so diagnostics and MCP output read off the catalog. Whether it sits in its own file or inside `Type.cs` is a file-layout choice.
+- `src/Precept/Language/Type.cs` — new `OrderingCondition` discriminated union, the shape the `Types` catalog's new per-entry property takes: `AlwaysOrdered`, `NeverOrdered`, `OrderedWhenModified(ModifierKind)`, `OrderedWhenQualified(QualifierAxis, QualifierRelation)`. `TypeTrait.Orderable` removed.
 - `src/Precept/Language/Types.cs` — `OrderingCondition` on every type entry. `period` → `OrderedWhenQualified(TemporalUnit, SameSingleComponent)`; `money`/`price` → `OrderedWhenQualified(Currency, ExactValue)` (price also on `Unit`); `quantity` → `OrderedWhenQualified(Unit, SameDimensionConvertible)`; `choice` → `OrderedWhenModified(Ordered)`; numerics and `date`/`time`/`instant`/`datetime`/`duration` → `AlwaysOrdered`; the rest `NeverOrdered`. `exchangerate` → `NeverOrdered`, settling the contradiction at `collection-types.md:147` against that line. The `.min` and `.max` accessor declarations at `:186` and `:193` swap `RequiredTraits: TypeTrait.Orderable` for a `RequiresOrdering` flag — and these are the **only** non-`None` uses of `RequiredTraits` in the whole catalog.
 - `src/Precept/Language/ProofRequirement.cs` — `QualifierCompatibilityProofRequirement` gains a `Relation` member. **32 construction sites** in `src/`, all in `Operations.cs`, get their relation written out; none changes behaviour.
 - `src/Precept/Language/OperationKind.cs` and `Operations.cs` — four new members and four new entries.
@@ -463,7 +500,7 @@ The comparator confirms the *placement*, not the mechanism, and it is honest to 
 
 ### Decision 1: Two periods order when both are known to be counted in one and the same single calendar unit
 
-**Stakes**: irreversible. **Conditional on § Open questions items 1 and 4** — this decision cannot proceed until the alignment directive is settled and the research gate is either satisfied or waived. The legs below are complete so that "build it" needs no further design; they do not make the decision settled.
+**Stakes**: irreversible. **Both conditions are now met.** This decision was written conditional on § Open questions items 1 and 4 — the alignment directive being settled and the research gate being satisfied or waived. The owner amended directive item 4 in canon (`temporal-type-system.md:244`), and he waived the research gate on 2026-07-29 for the reason recorded in § Owner rulings, ruling 2. The legs below were already complete so that "build it" needs no further design; nothing outside them is now holding the decision.
 
 - **Rationale**: it is the owner's ruling, and it is sound over what Precept can express. The measurement establishes that a single-unit comparison agrees with the ISO calendar order at every base date, in every unit, including negatives — ISO being the only calendar Precept exposes, and the scope the claim carries for the reason given in § What was measured. It is the only rule considered under which ordering agrees with equality, which is what keeps `.min` from having two candidates. It needs no position on whether a day is 24 hours, because it converts nothing and because canon already refuses `zoneddatetime ± period` (§ What was measured records that refusal as a precondition rather than a neighbouring fact). And it has no overflow case, because it compares two component counts rather than accumulating a total.
 - **Tradeoff accepted**: three, and the second is the one the first draft missed.
@@ -485,7 +522,7 @@ The comparator confirms the *placement*, not the mechanism, and it is honest to 
   - Rust `std::cmp::PartialOrd` — `impl<T> PartialOrd for [T] where T: PartialOrd,`. Accessed 2026-07-28.
   - PostgreSQL § 8.5 — *"Internally, `interval` values are stored as three integral fields: months, days, and microseconds. These fields are kept separate because the number of days in a month varies, while a day can have 23 or 25 hours if a daylight savings time transition is involved."* Accessed 2026-07-28.
   - Original measurement, § What was measured.
-- **Strongest counter-evidence**: **the coherence property this rule is chosen to protect has no consumer in the compiler.** The first draft claimed the proof engine's normal form assumes `not (a <= b)` is interchangeable with `b < a` and names `period` among the types it assumes it of. That was checked and is false: `TypeKind.Period` occurs nowhere in `ProofEngine*.cs`; the only site performing that rewrite is `NegateOp` at `ProofEngine.Strategies.cs:1057`, and every path into it is gated on `ToDecimal` (`:1067`), which accepts `decimal`, `int` and `long` only. `NarrowByConstraint`'s own comment at `ProofEngine.Satisfiability.cs:250` enumerates the types it handles and period is not among them. **And Decision 6 guarantees no consumer appears**, since its whole content is a type gate keeping period comparisons out of that path. So the design chose the narrowest of four candidate rules to preserve a property whose only real consumer is `.min` determinism on collections — which § Open questions item 5 concedes nothing demands. **Response**: `.min` determinism is a real Principle 3 obligation and the collection half is inside the owner's ruling, so the property is not free-standing. But the objection is correct that the first draft overstated it, and it is why tradeoffs 1 and 2 above now carry their full weight rather than being answered by the coherence argument alone. If the owner values `period in 'weeks'` against `period in 'days'` more than `.min` determinism on a collection nobody has written, the wider rule is the better one and this decision is wrong.
+- **Strongest counter-evidence**: **the coherence property this rule is chosen to protect has no consumer in the compiler.** The first draft claimed the proof engine's normal form assumes `not (a <= b)` is interchangeable with `b < a` and names `period` among the types it assumes it of. That was checked and is false: `TypeKind.Period` occurs nowhere in `ProofEngine*.cs`; the only site performing that rewrite is `NegateOp` at `ProofEngine.Strategies.cs:1057`, and every path into it is gated on `ToDecimal` (`:1067`), which accepts `decimal`, `int` and `long` only. `NarrowByConstraint`'s own comment at `ProofEngine.Satisfiability.cs:250` enumerates the types it handles and period is not among them. **And Decision 6 guarantees no consumer appears**, since its whole content is a type gate keeping period comparisons out of that path. So the design chose the narrowest of four candidate rules to preserve a property whose only real consumer is `.min` determinism on collections — which § Open questions item 5 concedes nothing demands. **Response**: `.min` determinism is a real Principle 3 obligation and the collection half is inside the owner's ruling, so the property is not free-standing. But the objection is correct that the first draft overstated it, and it is why tradeoffs 1 and 2 above now carry their full weight rather than being answered by the coherence argument alone. If the owner values `period in 'weeks'` against `period in 'days'` more than `.min` determinism on a collection nobody has written, the wider rule is the better one and this decision is wrong. **Since the ruling, `.min` determinism is a consumer that will exist** — the collection half is being built, so the property is no longer being preserved for a hypothetical. The weeks-versus-days boundary is a separate question and he did not rule on it; falsifier 3 keeps it live and names what would reopen it.
 - **Reversibility**: `Effectively-irreversible-post-ship` — a comparison operator on a public type cannot be withdrawn once authors write it. Before ship it is cheap: solo developer, pre-release, nothing external depends on the current behaviour.
 - **Blast radius**: catalogs — `Types`, `Operations`, `OperationKind`, `ProofRequirement`, plus the new `QualifierRelation`. Docs — `temporal-type-system.md` (twelve sites), `collection-types.md` (six), `precept-language-spec.md` (one), `type-checker.md`, `proof-engine.md`, `diagnostic-system.md`, `catalog-system.md`. Samples — none from this decision; § Ship now item 2 changes one line in `contractor-invoice-settlement.precept`. External consumers — none exist.
 
@@ -502,7 +539,7 @@ The comparator confirms the *placement*, not the mechanism, and it is honest to 
   - `src/Precept/Pipeline/ProofEngine.Qualifiers.cs:526-:528` — *"Acceptable as a single arm; must not be extended to other accessor operations (.first / .last / .at(N) / .min / .max) — those belong on the catalog-driven path."*
   - `src/Precept/Language/Types.cs:570`, `:608`, `:655`, `:489` — `money`, `quantity`, `price` carry `Orderable | EqualityComparable`; `period` carries `EqualityComparable`.
   - `docs/language/collection-types.md:541` — *"Unqualified `money`: `.min`/`.max` are type errors"*, against a live probe showing no diagnostic. Grepped `catalog-system.md` and `collection-types.md` for prior settlement on how orderability is declared — canon states the *outcome* per type and never states a mechanism, so the mechanism is genuinely undecided.
-- **Strongest counter-evidence**: a smaller path is real. Four operations plus a broadened analyzer suppression plus a `TemporalUnit` branch delivers scalar period ordering in roughly a hundred lines without touching the other three types. **Response**: that path delivers the scalar half only, because the value coming out of `.min` must carry its qualifier and the place it is lost is keyed on expression shape rather than on type. § Open questions item 5 puts the scalar-only option to the owner rather than assuming the collection half is wanted.
+- **Strongest counter-evidence**: a smaller path is real. Four operations plus a broadened analyzer suppression plus a `TemporalUnit` branch delivers scalar period ordering in roughly a hundred lines without touching the other three types. **Response**: that path delivers the scalar half only, because the value coming out of `.min` must carry its qualifier and the place it is lost is keyed on expression shape rather than on type. § Open questions item 5 put the scalar-only option to the owner rather than assuming the collection half was wanted, **and he ruled for both halves on 2026-07-29** — so the smaller path does not deliver what was authorised and this decision is in scope.
 - **Reversibility**: `Hard` — the enum member is public catalog surface consumed by MCP output.
 - **Blast radius**: every type entry in `Types.cs`; the enum in `Type.cs`; the PRECEPT0010 analyzer; `CatalogFormatters.cs`; `FaultAxisEnumerator.cs:254`; three test methods in `TypesTests.cs` covering 27 theory cases, which break at compile; five of eleven tests in `Precept0010Tests.cs`.
 
@@ -629,7 +666,7 @@ The comparator confirms the *placement*, not the mechanism, and it is honest to 
 6. `field WorkedTime as period in 'hours' default '0 hours'` compiles. It emits `PRE0141` today, against `business-domain-types.md:1821`.
 7. A period ordering comparison — in a `rule`, in an `ensure`, and in a transition guard — produces a message naming the operands and the fix, and never the text *"Expected a period value here, but got 'period'"*.
 
-**For the ordering operator**, if it is built.
+**For the ordering operator.** The owner authorised both halves on 2026-07-29 (§ Owner rulings, ruling 1), so these are obligations on the build rather than a conditional list — including 13, which is the collection half.
 
 8. `rule A <= B` where both fields are `period in 'days'` compiles with no diagnostic, and the comparison appears in the proof output as a discharged qualifier obligation on the temporal-unit axis. The same holds in an `ensure` and in a transition guard.
 9. `rule A <= B` where `A` is `period in 'days'` and `B` is `period in 'months'` is refused with `PRE0166` naming both units.
@@ -648,9 +685,9 @@ The comparator confirms the *placement*, not the mechanism, and it is honest to 
 
 **Upstream.** § Ship now items 1, 2, 3 and 4 are preconditions for the ordering operator, and items 1 and 3 are unavoidable regardless. Item 1 is the sharpest: Decision 1's entire correctness argument reads a declared qualifier and assumes it constrains the value, and one binding path defeats that today. Items 5 and 6 are not preconditions but are on every route this design points authors down.
 
-**Owner decisions.** Decision 1 cannot proceed until § Open questions items 1 and 4 are settled.
+**Owner decisions.** Decision 1 was conditional on § Open questions items 1 and 4. Both are settled — item 1 by the owner's amendment to alignment directive item 4, live at `temporal-type-system.md:244`, and item 4 by his waiver of 2026-07-29. **No owner decision is now outstanding on this design.** The one owner question left anywhere in this area is § Open questions item 3, which is a defect rather than a design question and does not gate anything here.
 
-**Downstream.** Readiness-plan row `N82` closes when the document reconciliation lands and the mechanism is designed. The qualifier-conditional ordering capability, once it exists, is what a `by P` key-type check would consult. A period interval domain, when built, makes period guards informative with no change to anything written under this design.
+**Downstream.** Readiness-plan row `N82` closed on 2026-07-29 — the document reconciliation landed ([`period-ordering-reconciliation.md`](period-ordering-reconciliation.md)) and the mechanism is designed here. The qualifier-conditional ordering capability, once it exists, is what a `by P` key-type check would consult. A period interval domain, when built, makes period guards informative with no change to anything written under this design.
 
 ---
 
@@ -664,7 +701,7 @@ Per the routing table in `CLAUDE.md § Documentation Sync`.
 | `docs/language/collection-types.md` | `:147` restated as a condition rather than a list, with `exchangerate` corrected; `:386` and `:1098` replaced by pointers to `:147`; the period rows `:530-:533`; the money/quantity/price rows `:541-:544` and the sentence at `:553` |
 | `docs/language/precept-language-spec.md` | `:1449` reworded — it was already not literally true given `:1692`/`:1693` |
 | `docs/language/business-domain-types.md` | § D14 gains the zero-literal comparison rule and a note that the declaration case was already settled at `:1821`; `:1847`'s stated reason repaired, since `Period.ToDuration()` exists and the refusal is real only for years and months |
-| `docs/language/catalog-system.md` | the new `QualifierRelation` and `OrderingCondition` catalogs; `TypeTrait` loses a member |
+| `docs/language/catalog-system.md` | **not a new catalog in the inventory** — the `Types` catalog's entry shape gains the `OrderingCondition` property, the `ProofRequirement` catalog's compatibility requirement gains its `Relation` member, and `QualifierRelation` is described as the shared metadata vocabulary both read. `TypeTrait` loses a member |
 | `docs/compiler/type-checker.md` | `:886` — the temporal-unit discharge is now two relations by position; `:884` — the basis-path gap |
 | `docs/compiler/proof-engine.md` | `:777` — same; the relational-facts section gains the type gate |
 | `docs/compiler/diagnostic-system.md` | `PRE0165`, `PRE0166`, `PRE0167`; the replaced messages for `PRE0018` and `PRE0104`; a `.precept` scenario file in `test/integrationtests/diagnostics/` for each new code |
@@ -689,9 +726,21 @@ Per the routing table in `CLAUDE.md § Documentation Sync`.
 
 ## Open questions
 
-The design is not locked. Five questions are open, and the first two decide whether the rest matter.
+Five were asked. **Four are closed and one was never a question.** The design is still not locked — a lock is the owner's act and § Is this lockable states what it would cover — but nothing on this list is now waiting on an answer.
+
+| # | Question | Disposition |
+|---|---|---|
+| 1 | Is the alignment directive satisfied, or does it need amending? | **Closed** — it needed amending, and the owner amended it. Directive item 4 at `temporal-type-system.md:244` now carries the named exception, in his wording |
+| 2 | Should the ordering operator ship at all? | **Closed** by ruling 1, 2026-07-29 — *"build both."* It ships |
+| 3 | What does a period's sign mean when its components disagree? | **Not a design question.** It is a live defect — a false proof reproducible at HEAD — and it is independent of ordering. See the item below for where it is tracked and for the one part of it that does need a decision |
+| 4 | Does the comparator-survey gap have to close first? | **Closed** by ruling 2, 2026-07-29 — waived, on the ground that those systems are not comparators for this decision. § Owner rulings |
+| 5 | Scalar only, or scalar and collection? | **Closed** by ruling 1 — both |
+
+The five subsections below are kept as they were written, because the argument each carries is why the answer is what it is. Each now opens with its disposition.
 
 **1. Is the NodaTime alignment directive satisfied by this reading, or does it need amending?**
+
+> **Closed — it needed amending, and it has been amended.** The design's own conclusion below, that this is an amendment request rather than a reading, was right and the owner accepted it. The amended item 4 is live in canon and is quoted in § What the adversarial review found. The wording the owner chose is shorter than the review's draft and names a single exception with no fence, on the reasoning that a named exception needs none — a composite is not pinned to a single unit, a mixed pair is not the same single unit, and `zoneddatetime` is not a `period`. `zoneddatetime` therefore stays refused for its own separate reason, which is what the review's draft was built to guarantee.
 
 `temporal-type-system.md:244` item 4: *"When NodaTime has no natural ordering on a type, Precept has no natural ordering on that type."*
 
@@ -702,6 +751,8 @@ The reading this design rested on: NodaTime has no natural ordering on `Period` 
 So the honest position is: **this is an amendment request, not a reading.** The better argument for it is not that a qualifier makes a type, but that `collection-types.md:553` already makes ordering conditional on a qualifier for three types, and item 4 was written before that pattern existed. If an amendment is wanted, it must be worded so `zoneddatetime` stays refused — and `zoneddatetime` is refused for a different reason, that two orderings are each total and canon will not pick, so a clause keyed on "NodaTime's stated obstacle does not apply to this subset" keeps it out. The wording belongs in that conversation, not here.
 
 **2. Should the ordering operator ship at all?**
+
+> **Closed — yes, both halves.** Ruling 1, 2026-07-29: *"build both."* What follows is the weighing that was put to him, kept because it is the record of what he was choosing between. **The smaller answer below is closed** and should not be revived: the review's § 5 established that shipping collection `.min`/`.max` on pinned periods while withholding the scalar operator is the one outcome worse than either, and the ruling takes the whole path rather than the middle.
 
 The corrected picture: the operator is sound, it is the owner's ruling, and on matching single-unit fields it changes `GracePeriod.days <= MaximumGrace.days` into `GracePeriod <= MaximumGrace`. Neither identified author need requires it — the ASC 842 test is a date comparison, and the contractor's field should be a `duration`. It refuses `period in 'weeks'` against `period in 'days'`, which is exact. And the coherence property it was chosen to protect has no consumer in the compiler.
 
@@ -719,17 +770,82 @@ rule ExpirationDate <= CommencementDate + ShortTermCeiling when LeaseClassificat
 
 **3. What does a period's sign mean when its components disagree?**
 
-Independent of ordering, and broken today. `field J as period nonnegative default '1 months + -30 days'` compiles with the obligation reported **Proved** — a false proof, since that value moves forward from 2021-01-01 and backward from 2021-02-01. Refusing mixed-sign literals does not close it: `period − period` produces them and `field D as period nonnegative <- A - B` raises no obligation at all. Closing it needs either a refusal on `period − period` and unary negation, or a sign domain over period components, which is the deferred interval work. This stays broken under every option here and needs its own decision.
+> **Not a design question — a defect, and a second one behind it.** Filing this as an open question of this design was a mis-classification, and the correction matters because an open question stalls a lock while a defect does not. Nothing about the ordering rule depends on it: the ordering reduction compares two counts of one unit and never reads a sign, and a mixed-sign value cannot arise in a single-unit basis at all.
+
+**The defect, reproduced at HEAD 2026-07-29.** `field J as period nonnegative default '1 months + -30 days'` compiles with one unrelated warning, zero type errors, and the obligation *"Default value of 'J' must satisfy 'nonnegative'"* reported **Proved**, strategy `Literal`. That is a false proof: the value moves forward from 2021-01-01 and backward from 2021-02-01, so there is no reading of `nonnegative` it satisfies. The mechanical cause is already written down — `ProjectPeriodSign` returns the sign of the first non-zero component and never looks at the rest (`TypedExpressionMagnitude.cs:22-:28` says so in its own summary: *"Mixed-SIGN periods … misclassify … NOT suitable for min/max bound comparison"*).
+
+**The second defect behind it.** `field D as period nonnegative <- A - B`, with `A` and `B` both `period in 'days'`, compiles with **zero proof obligations** — verified at HEAD 2026-07-29. So refusing mixed-sign literals would not close the hole; `period − period` reaches the same place with nothing raised at all, and this one is not a misclassification but a missing obligation.
+
+**Where defects are tracked, and what is and is not filed.** `docs/Working/bugs.md`. The root cause is filed there as part of **BUG-047** (`bugs.md:457`, *"its non-zero check reads only the leading component"*), whose mechanical-cause bullet at `:481` names `ProjectPeriodSign` and the leading-component read exactly. But BUG-047's scope is the period *divisor* path, and the two cases above are different positions: a declaration-attribute discharge of a `nonnegative` modifier, and a computed field raising no obligation. **Neither is filed in its own right**, and no other `bugs.md` entry covers them — a grep of that file for `ProjectPeriodSign` and for mixed signs returns only BUG-047's line `:481`. The readiness plan's *"the `nonnegative` unsoundness"* row (`compiler-readiness-plan.md:140`, and the fourth "Known risks" entry it points at) is **a different defect** — `field Bal as decimal nonnegative max 100` reporting its interval as `[−∞ .. 100]` — and does not cover these. Filing them, or widening BUG-047 to cover the two positions, is bug-tracking work this design does not do.
+
+**What inside it genuinely needs a decision, and it is not this design's.** What non-zero-ness and non-negativity *mean* for a period whose components disagree in sign. Closing that needs either a refusal on `period − period` and unary negation, or a sign domain over period components — which is the interval work deferred at `temporal-type-system.md:1713`. BUG-047 records the same open point in its own terms (*"what non-zero predicate a `period` divisor must satisfy"*). That decision belongs with the interval domain, not here.
 
 **4. Does the comparator-survey gap have to close first?**
+
+> **Closed — waived, 2026-07-29.** *"waive it, we're built on noda."* The design's own position below was the weaker one: build § Ship now regardless, and do not promote the ordering rule to canon before the survey exists. The owner's reason overtakes it — those systems are not comparators for this decision, because Precept ships NodaTime's `Period` rather than choosing among temporal models, so what their period types do has no bearing on whether Precept can order the value it holds. Full reasoning and the waiver's scope in § Owner rulings, ruling 2.
 
 `research/INDEX.md:48` calls a broader temporal survey *"a Phase 11 prerequisite for any irreversible temporal-surface decision."* Decision 1 is irreversible. Since the first draft, Rust and PostgreSQL have been cited from primary documentation — and PostgreSQL turned out to *agree with Precept's canon* about why interval components cannot be merged, while exposing the fixed conversions as functions an author calls. That is a better-grounded position than the first draft had, and it is still short of a survey: java.time and Joda-Time are asserted and unverified, and four more systems are unsurveyed. **The design's own position: build § Ship now regardless; do not promote the ordering rule to canon before the survey exists.** The gate is the owner's to waive.
 
 **5. Scalar only, or scalar and collection?**
 
+> **Closed — both, 2026-07-29.** Ruling 1. The consequence to carry forward is the one this subsection already names: the collection half forces the four-type capability, so Decision 2 is in scope with its full blast radius, and the counter-evidence leg's cheaper scalar-only path is not the authorised build.
+
 The ruling covers both. The scalar half is genuinely period-scoped — four operations, one relation, roughly a hundred lines — and delivers everything the two identified needs would want, since both are scalar. The collection half forces the four-type capability, because the piece it needs is keyed on expression shape rather than on type.
 
 No sample declares a collection of periods, money, quantity or price, so the collection half is not demanded by anything written. But `.min` determinism is the only genuine consumer of the coherence property that Decision 1 rests on, so taking the scalar half alone weakens Decision 1's rationale as well as narrowing it. And § Ship now item 3 fixes the money and quantity defects regardless of what happens to periods.
+
+---
+
+## Is this lockable
+
+**This section is an assessment, not a status change.** The status field still reads `Externally-Grounded — not locked`, and no agent may change it. What follows is the working, so the owner can check it rather than take it.
+
+### The six blockers the adversarial review listed
+
+The review's § 7.4 named six, in dependency order. Their state on 2026-07-29:
+
+| # | Blocker | Kind | State |
+|---|---|---|---|
+| 1 | § Ship now item 1 — the binding path where a declared qualifier does not constrain the value — lands first | Code | **Not done.** Acceptance criterion 1; § Dependencies makes it a precondition |
+| 2 | Re-scope the soundness claim to the ISO calendar; add calendar support as a re-verification trigger | Documentation | **Done.** § What was measured carries the scope and the Badi counterexample; § Operational dimensions carries the trigger as item 2 |
+| 3 | Cite the `zoneddatetime ± period` refusal as a precondition of the "no position on day length" claim | Documentation | **Done.** § What was measured states it as a precondition rather than a neighbouring fact; § Operational dimensions carries it as trigger 3 |
+| 4 | Mixed-unit and composite refusals are compile errors carrying `PRE0165`/`PRE0166`, with `PRE0018` replaced in the same change | Code | **Not done.** Acceptance criteria 7, 9, 10 |
+| 5 | Decision 6's relational-fact type gate ships with the operators, not after | Code | **Not done.** Decision 6, acceptance criterion 15 |
+| 6 | The directive amendment is recorded before or with the Decision 14 rewrite | Owner | **Done.** The owner amended item 4 and the Decision 14 rewrite landed with it; `temporal-type-system.md:244` and `:1481`, recorded in [`period-ordering-reconciliation.md`](period-ordering-reconciliation.md) |
+
+A seventh correction, from the review's § 8 rather than its § 7.4 — the Inventory and doc-update table calling `QualifierRelation` and `OrderingCondition` "new catalogs" — is applied in § Inventory and § Doc-update enumeration.
+
+### Whether an outstanding build item blocks a lock
+
+**It does not, and the design already treats these three as build work rather than as questions.** Each of the three appears in § Acceptance criteria, which is the section that states what must be true of the built thing; § Dependencies states the order they must land in, with item 1 first because Decision 1's correctness argument reads a declared qualifier and assumes it constrains the value. None of them asks anything this design has not answered — what to build, in what order, and how to tell it worked are all written down.
+
+Treating an unbuilt acceptance criterion as a lock blocker would invert the lifecycle: a design is locked so that a plan can be written against it and code can be built to it. If a design could only lock once its acceptance criteria were met, nothing would ever be designed before it was built. The distinction that decides a lock is whether an *unanswered question* remains — something a builder would have to decide for themselves, and could decide wrongly. On this design there is none.
+
+**The one caveat that belongs with that.** The review wrote blocker 1 as "must land first", and it means it. A build that shipped the operators before the binding path is fixed would make the prevention claim false on arrival, which the Philosophy Alignment table's Principle 1 row says in its own words. That is a sequencing obligation on whoever plans the work, and it is recorded in § Dependencies. Locking does not discharge it.
+
+### What locking this design would settle
+
+- **Decision 1** — two periods order when both resolve, on the temporal-unit axis, to a basis naming exactly one component and the same component on both sides. Everything else refused at compile time. Irreversible after ship.
+- **Decision 2** — `TypeTrait.Orderable` is removed and replaced by a condition on the type entry, across `period`, `money`, `quantity`, `price`, `choice` and every other entry. Public catalog surface; hard to reverse.
+- **Decision 3** — the discharge relation lives on the proof requirement, not on the axis. 32 mechanical construction-site edits.
+- **Decision 4** — `.min`/`.max` legality is the comparison relation applied to the element's declared qualifier against itself.
+- **Decision 5** — a period literal deriving no basis takes the other operand's basis in a comparison.
+- **Decision 6** — the relational-fact path gains a type gate, shipping with the operators.
+- **Decision 7** — ordering ships before the period interval domain, and period comparisons contribute no proof facts.
+- **Decision 8** — Decision 14 is rewritten rather than deleted. **Already executed**, 2026-07-29, ahead of the lock.
+
+All eight carry the four legs `CLAUDE.md § Per-Decision Rationale` requires — rationale, alternatives rejected with reasons, precedent, tradeoff accepted — plus a counter-evidence leg, a reversibility mark and a blast radius. Two precedent legs answer in the negative and say so: Decision 6 records that there is none, because the type gate fixes a defect this pass found rather than following anything; and Decision 8's precedent is the project's own rationale rule rather than an instance of a decision being repaired this way. Both are answers to the leg, not omissions of it. Decision 1's counter-evidence leg names the condition under which the decision is wrong (that the owner values `period in 'weeks'` against `period in 'days'` more than `.min` determinism), prices it, and hands it to falsifier 3. That is a named live tension inside a locked decision, which is what the four-leg standard asks for rather than something it forbids.
+
+### What locking would not settle
+
+- **The § Ship now repairs.** Six defects, four of them not about periods. A lock does not fix them, and item 1 must be fixed before the operators ship.
+- **§ Open questions item 3.** The mixed-sign defect and the question of what non-zero-ness means for a period whose components disagree. Independent of ordering; belongs with the deferred interval work.
+- **The weeks-versus-days boundary.** Refused for reach rather than correctness, with falsifier 3 naming what would reopen it.
+- **Where the work is scheduled.** `compiler-readiness-plan.md` § 1 and § 4 record the mechanism as folded into phase 5. Phase 5's own stated scope is settling the obligation families and the discharge procedure, and the build happens at phase 11 — so "folded into phase 5" needs reading as where the obligation and discharge shape are settled, not where the code lands. Whoever plans the phases owns that, not this design.
+
+### Assessment
+
+**Lockable.** Every question this design put to the owner is answered, three of the review's six blockers are closed, and the other three are implementation obligations the design already carries as acceptance criteria with a stated order. The remaining risk is in the building, not in the deciding — and the design names the sequencing constraint that keeps the building honest.
 
 ---
 
@@ -738,3 +854,5 @@ No sample declares a collection of periods, money, quantity or price, so the col
 The rule and its decision procedure for every declaration form and every operand origin, including the result basis of period-producing operations. The mechanism, in file-level detail, and why the relation belongs on the requirement rather than the axis. The measurement that settles whether a same-unit comparison depends on a reference date, in both directions, and the one limit on it. The zero-literal rule and the narrowing that makes it sound. The type gate on the relational-fact path. Six repairs that need no ruling, four of which are not about periods. The refusal messages. The document reconciliation.
 
 And the plain answer to the question the owner asked: NodaTime's reason is real, it is about the width of the type, and it does not reach a value known to be counted in one unit. For two scalar fields the comparison an author wants already works today under a different spelling, so there the operator buys legibility rather than capability, and that half should be decided on that basis. For a collection of pinned periods there is no other route at all — `.min`/`.max` legality is a trait of the element type and no accessor can supply it from outside — so that half is a capability question, and it is the one that decides whether the operator is worth building.
+
+**And it has been decided.** 2026-07-29 — *"build both."* The research gate was waived the same day, on the ground that the unsurveyed systems are not comparators for a decision where Precept ships NodaTime's own `Period`. § Owner rulings carries both, and § Is this lockable says what a lock would cover and what would still be outstanding after it.
