@@ -71,6 +71,14 @@ deliberate:
 against `$CANON_WIDE`, not `$CANON`. The register marks those rows. This is a widening of the plan's
 condition 3, not an exception to it.
 
+**Both variables above were checked at `3a561dad` by the condition-3 re-run and both are correct as
+written** — `$CANON_WIDE` carries `docs/tooling` and the § 7 resolver carries it too. What was wrong
+was the *second copy* of the definition: `contradiction-register.md` § How to read a row spelled
+**WIDE** out as `$CANON` plus `README.md docs/compiler-and-runtime-design.md`, with no
+`docs/tooling`, and that is the copy a re-runner working row by row reads. The re-run corrected it
+there. The lesson is the one this file already applies to the canonical documents: a definition
+written down twice drifts, and the copy that drifts is the one nobody re-reads.
+
 Excluded from the search, and each for a stated reason:
 
 | Path | Why excluded |
