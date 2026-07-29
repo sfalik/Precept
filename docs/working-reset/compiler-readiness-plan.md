@@ -52,11 +52,16 @@ by editing canon; the twenty-first, `R13`, was ruled against and disposed of wit
 executed" — which this section and the board both said until 2026-07-28 — was one too many. All 21 are
 resolved.
 
-**The condition is still not satisfied**, and the reason is not the missing commit hashes. Commit hashes
-are condition 2, which fails on these 21 as well. Condition 6 fails because `N82`, the twenty-second row,
-is unchanged and still needs its owner — and because the fault-backstop pass left two open items in canon
-that themselves need owners meeting the condition's bar. One of the two has an owning phase and the other
-does not; both are set out under exit condition 6 below.
+**`N82` is now executed too, 2026-07-29** — Decision 14 rewritten, alignment directive item 4 amended on
+the owner's approved wording, `collection-types.md:533` reconciled, and four further sites that cite
+Decision 14 by number corrected with it. Record in
+[`phase-2/period-ordering-reconciliation.md`](phase-2/period-ordering-reconciliation.md). The mechanism is
+not built and is not this phase's; it is folded into phase 5.
+
+**What still holds condition 6 open is not a register row.** The fault-backstop pass left two questions
+open inside canon, and both need owners meeting the condition's own bar. One has an owning phase. The
+other does not, and that is recorded as the result rather than assigned to the nearest phase — it is on
+§ 4 as a question about ownership. Both are set out under exit condition 6 below.
 
 **The twenty-second is the one the board had never counted**: `N82`, same-basis period ordering. The
 owner ruled at the walk that periods pinned to the same basis order, against locked Decision 14. The row
@@ -182,10 +187,12 @@ phases.
   **The accepted cost**: more definitions are refused, and authors write guards they did not write
   before — the same trade want:171 and want:189 already take.
 - **Same-basis periods order** (walk item 19). You ruled it, against locked Decision 14. That overrides
-  the locked decision on your authority; `temporal-type-system.md:1478` and `collection-types.md:533`
-  reconcile to the ruling at phase 2, and BUG-047 is re-checked. The ordering itself needs a
-  qualifier-conditional trait that does not exist — **new language surface, so it goes through
-  `/design`**, not into a phase-2 doc edit.
+  the locked decision on your authority. **The document half is done, 2026-07-29**: Decision 14 rewritten
+  in place and renamed, alignment directive item 4 amended with your approved wording, the bolded line in
+  `collection-types.md` reconciled, and four further sites that cite Decision 14 by number corrected with
+  it. Record in [`phase-2/period-ordering-reconciliation.md`](phase-2/period-ordering-reconciliation.md).
+  BUG-047 is still to be re-checked. The mechanism is not built and is not this phase's — it went through
+  `/design`, was adversarially reviewed, and is folded into phase 5.
 - **Three severities rise to Error** (walk item 22) — required-state dominance, unsatisfiable rule,
   contradictory rule. Your ruling; the code still has all three at Warning. Phase 10 owns the failing
   tests, phase 11 the fix.
@@ -1209,6 +1216,36 @@ for it. Each is his answer to a plainly-stated worked case, recorded with his wo
   the answer. His scope call, with the widening path named. (Walk item 13.)
 - **Overflow is an authorized exemption for the MVP, not a hole to close here.** This phase does not carry
   it as a fault family. No document may claim it prevented. (Walk item 15.)
+
+**A design this phase folds in: period ordering.** Added 2026-07-29. The owner ruled at the phase-1 walk
+that periods pinned to the same single unit order, against locked Decision 14. The design is
+[`phase-2/period-ordering-design.md`](phase-2/period-ordering-design.md), adversarially reviewed at
+[`phase-2/period-ordering-adversarial-review-2026-07-28.md`](phase-2/period-ordering-adversarial-review-2026-07-28.md).
+The rule itself is already in canon — phase 2 reconciled Decision 14 and the alignment directive, which is
+register row `N82`. What is **not** settled is the mechanism, and most of it is this phase's.
+
+**What belongs here.** The ordering condition is an obligation family, discharged from declarations, and
+`period` would be its fourth member: `money` and `quantity` already carry a qualifier-compatibility
+requirement, and `choice` carries a modifier-gated one for the same reason. So the discharge walk has to
+reach `period < period` and decide it the way it already decides `money < money`, and the family has to be
+stated once rather than four times. The design's Decision 6 — a type gate on relational facts — is also
+this phase's: without it, registering a period ordering operation routes period operands into decimal
+interval arithmetic built on a projection its own source disclaims.
+
+**What is not this phase's**, so nobody widens it by accident: the two new catalogs and `TypeTrait` losing
+a member are phase 9's; the three new diagnostics and the replaced `PRE0018` message are phase 10's tests
+and phase 11's build; and the six repairs the design found are unassigned bug-fix work already carried on
+§ 5, four of which are not about periods at all.
+
+**One precondition, and it is not optional.** The design's own first repair — a declared qualifier does not
+constrain the value on the binding path, so `dequeue Q into X` puts an arbitrary value into a qualified
+field with no obligation raised — has to land before any of this. The whole correctness argument reads a
+declared qualifier and assumes it constrains the value. It reproduces on `money` as well as `period`, so
+the existing precedent has the same hole and the two stand or fall together.
+
+**The design is not locked**, and this phase does not need it to be. It is `Externally-Grounded` pending
+one owner ruling on a research gate and three build items. Fold in what is settled; do not treat its open
+questions as answered.
 
 **Where the fragment stops — the one thing on the "Waiting on Shane" table for this phase.** The procedure
 decides sequents drawn from a *subset* of the expression grammar, and where that subset ends is a decision

@@ -65,7 +65,7 @@
   - [11. `date - date` returns `period` (not integer, not duration)](#11-date---date-returns-period-not-integer-not-duration)
   - [12. `period` is a surface type (field type AND expression type)](#12-period-is-a-surface-type-field-type-and-expression-type)
   - [13. `period` is full NodaTime Period — date AND time components (v2.1 revision)](#13-period-is-full-nodatime-period--date-and-time-components-v21-revision)
-  - [14. No ordering on `period` — `==` and `!=` only](#14-no-ordering-on-period---and--only)
+  - [14. `period` orders only when both operands are pinned to the same single unit (revised 2026-07-26)](#14-period-orders-only-when-both-operands-are-pinned-to-the-same-single-unit-revised-2026-07-26)
   - [15. Structural equality on `period` — `1 month != 30 days`](#15-structural-equality-on-period--1-month--30-days)
   - [16. Sub-day duration bridging — `time + duration` via thin type-checker translation](#16-sub-day-duration-bridging--time--duration-via-thin-type-checker-translation)
   - [17. Typed constant quantities — sole mechanism for temporal quantity construction (rewritten 2026-04-17)](#17-typed-constant-quantities--sole-mechanism-for-temporal-quantity-construction-rewritten-2026-04-17)
@@ -241,7 +241,7 @@ This means:
 1. When NodaTime keeps two concepts separate, Precept keeps them separate.
 2. When NodaTime exposes a distinction, Precept exposes it.
 3. When NodaTime's type system prevents a nonsensical operation, Precept inherits that prevention.
-4. When NodaTime has no natural ordering on a type, Precept has no natural ordering on that type.
+4. When NodaTime has no natural ordering on a type, Precept has no natural ordering on that type. One exception: a `period` pinned to a single unit orders against the same single unit — see Decision 14.
 5. When NodaTime uses structural equality, Precept uses structural equality.
 
 The v1 proposal violated all five. It collapsed `Period` into `Duration`, hid the calendar/timeline distinction behind custom dispatch, and required Precept to implement its own unit-compatibility enforcement. The v2 proposal trusts NodaTime's design and exposes it.
@@ -797,12 +797,13 @@ These resolve to `Period.FromDays`, `Period.FromMonths`, `Period.FromYears`, `Pe
 | `period ± period` | `period` | Combined calendar period / difference. `Period ± Period`. |
 | `-period` | `period` | Unary negation. `-('3 months')` is equivalent to negating the period. |
 | `==`, `!=` | `boolean` | **Structural equality.** `1 month != 30 days` — structurally different. NodaTime's equality is structural. |
+| `<`, `>`, `<=`, `>=` | `boolean` | **Only when both operands are pinned to the same single unit** — `period in 'days'` against `period in 'days'`. A comparison of the two component counts; no conversion and no reference date. See Decision #14, which also records that this is not built yet. |
 
 **Compiler warning — degenerate literal comparisons:** When both operands of a period `==` are constant expressions with non-overlapping components (e.g., `1 month == 30 days`), the compiler emits `DegeneratePeriodComparison`: *"This is always `false` — `1 month` and `30 days` use different parts. Period equality compares each part (years, months, days) separately."* The comparison is legal (structural equality is well-defined), but the result is statically knowable and almost certainly not what the author intended. The same code fires for `!=` between non-overlapping constants — the message reads *always `true`* in that case.
 
 | **Not supported** | **Why** |
 |---|---|
-| `<`, `>`, `<=`, `>=` | Periods can't be compared with `<` or `>` — a month isn't always the same length, so ordering isn't reliable. See Locked Decision #14. |
+| `<`, `>`, `<=`, `>=` on any pairing other than two operands pinned to the same single unit | A month isn't always the same length, so "is 1 month more than 30 days" has no answer without a reference date. Mixed units, composite bases, `of 'date'` / `of 'time'`, and unqualified `period` are all refused. See Decision #14. |
 | `period * integer` | Periods can't be multiplied. Write the value directly: `60 days` instead of `30 days * 2`. |
 | `period ± duration` | Periods (days, months, years) and durations (hours, minutes, seconds) can't be mixed. |
 
@@ -1325,7 +1326,7 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 | `time` | ✓ | ✓ | Within-day |
 | `instant` | ✓ | ✓ | Nanoseconds on global timeline |
 | `duration` | ✓ | ✓ | Nanoseconds |
-| `period` | ✓ | **✗** | **No natural ordering.** See Decision #14. |
+| `period` | ✓ | **Only when pinned** | **Both operands must be pinned to the same single unit** — `period in 'days'` against `period in 'days'`, ordered by component count. Every other pairing is a compile error. See Decision #14. |
 | `timezone` | ✓ | ✗ | Equality by IANA identifier. |
 | `datetime` | ✓ | ✓ | Same-calendar |
 | `zoneddatetime` | ✓ | **✗** | **No natural ordering.** NodaTime omits `IComparable<ZonedDateTime>`. Compare via `.instant` or `.datetime` accessor. |
@@ -1342,7 +1343,7 @@ Cross-type comparison is always a type error.
 | `zoneddatetime ± period` | Periods can't be added directly to a zoned datetime — navigate to `.datetime` first. |
 | `date ± integer` | A bare number doesn't specify a unit. Use `'{n} days'`. |
 | `instant ± integer` | A bare number doesn't specify a unit. Use `'{n} hours'` or `'{n} seconds'`. |
-| `period < period` | Periods can't be compared with `<` or `>`. |
+| `period < period`, unless both operands are pinned to the same single unit | Without a single declared unit on both sides, a period comparison has no answer that a reference date cannot change. See Decision #14. |
 | `zoneddatetime < zoneddatetime` | No natural ordering — NodaTime omits `IComparable<ZonedDateTime>`. Compare via `.instant` or `.datetime` accessor. |
 | `period * integer` | Periods can't be multiplied. |
 | `date + date` / `time + time` / `instant + instant` / `datetime + datetime` / `zoneddatetime + zoneddatetime` | Adding two points together isn't meaningful. Use `-` to get the distance between them. |
@@ -1477,12 +1478,16 @@ All temporal types support `optional`. All follow existing null propagation rule
 - **Precedent:** NodaTime `Period` — full date+time components. `Period.HasDateComponent` / `Period.HasTimeComponent` for introspection.
 - **Tradeoff:** `date + period` where the period has time components: NodaTime's `LocalDate.Plus(Period)` throws `ArgumentException` on non-zero time components (`Preconditions.CheckArgument(!period.HasTimeComponent, ...)`). Precept's `of 'date'` constraint catches this at compile time rather than letting it reach the runtime exception. This is stricter-earlier, not a divergence.
 
-### 14. No ordering on `period` — `==` and `!=` only
+### 14. `period` orders only when both operands are pinned to the same single unit (revised 2026-07-26)
 
-- **Why:** NodaTime's `Period` has no `IComparable`. "Is 1 month greater than 30 days?" depends on which month. NodaTime requires `CreateComparer(LocalDateTime)` — a reference date. Precept exposes this truth.
-- **Alternatives rejected:** Reference-date ordering (adds complexity). Approximate ordering (incorrect — violates "force authors to think about the details").
-- **Precedent:** NodaTime `Period` — no `IComparable`.
-- **Tradeoff:** Cannot sort by period or use `<`/`>` guards. Compare concrete dates instead: `StartDate + GracePeriod < Deadline`.
+**The rule.** `period` supports `==` and `!=` unconditionally. It supports `<`, `<=`, `>` and `>=` if and only if both operands resolve, on the temporal-unit axis, to a basis naming exactly one component, and it is the same component on both sides — `period in 'days'` against `period in 'days'`. The comparison is then a comparison of the two component counts. Every other pairing is a compile-time error rather than a computed answer: mixed units (`in 'days'` against `in 'months'`), composite bases (`in 'years + months'`, including against itself), the category qualifiers `of 'date'` and `of 'time'`, and unqualified `period`.
+
+- **Why:** NodaTime withholds ordering from `Period` because `Period` is one type spanning every combination of its components, and `IComparable<Period>` is a contract on the whole type — C# offers no way to make it conditional on what a particular value holds. Its own documentation names the case it is refusing: *"Certain periods can't naturally be compared without more context - how 'one month' compares to '30 days' depends on where you start."* That reason is real, and it is about the width of the type. It does not reach a value known to hold one count of one unit. Measured with `Period.CreateComparer(base)` over 600 base dates — every month, every month-end, leap-year February, non-leap century February — across all seven units and counts spanning ±40 years to ±400, including negatives and zero: **in the ISO calendar the count order and the calendar order never disagreed, and no two distinct counts ever landed on the same date.** ISO is the scope of that claim and the only calendar Precept exposes; the same run across eight other NodaTime calendars found the two orders disagreeing only in the Badi calendar, on a defect in the shipped library rather than a real disagreement between calendars. The comparison converts nothing and consults no reference date, so it takes no position on how long a month is — and it takes none on how long a day is because `zoneddatetime ± period` is a type error, so a period count is never put where it would have to answer an elapsed-hours question across a daylight-saving transition.
+- **Alternatives rejected:** Reference-date ordering — still rejected; it adds complexity, and its shape is already available by comparing concrete dates (`StartDate + GracePeriod < Deadline`). Approximate ordering, "a month is about 30.44 days" — still rejected; it is incorrect, and it would present approximation as exactness. This rule is neither of those: it converts nothing and consults no reference date. **New with this revision:** ordering composite bases, including a composite against itself — rejected on measurement rather than on argument. Over every pair drawn from `{years, months}`, 432 of 141,376 pairs change their order with the reference date; `'1 year + 1 month'` against `'13 months'` is equal from 2019-01-01 and less-than from 2020-02-29.
+- **Precedent:** NodaTime `Period` — no `IComparable`, with `Period.CreateComparer(LocalDateTime)` supplied in its place, and that method's documentation naming the mixed-component case as the reason it exists. Inside Precept, ordering conditional on a declared qualifier is already how three other types work: `money in 'USD'` and `quantity in 'kg'` order only against a matching qualifier, `quantity of 'length'` orders conversion-aware within a dimension, and `choice of T(...) ordered` orders only because the declaration says so.
+- **Tradeoff:** two comparisons that are exact are refused anyway, to keep ordering consistent with the structural equality of Decision 15. `period in 'weeks'` against `period in 'days'` is exact — `Period.Normalize()` folds weeks into days at 7:1 with no calendar argument — and is refused. Two same-composite time-only bases (`in 'hours + minutes'` against the same) have an exact total through `Period.ToDuration()` and are refused. Both are refused for reach, not for correctness: admitting them would give `'1 week'` and `'7 days'` an order while `==` says they are different values, and `.min` over a collection holding both would have two candidates.
+
+**Implementation state: not built.** `rule A <= B` on two `period in 'days'` fields is refused today with `PRE0018 "Expected a period value here, but got 'period'"` — a message that never mentions ordering. What compiles today, and computes the identical predicate, is the component accessor on a matching basis: `rule A.days <= B.days`. On collections the accessor route does not reach at all — see the `period in 'days'` row in [Collection Types](collection-types.md#temporal-and-business-domain-inner-types).
 
 ### 15. Structural equality on `period` — `1 month != 30 days`
 

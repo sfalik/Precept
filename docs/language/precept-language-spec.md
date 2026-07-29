@@ -1446,7 +1446,7 @@ Dotted notation is the **only** way to reach an event arg. A bare identifier alw
 | `zoneddatetime` | `±` | `duration` | `zoneddatetime` | Timeline arithmetic. |
 | `zoneddatetime` | `-` | `zoneddatetime` | `duration` | |
 
-**Temporal comparison:** `date`, `time`, `instant`, `duration`, `datetime` support all comparison operators. `period`, `timezone`, and `zoneddatetime` support only `==`/`!=` — ordering operators are type errors. Cross-type temporal comparison is always a type error.
+**Temporal comparison:** `date`, `time`, `instant`, `duration`, `datetime` support all comparison operators. `timezone` and `zoneddatetime` support only `==`/`!=` — ordering operators are type errors. `period` supports `==`/`!=` always, and the ordering operators only when both operands are pinned to the same single unit (`period in 'days'` against `period in 'days'`); every other pairing is a type error — see [Decision 14](temporal-type-system.md#14-period-orders-only-when-both-operands-are-pinned-to-the-same-single-unit-revised-2026-07-26), which also records that this is not built yet. Cross-type temporal comparison is always a type error.
 
 **Business-domain operators** — see the [business-domain types](business-domain-types.md) for the full per-type operator matrix with cancellation rules. Summary:
 
