@@ -84,7 +84,8 @@
   - [Causal Violation Explanations](#causal-violation-explanations)
   - [Computed Field Freshness in Restored Versions](#computed-field-freshness-in-restored-versions)
   - [Event-Prospect Evaluation in Update Inspection](#event-prospect-evaluation-in-update-inspection)
-- [13. Implementation Notes](#13-implementation-notes)
+- [13. Open Questions / Implementation Notes](#13-open-questions-implementation-notes)
+  - [Open Questions](#open-questions)
   - [Implementation Status](#implementation-status)
   - [Resolved Design Questions](#resolved-design-questions)
 - [14. Deliberate Exclusions](#14-deliberate-exclusions)
@@ -1620,6 +1621,8 @@ public readonly record struct Fault(
 Faults are **never thrown** — they are returned as structured outcome variants. This maintains the pattern-matchable, composable outcome model.
 
 > **Open — whether anything constructs a `Fault`.** The case in question is a defect in Precept itself — in the compiler, the builder or the evaluator — not anything an author can write in a definition. `Fault` and `EventOutcome.Faulted` are declared, and `compiler-and-runtime-design.md` names the evaluator as where such a breach would surface. Against that, § No Unclassified Exceptions below and `precept-builder.md` § Builder Invariant Violations both say a corrupted model is an unrecoverable exception. Whether the evaluator carries a detection mechanism at all, or whether these stay declared classifications with no producer while engine defects remain exceptions, is undecided.
+>
+> **Parked.** The owner has held this until the runtime design is done, with a stated lean towards exception. A lean is not a ruling: do not build or write against exception as the answer. Indexed in § 13 Open Questions; stated more fully in `fault-system.md` § Q3, which is the same question.
 
 ### Recovery Paths
 
@@ -1997,7 +2000,23 @@ This enables progressive UIs: show users what actions become available as they f
 
 ---
 
-## 13. Implementation Notes
+## 13. Open Questions / Implementation Notes
+
+### Open Questions
+
+An index of what this document leaves undecided. Each entry says what somebody has to decide and points at the section where the case for it is written; that discussion stays where it is, because it depends on the material around it.
+
+- **Whether a defect in Precept itself reaches the caller as a structured outcome or as a thrown exception.** The case is a bug in the compiler, the builder or the evaluator — not anything an author can write. Nothing constructs a `Fault` today, and canon says both things: `compiler-and-runtime-design.md` names the evaluator as where such a breach surfaces, while § 9 No Unclassified Exceptions and `precept-builder.md` § Builder Invariant Violations both call a corrupted model an unrecoverable exception. **The owner has parked this until the runtime design is done. His stated lean is exception. A lean is not a ruling** — whoever picks this up decides it, and nothing may be built or written as though the answer were already exception. See § 9 Fault Production, and `fault-system.md` § Q3, which states the same question more fully.
+- **Which type carries what inspection reports in place of a constraint verdict.** Execution has no constraint-evaluation phase, so inspection has none to preview, and `TransitionInspection.Constraints`, `UpdateInspection.Constraints` and `EventInspection.EventEnsures` currently have nothing to fill them. What inspection is meant to report instead is proof provenance — no check needed here, and here are the premises it was proven from — and no document says which type carries that. `BuildConstraintResults` stays unspecified until it is decided. See § 7.2 Inspection Operations.
+- **When a state carries more than one state action, whether all of them fire and in what order.** Owned by `precept-language-spec.md` § 3A.4; the flow diagram and lifecycle here depict a single action chain per position and do not answer it. See § 6 Execution Flow Diagram and § 6 Working Copy Management.
+- **Whether entry actions fire at construction and on a self-transition.** Same origin and same two sections as the entry above.
+- **Whether an `Update` holds each incoming value to the constraints declared on the field it enters and nothing wider.** The "nothing wider" scope is disputed and is not settled canon; the dispute is recorded in `precept-language-spec.md` § 0.7, *Governance*. See § 7.6 Ingress Validation.
+- **Four opcode semantics that nothing pins down**: how `LOAD_ARG` treats an absent or null input, whether `BRANCH_FALSE` treats numeric zero as false or only `false` itself, whether `RETURN` may legally fall through to further opcodes, and whether the evaluation stack is pooled rather than `stackalloc`-only. They have to be settled before builder-emitted plans and any later compiled path can be relied on to execute identically. See § 7.3 Opcode Execution Engine.
+- **The internal field layout of `PreceptValue`** — which tag type, where the union payload sits, and which value types share which union region. The 32-byte size and the tagged-value-struct shape are locked; the layout inside them is not. See § 5 Inputs and Outputs.
+- **What a trace record looks like, how a trace context is attached to an evaluation call, and how the language server and MCP server read the trace output.** See § 11 Decision 8.
+- **Whether the working copy's slot array is stack-allocated for small precepts or always heap-allocated.** See § Implementation Status below.
+- **Which ownership model `Version.Slots` uses** — the working array donated raw, or wrapped in an immutable type. The choice decides how far zero-copy promotion reaches and what a snapshot guarantees. See § Implementation Status below.
+- **Which storage shape `FieldDescriptor.AccessModes` takes** — a dictionary keyed by state, or an indexed representation. The same question is written in `precept-builder.md` § Pass 1 — Descriptor Pass. See § 7.5 Access Mode Enforcement and § Implementation Status below.
 
 ### Implementation Status
 

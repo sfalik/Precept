@@ -62,7 +62,8 @@
   - [Flat Evaluation Plans](#flat-evaluation-plans)
   - [ConstraintInfluenceMap as First-Class Artifact](#constraintinfluencemap-as-first-class-artifact)
   - [Single-Factory Construction Pattern](#single-factory-construction-pattern)
-- [13. Implementation Notes](#13-implementation-notes)
+- [13. Open Questions / Implementation Notes](#13-open-questions-implementation-notes)
+  - [Open Questions](#open-questions)
   - [Implementation Status](#implementation-status)
   - [Resolved Questions](#resolved-questions)
   - [Pending Design Decisions](#pending-design-decisions)
@@ -852,7 +853,20 @@ The last of those rests on both conditions the factory imposes, not on the `HasE
 
 ---
 
-## 13. Implementation Notes
+## 13. Open Questions / Implementation Notes
+
+### Open Questions
+
+An index of what this document leaves undecided. Each entry says what somebody has to decide and points at the section where the case for it is written; that discussion stays where it is, because it depends on the material around it.
+
+- **What happens when the certificate gate refuses.** Whether a verification failure throws or returns a structured result, whether the failure names the derivation step that failed to replay, and whether verification is cached across loads are all undecided. What is settled is that the failure must explain itself. See § 9 The Certificate Gate, and § 10 Input Contract, which states the condition without the mechanism.
+- **How the certificate reaches `Precept.From` at all.** The `Compilation` record does not carry one, and the proof record is described as emitted alongside the definition rather than inside the compiler's analysis output. Whether it becomes a sixth member of `Compilation`, a separate argument, or a file the method is pointed at is decided with the rest of the gate's shape. See § 9 The Certificate Gate.
+- **Whether the `ConstraintPlanIndex` keeps its five-anchor shape.** Only two uses survive the removal of the per-operation constraint pass — assembling the constraint catalogs, and routing an incoming value to the constraints declared on the slot it enters — and both are anchored to a slot or to a catalog listing rather than to a state or an event. The index could shrink to what ingress needs, or be replaced by a premise list derived from the definition's certificate. The same question reaches Pass 4, the `ConstraintPlanIndex` entry in § 8 Downstream Consumers, and `catalog-system.md` § Evaluator-catalog integration pattern. See § 12 Constraint Indexes, and What They Index Now.
+- **Which storage shape `FieldDescriptor.AccessModes` takes** — an immutable dictionary keyed by state, or an immutable array of state-and-mode pairs. Also written in `evaluator.md` § 7.5 Access Mode Enforcement. See § 7 Pass 1 — Descriptor Pass.
+- **Whether `ConstructMeta` should carry `ModelContribution` metadata** so the assembly loop becomes fully generic, instead of the builder knowing directly that a field declaration adds a field and a transition row adds a transition. See § Pending Design Decisions below.
+- **Whether the expression compiler stays a stack machine or moves to register allocation.** A stack machine is what this design specifies; the document leaves the move open against profiling evidence. See § Pending Design Decisions below.
+- **Whether the `ExecutionPlan` opcode array stays a discriminated union or becomes a flat struct array with an enum discriminator.** Cache locality against allocation cost, pending profiling evidence. See § Pending Design Decisions below.
+- **Whether a defect in Precept itself reaches the caller as a structured outcome or as a thrown exception.** This document is party to that question: § 9 Builder Invariant Violations states one of the two accounts that disagree, and it is not settled that the account is right. The question is filed in `fault-system.md` § Q3 and indexed in `evaluator.md` § 13 Open Questions. **The owner has parked it; his stated lean is exception, and a lean is not a ruling.**
 
 ### Implementation Status
 
