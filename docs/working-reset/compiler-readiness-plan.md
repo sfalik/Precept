@@ -940,6 +940,40 @@ disagree in either direction.
 - A build check comparing each list against its catalog, with two committed tests demonstrating it fails
   in both directions.
 - A join between the numbered statements and the data-file entries.
+- **A disposition for every open question in the compiler documents.** See below.
+
+**Every open question in `docs/compiler/` gets a disposition here, because nothing else in this plan
+reads those documents.** Added 2026-07-28 at Shane's instruction, after the same gap was found and closed
+on the runtime side.
+
+The seven pipeline stage documents — lexer, parser, name binder, type checker, graph analyzer, diagnostic
+system, tooling surface — plus `proof-engine.md` carry Open Questions sections, with roughly fifteen
+entries between them. **No phase in this plan takes those documents as its subject.** The plan names them
+twice in seventeen hundred lines and both are incidental. Phase 10 makes the consequence concrete: its
+input is the union of phase 3's language claims, phase 4's step kinds, phase 5's discharge claims and
+phase 7's coverage claims, so a stage document's claim never becomes a criterion and its open questions
+never become anything's problem. Phase 11 then builds against tests that were never written for them.
+
+What this phase does with them, and the order matters:
+
+1. **Survey before counting.** The equivalent runtime survey found that of nine entries under Open
+   Questions headings, **only four were genuinely open** — one was marked locked, one resolved, and three
+   were binding requirements the section itself described as such. Expect the same here. An entry that is
+   not a question gets relabelled where it sits; it does not get an owner.
+2. **Close the ones this phase's own scope reaches.** A question about what an author may write is a
+   language question and this phase answers it, numbered like every other normative statement.
+3. **Route the rest, each to a phase whose stated scope actually reaches it.** Check the phase entry; do
+   not assume. A question about the discharge procedure is phase 5's. A question about catalog shape is
+   phase 9's.
+4. **Anything no phase reaches is reported as that, not assigned to the nearest one.** That is a real
+   result and it is the finding condition 6 exists to produce. It goes to § 4 as a question about
+   ownership rather than about the answer.
+
+**Done when** every entry has one of: closed here with a numbered statement, a named phase whose scope
+covers it, a recorded owner ruling that the work is not being done, or an entry in § 4 saying no phase
+reaches it. Check: entries with none of those = 0.
+
+**This widens the phase and its size has not been re-estimated for it.** Recompute before starting.
 
 **A decision this phase has to make and state, because nothing settles it today.** The build can only
 compare two machine-readable things, so the check it delivers is *data file versus catalog*. The drift it
