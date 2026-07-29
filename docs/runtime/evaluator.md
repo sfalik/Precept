@@ -16,7 +16,7 @@
 > - **`Version` is the primary runtime input** — every evaluator operation starts from an immutable snapshot of entity state at the moment of the operation. See [§Primary Input: The Version Type](#primary-input-the-version-type) and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
 > - **Mutate only through a working copy** — all writes happen on a working copy and the input `Version` is never modified in place. See [§Working Copy Management](#working-copy-management) and [§7.1 The Four Operations](#71-the-four-operations).
 > - **One opcode engine powers every operation** — `Create`, `Fire`, `Update`, and `Restore` all execute through the same opcode execution machinery, with inspection reusing the same plan set. See [§7.1 The Four Operations](#71-the-four-operations), [§7.2 Inspection Operations](#72-inspection-operations), and [§7.3 Opcode Execution Engine](#73-opcode-execution-engine).
-> - **No diagnostics means no evaluator faults** — compiler proofs are intended to eliminate runtime fault paths, leaving evaluator faults as defense-in-depth only. See [§9. Failure Modes and Recovery](#9-failure-modes-and-recovery) and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
+> - **A compiled definition has no fault path at evaluation time** — the compiler proves every fault-prone operation safe or refuses the definition, so the evaluator carries no fault-prevention check to run. See [§9. Failure Modes and Recovery](#9-failure-modes-and-recovery) and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
 
 ## Contents
 
@@ -53,7 +53,6 @@
   - [Business-Domain Internal Types](#business-domain-internal-types)
 - [9. Failure Modes and Recovery](#9-failure-modes-and-recovery)
   - [In-Domain Failures (Expected Business Events)](#in-domain-failures-expected-business-events)
-  - [Impossible-Path Failures (Defense-in-Depth)](#impossible-path-failures-defense-in-depth)
   - [Fault Production](#fault-production)
   - [Recovery Paths](#recovery-paths)
   - [No Unclassified Exceptions](#no-unclassified-exceptions)
@@ -144,7 +143,6 @@ Inspection and commit paths execute the **same prebuilt plans** — the only dif
 | **Computed field recomputation** | After mutations and before commit: walk `SlotLayout.ComputedSlots` and re-evaluate |
 | **Structured outcome production** | Produce `EventOutcome`, `UpdateOutcome` discriminated unions — never throw for in-domain failures |
 | **Inspection production** | Produce `EventInspection`, `UpdateInspection` with full row-by-row and constraint-by-constraint detail |
-| **Fault backstop routing** | At impossible-path sites: check `opcode.FaultSite` (CC#6 `FaultSiteAnnotation?`); null = no check; non-null → `Faults.Create(annotation, context)` |
 
 ### Out of Scope
 
@@ -314,7 +312,7 @@ Runtime quantity args are normalized to UCUM base units at the **intake boundary
 
 | Input | Source | Description |
 |---|---|---|
-| `Precept` | `Version.Precept` | The executable model — descriptor tables, dispatch indexes, constraint plan indexes, execution plans, fault backstops |
+| `Precept` | `Version.Precept` | The executable model — descriptor tables, dispatch indexes, constraint plan indexes, execution plans |
 | `Version` | Operation input | Current state + field slot array |
 | `EventDescriptor` | Fire/InspectFire | The event being fired (resolved from name at API boundary) |
 | `args` | Fire/InspectFire | Event argument values keyed by `ArgDescriptor.Name` |
@@ -335,7 +333,7 @@ public abstract record EventOutcome
     // CC#24: EvaluatedRows carries per-candidate TransitionInspection for tooling debug trace
     public sealed record Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows) : EventOutcome;
     public sealed record UndefinedEvent() : EventOutcome;                              // No rows for event in current state
-    public sealed record Faulted(Fault Fault) : EventOutcome;                          // CC#12: impossible-path failure surfaced as structured outcome
+    public sealed record Faulted(Fault Fault) : EventOutcome;                          // engine-invariant breach — a defect in the compiler, builder or evaluator
 }
 ```
 
@@ -433,7 +431,8 @@ public static class Evaluator
     internal static EventInspection InspectFire(Precept precept, Version version, EventDescriptor @event, FiredArgs? args);
     internal static UpdateInspection InspectUpdate(Precept precept, Version version, PreceptValue[]? patch);
     
-    // ── Fault Backstop ───────────────────────────────────────────
+    // ── Fault Construction ───────────────────────────────────────
+    // Declared; nothing calls it. See § Fault Production.
     internal static Fault Fail(FaultCode code, params object?[] args);
 }
 ```
@@ -977,16 +976,12 @@ internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slo
     foreach (var opcode in plan.Opcodes)
     {
         Dispatch(opcode, slots, args, stack, ref top);
-
-        // CC#6: Defense-in-depth fault backstop — zero overhead when FaultSite is null (proven safe)
-        if (opcode.FaultSite is { } annotation && IsFaultCondition(stack, top, opcode))
-            return Fail(annotation.Code, annotation.PreventedBy, annotation.Site);
     }
     return stack[0];
 }
 ```
 
-**Two-layer defense model (CC#6):** The first line of defense is the compile gate — the type checker and proof engine emit diagnostics for unresolved obligations, preventing the `Precept` object from being built unless the author fixes them. The second line is the runtime backstop — `FaultSiteAnnotation` on opcodes compiled from unresolved sites (force-builds, catalog evolution, or compiler bugs). For a cleanly-compiled precept, every `opcode.FaultSite` is `null`, and the null check is the only runtime cost — effectively zero overhead. See `proof-engine.md §2` for the structural elision model and `precept-builder.md §Pass 4` for the planting contract.
+**The loop runs no fault check.** The type checker and proof engine emit diagnostics for unresolved obligations, and no `Precept` is built until the author fixes them. There is no second pass behind that: an opcode carries no fault annotation to test, and the evaluator just computes.
 
 **Operator dispatch (opcode-embedded, zero-knowledge evaluator):**
 
@@ -1416,22 +1411,6 @@ public sealed record ConstraintViolation(
 );
 ```
 
-When an opcode hits a fault backstop site (identified by a non-null `FaultSiteAnnotation` on the opcode, stamped by the Precept Builder per CC#6), the evaluator produces a structured `Fault`:
-
-```csharp
-internal static Fault Fail(FaultCode code, params object?[] args)
-    => Faults.Create(code, args);
-```
-
-The `Faults` catalog produces a fully-formed `Fault` with:
-- `Code`: The `FaultCode` enum value
-- `CodeName`: Stable string identity (e.g., `"DivisionByZero"`)
-- `Message`: Pre-formatted English diagnostic message
-
-Faults are **never thrown** — they are returned as structured outcome variants. This maintains the pattern-matchable, composable outcome model.
-
-**`Faulted` outcome (CC#12):** Impossible-path failures are modeled as structured `Fault` values raised via `Faults.Create` and surfaced as `EventOutcome.Faulted(Fault fault)` — the 8th `EventOutcome` variant. The evaluator's `Fail()` path now returns a `Faulted` outcome rather than an unhandled exception. MCP `precept_fire` serializes this as `{ "outcome": "Faulted", "fault": { "code": ..., "codeName": ..., "message": ... } }`.
-
 ---
 
 ## 8. Dependencies and Integration Points
@@ -1440,7 +1419,7 @@ Faults are **never thrown** — they are returned as structured outcome variants
 
 | Dependency | Artifact | What the Evaluator Reads |
 |---|---|---|
-| **Precept Builder** | `Precept` | The complete executable model: `SlotLayout`, `TransitionDispatchIndex`, `ConstraintPlanIndex`, `ExecutionRow[]`, `FaultBackstops` |
+| **Precept Builder** | `Precept` | The complete executable model: `SlotLayout`, `TransitionDispatchIndex`, `ConstraintPlanIndex`, `ExecutionRow[]` |
 | **Version** | Slot array + state | Current field values via `Version.Slots`, current state via `Version.CurrentState` |
 
 ### Internal Dependencies (within the Precept model)
@@ -1453,7 +1432,6 @@ Faults are **never thrown** — they are returned as structured outcome variants
 | `ExecutionRow` | Guard plan, action plans, target state, outcome kind |
 | `ExecutionPlan` | Flat opcode array for expressions |
 | `ActionPlan` | Action kind, target slot, value plan, into slot |
-| `FaultSiteAnnotation` | Nullable annotation on opcode: fault code + preventing diagnostic code + source location (CC#6). Null = proven safe. |
 | `ConstraintDescriptor` | Constraint kind, anchors, expression plan, because clause |
 | `FieldDescriptor` | Slot index, type, modifiers, access modes, computed plan |
 
@@ -1617,42 +1595,12 @@ All in-domain failures produce structured outcome variants — never exceptions:
 | Authored rejection | `EventOutcome.Rejected(reason)` | A `reject` row was the winning candidate |
 | Ingress violation on an argument | `EventOutcome.InvalidArgs(reason)` | Arg validation failed at ingress — wrong type, missing required, or a value violating a constraint declared on the argument |
 | Invalid fields | `UpdateOutcome.InvalidFields(reason)` | Patch validation failed (type mismatch, unknown field) |
-| Impossible-path fault | `EventOutcome.Faulted(fault)` | Defense-in-depth backstop; only fires when upstream pipeline has a bug (CC#12) |
 
 These are **not errors** — they are expected business outcomes. Callers pattern-match on the outcome type to determine the appropriate response.
 
-### Impossible-Path Failures (Defense-in-Depth)
-
-Impossible-path failures indicate bugs in upstream stages (compiler/builder) or corrupted data:
-
-| Failure | FaultCode | Should Be Prevented By |
-|---|---|---|
-| Division by zero | `DivisionByZero` | Guard `when Divisor != 0` or `nonzero` modifier |
-| Sqrt of negative | `SqrtOfNegative` | Guard `when Value >= 0` or `nonnegative` modifier |
-| Type mismatch at runtime | `TypeMismatch` | Static type checking |
-| Undeclared field reference | `UndeclaredField` | Static name resolution |
-| Null in non-nullable context | `UnexpectedNull` | `optional` modifier or null guard |
-| Invalid member access | `InvalidMemberAccess` | Static type checking |
-| Function arity mismatch | `FunctionArityMismatch` | Static signature checking |
-| Collection empty on access | `CollectionEmptyOnAccess` | Guard `when F.count > 0` |
-| Collection empty on mutation | `CollectionEmptyOnMutation` | Guard `when F.count > 0` |
-
-Every `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compiler diagnostic that should have caught it:
-
-```csharp
-public enum FaultCode
-{
-    [StaticallyPreventable(DiagnosticCode.DivisionByZero)]
-    DivisionByZero = 1,
-    
-    [StaticallyPreventable(DiagnosticCode.SqrtOfNegative)]
-    SqrtOfNegative = 2,
-    
-    // ...
-}
-```
-
 ### Fault Production
+
+`Fault` is the name for a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. It is not a check standing behind a proof: a fault-prone operation is proven safe or the definition is refused, so a compiled definition has no fault-prevention check for the evaluator to run.
 
 ```csharp
 internal static Fault Fail(FaultCode code, params object?[] args)
@@ -1669,18 +1617,20 @@ public readonly record struct Fault(
 );
 ```
 
+Faults are **never thrown** — they are returned as structured outcome variants. This maintains the pattern-matchable, composable outcome model.
+
+> **Open — whether anything constructs a `Fault`.** The case in question is a defect in Precept itself — in the compiler, the builder or the evaluator — not anything an author can write in a definition. `Fault` and `EventOutcome.Faulted` are declared, and `compiler-and-runtime-design.md` names the evaluator as where such a breach would surface. Against that, § No Unclassified Exceptions below and `precept-builder.md` § Builder Invariant Violations both say a corrupted model is an unrecoverable exception. Whether the evaluator carries a detection mechanism at all, or whether these stay declared classifications with no producer while engine defects remain exceptions, is undecided.
+
 ### Recovery Paths
 
 | Failure Type | Recovery |
 |---|---|
 | In-domain failure | Caller handles the outcome appropriately (display error, retry, etc.) |
-| Impossible-path fault | Log the fault with `FaultCode` and `CodeName`; investigate compiler/builder bug; do not retry |
+| Engine-invariant breach | Log the fault with `FaultCode` and `CodeName`; investigate the compiler, builder or evaluator defect; do not retry |
 
 ### No Unclassified Exceptions
 
-The evaluator does not throw exceptions for in-domain operations. Every failure path either:
-- Produces a structured outcome variant (for expected failures), or
-- Produces a `Fault` via `Faults.Create` (for impossible paths)
+The evaluator does not throw exceptions for in-domain operations. Every in-domain failure path produces a structured outcome variant.
 
 The only exception paths are truly exceptional: out-of-memory, corrupted `Precept` model, etc. These are unrecoverable and should not be caught.
 
@@ -1705,7 +1655,7 @@ The only exception paths are truly exceptional: out-of-memory, corrupted `Precep
 |---|---|
 | **Determinism** | Same `Precept` + same `Version` + same operation + same inputs → same outcome. No randomness, no external state. |
 | **Immutability preservation** | Input `Version` is never mutated. Output `Version` (in success outcomes) is a fresh instance. |
-| **Fault–diagnostic correspondence** | Every `Fault` produced by the evaluator carries a `FaultCode` with a `[StaticallyPreventable]` attribute. If the compiler emits no errors, the evaluator should never fault. |
+| **No fault path at evaluation time** | A definition that compiled has no fault-prevention check for the evaluator to run and no site at which one could fire. Each `FaultCode` member names, through `[StaticallyPreventable]`, the diagnostic responsible for preventing that class of failure at authoring time. |
 | **Inspection–commit agreement** | `InspectFire` and `Fire` execute the same plans. A row that `InspectFire` marks `Prospect.Certain` will be the winning row when `Fire` is called with the same inputs. |
 | **Ingress completeness** | Every constraint declared on an incoming value is checked as it enters. The evaluator does not short-circuit on first violation (it collects all violations for diagnostic completeness). |
 | **Access mode bypass for Restore** | `Restore` bypasses both access-mode checks and ingress validation — trusted hydration (spec §0.7; Decision 5 below). |
@@ -2053,7 +2003,7 @@ This enables progressive UIs: show users what actions become available as they f
 
 1. **All operation bodies throw `NotImplementedException`** — `Fail(FaultCode)` routing to `Faults.Create` is the only implemented path.
 
-2. **Descriptor types are defined but pending full implementation** — `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor` exist in `Descriptors.cs`; shapes need `AccessModes` and computed plan references.
+2. **Descriptor types are defined but pending full implementation** — `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor` exist in `Descriptors.cs`; shapes need `AccessModes` and computed plan references. `Descriptors.cs` also declares `FaultSiteDescriptor`, which the evaluator has nothing to do with and which is on its way out.
 
 3. **Opcode types are designed but not implemented** — The `Opcode` DU and its subtypes are specified in `precept-builder.md` but no C# types exist yet.
 
@@ -2069,13 +2019,11 @@ This enables progressive UIs: show users what actions become available as they f
 
 9. **Inspection–commit plan sharing** — Confirmed: same plans, same execution. Disposition (report vs. enforce) is the only difference.
 
-10. **Fault backstop threading (CC#6)** — Every backstop site carries a non-null `FaultSiteAnnotation` on the opcode, stamped by the builder from `ProofLedger.FaultSiteLinks`. The evaluator checks `opcode.FaultSite` after dispatch; null = proven safe, no check. Non-null triggers `Faults.Create(code, args)`, not a raw throw. For cleanly-compiled precepts, all annotations are null — zero overhead.
+10. **`ConstraintViolation` full shape** — Canonical 5-field shape is the designed public contract. Implementation of `FailingSubexpression` and `FailingValue` population requires evaluator instrumentation (tracking which opcode produced the failing value). `Because` comes from `ConstraintDescriptor` metadata; `RelevantFields` is a snapshot of `version.Slots` at evaluation time. Full population is an implementation milestone, not a design question.
 
-11. **`ConstraintViolation` full shape** — Canonical 5-field shape is the designed public contract. Implementation of `FailingSubexpression` and `FailingValue` population requires evaluator instrumentation (tracking which opcode produced the failing value). `Because` comes from `ConstraintDescriptor` metadata; `RelevantFields` is a snapshot of `version.Slots` at evaluation time. Full population is an implementation milestone, not a design question.
+11. **Event-prospect evaluation in `InspectUpdate`** — Runs `InspectFire` over all events available in the current state, using the hypothetical post-patch field values via a temporary `Version` object. Consider lazy evaluation for precepts with many events.
 
-12. **Event-prospect evaluation in `InspectUpdate`** — Runs `InspectFire` over all events available in the current state, using the hypothetical post-patch field values via a temporary `Version` object. Consider lazy evaluation for precepts with many events.
-
-13. **Working copy isolation** — Each candidate row evaluation must have its own working copy. Rows are evaluated in order; a failing row's mutations must not leak to subsequent rows.
+12. **Working copy isolation** — Each candidate row evaluation must have its own working copy. Rows are evaluated in order; a failing row's mutations must not leak to subsequent rows.
 
 ---
 
@@ -2154,7 +2102,7 @@ The same inputs always produce the same outputs. This enables confident testing 
 | Catalog system architecture | `docs/language/catalog-system.md` |
 | Constraint catalog and DU subtypes | `docs/language/catalog-system.md §Constraints` |
 | Actions catalog and SyntaxShape | `docs/language/catalog-system.md §Actions` |
-| Fault–diagnostic correspondence | `docs/compiler/proof-engine.md §Fault Backstops` |
+| Fault–diagnostic correspondence | `docs/compiler/diagnostic-system.md § FaultCode → DiagnosticCode Chain` |
 | MCP runtime-tool status and contract doc | `docs/tooling/mcp.md §4` |
 
 ### Ingress Validation Matrix
@@ -2191,7 +2139,7 @@ This matrix summarizes which constraints and access-mode checks each operation e
 | `src/Precept/Runtime/UpdateOutcome.cs` | Update outcome DU (with nested variants) |
 | `src/Precept/Runtime/Inspection.cs` | Inspection types (`EventInspection`, `UpdateInspection`, `TransitionInspection`, `RowEffect`, `ArgError`, `ConstraintResult`, `FieldSnapshot`) |
 | `src/Precept/Runtime/SharedTypes.cs` | `ConstraintViolation`, `ConstraintDescriptor`, `FieldAccessInfo`, `FieldAccessMode` |
-| `src/Precept/Runtime/Descriptors.cs` | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` |
+| `src/Precept/Runtime/Descriptors.cs` | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`; also `FaultSiteDescriptor`, which the evaluator does not read and which is on its way out |
 | `src/Precept/Language/FaultCode.cs` | `FaultCode` enum with `[StaticallyPreventable]` attributes |
 | `src/Precept/Language/Faults.cs` | `Faults.Create()` factory and `FaultMeta` catalog |
 | `src/Precept/Language/Fault.cs` | `Fault` record struct |

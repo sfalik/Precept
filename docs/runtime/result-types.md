@@ -48,7 +48,7 @@ The runtime uses three type families to represent operation results:
 2. **UpdateOutcome** (4 variants) — returned by `Version.Update`. One committed result.
 3. **Inspection types** (EventInspection, UpdateInspection) — returned by `Version.InspectFire` and `Version.InspectUpdate`. Progressive annotated landscape.
 
-Faults (evaluator-level errors the type checker should have prevented) are returned as the `EventOutcome.Faulted(Fault)` variant — a structured value inside the outcome hierarchy, never thrown. See `fault-system.md`.
+A `Fault` — a breach of one of the engine's own invariants — is returned as the `EventOutcome.Faulted(Fault)` variant, a structured value inside the outcome hierarchy, never thrown. See `fault-system.md`.
 
 ## Responsibilities and Boundaries
 
@@ -69,7 +69,7 @@ Faults (evaluator-level errors the type checker should have prevented) are retur
 
 The result type families are scoped to exactly the operations the `Version` exposes: two commit operations (`Fire`, `Update`) and two inspection counterparts (`InspectFire`, `InspectUpdate`). Each commit operation returns its own sealed hierarchy so callers pattern-match exactly the variants their operation can produce. Inspection operations return an annotated landscape without committing state.
 
-Faults — errors the type checker should have prevented, such as referencing an unknown field — surface as the single `EventOutcome.Faulted(Fault)` variant rather than as thrown exceptions. Confining them to one backstop variant keeps the rest of the hierarchy business-meaningful while still letting a caller pattern-match the impossible-path case explicitly, with no hidden control flow.
+A breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator — surfaces as the single `EventOutcome.Faulted(Fault)` variant rather than as a thrown exception. Confining it to one variant keeps the rest of the hierarchy business-meaningful while still letting a caller pattern-match the engine-defect case explicitly, with no hidden control flow.
 
 ## Inputs and Outputs
 
@@ -112,7 +112,7 @@ public abstract record EventOutcome
 | `InvalidArgs` | Ingress validation failure — wrong type, unknown key, or an argument value that violates a constraint declared on it | Ingress governance (§3A.4) | Yes |
 | `Unmatched` | All guards failed (including `when` precondition) — no row matched; `EvaluatedRows` carries per-candidate guard trace | Dispatch — no row matched (§3A.4) | Yes |
 | `UndefinedEvent` | No transition rows or hooks for this event in current state | Dispatch — no rows for (state, event) (§3A.4) | Yes |
-| `Faulted` | Evaluator impossible path — a `Fault` that the type checker should have prevented (programmer error, not a business outcome) | Backstop | Yes |
+| `Faulted` | A breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator, not a business outcome | — | Yes |
 
 **`Rejected` vs `InvalidArgs`:** `Rejected` is a business decision authored in the precept (`-> reject "reason"`). `InvalidArgs` is a caller error — the args don't match the event's declared contract. Parallel with `UpdateOutcome.InvalidFields`. DDD's "business rejection vs. invalid input" distinction.
 
@@ -126,7 +126,7 @@ What does fail at runtime is ingress: an argument value that violates a constrai
 
 **`Unmatched` trace:** `EvaluatedRows` uses the same `TransitionInspection` type as `EventInspection.Transitions`, making inspect and commit paths type-consistent. Callers who want to understand why no row matched get the full per-candidate guard trace at no extra cost — guard evaluation was already running during the commit pass.
 
-**`Faulted` semantics:** A `Fault` represents an evaluator-internal impossible path (e.g., referencing an undeclared field, ambiguous dispatch) that the type checker should have caught. `Faulted` surfaces this as a structured outcome variant rather than a raw exception at the runtime boundary. See `fault-system.md` for the `Fault` type definition. MCP `precept_fire` serializes `Faulted` as `{ "outcome": "Faulted", "fault": { ... } }`.
+**`Faulted` semantics:** A `Fault` names a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. `Faulted` surfaces it as a structured outcome variant rather than a raw exception at the runtime boundary. Nothing constructs one today; whether anything ever will is undecided (`fault-system.md` Q3). See `fault-system.md` for the `Fault` type definition. MCP `precept_fire` serializes `Faulted` as `{ "outcome": "Faulted", "fault": { ... } }`.
 
 ---
 
@@ -433,7 +433,7 @@ Guard evaluation under partial args must use Kleene three-value logic. Compariso
 
 - `compiler-and-runtime-design.md` — compiler/runtime architecture overview
 - `executable-model.md` (D8/R4) — arg-dependency sets and evaluator contract
-- `fault-system.md` — `Fault`/`FaultCode`; an evaluator-level fault is returned as the `EventOutcome.Faulted(Fault)` variant
+- `fault-system.md` — `Fault`/`FaultCode`; a breach of one of the engine's own invariants is returned as the `EventOutcome.Faulted(Fault)` variant
 - `runtime-api.md` — full `Version` API spec; § Constraint Exposure Model (three-tier model, Tier 3 = `ConstraintResult.Constraint`)
 
 ---

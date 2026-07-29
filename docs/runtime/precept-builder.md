@@ -31,7 +31,7 @@
   - [Pass 3 — Dispatch Index Pass](#pass-3-dispatch-index-pass)
   - [Pass 4 — Execution Plan Pass](#pass-4-execution-plan-pass)
   - [Pass 5 — Constraint Plan Pass](#pass-5-constraint-plan-pass)
-  - [Pass 6 — Fault Backstop Pass](#pass-6-fault-backstop-pass)
+  - [Pass 6 — Constraint Influence Pass](#pass-6-constraint-influence-pass)
 - [8. Dependencies and Integration Points](#8-dependencies-and-integration-points)
   - [Upstream Dependencies](#upstream-dependencies)
   - [Catalog Dependencies](#catalog-dependencies)
@@ -39,6 +39,7 @@
   - [Integration Contract](#integration-contract)
 - [9. Failure Modes and Recovery](#9-failure-modes-and-recovery)
   - [Error Guard](#error-guard)
+  - [The Certificate Gate](#the-certificate-gate)
   - [Builder Invariant Violations](#builder-invariant-violations)
   - [No Partial Builds](#no-partial-builds)
   - [Recovery Path](#recovery-path)
@@ -112,7 +113,7 @@ The builder executes six sequential transformation passes:
 3. **Dispatch index pass** — build `TransitionDispatchIndex` and `ReachabilityIndex` from topology
 4. **Constraint plan pass** — sort constraints into activation-anchor buckets
 5. **Execution plan pass** — compile typed expressions and actions into flat opcode arrays
-6. **Fault backstop pass** — materialize `Precept.FaultBackstops` from per-opcode `FaultSiteAnnotation` entries; build `ConstraintInfluenceMap`
+6. **Constraint influence pass** — build `ConstraintInfluenceMap` from `ProofLedger.ConstraintInfluenceEntries`
 
 ---
 
@@ -129,7 +130,6 @@ The builder executes six sequential transformation passes:
 | **Reachability index building** | Build `ReachabilityIndex` from `StateGraph` — pre-computed state reachability sets |
 | **Constraint plan organization** | Sort `ConstraintDescriptor` entries into activation-anchor buckets (`always`, `in`, `from`, `to`, `on`) |
 | **Execution plan compilation** | Compile typed expressions and action chains into flat slot-addressed opcode arrays |
-| **Fault backstop planting** | During Pass 4 expression compilation: stamp `FaultSiteAnnotation?` on opcodes from unresolved proof obligations (CC#6). Pass 6 materializes `Precept.FaultBackstops` and builds `ConstraintInfluenceMap`. |
 | **Constraint influence map construction** | Reshape `ProofLedger.ConstraintInfluenceEntries` into query-efficient `ConstraintInfluenceMap` |
 
 ### Out of Scope
@@ -151,7 +151,7 @@ The Precept Builder is scoped precisely as the transformation boundary — it is
 
 | Metric | Value | Rationale |
 |---|---|---|
-| Estimated LOC | 600–900 | ~200 descriptor construction + ~100 slot layout + ~150 dispatch index + ~150 constraint plan + ~150 execution plan compiler + ~50 fault backstop |
+| Estimated LOC | 600–900 | ~200 descriptor construction + ~100 slot layout + ~150 dispatch index + ~150 constraint plan + ~150 execution plan compiler |
 | External dependencies | 0 | Pure transformation — no I/O, no external services, no runtime calls |
 | Catalog dependency | ~30% | Reads `Constraints.GetMeta(kind)` for anchor classification, `Actions.GetMeta(kind)` for action plan shapes |
 | Determinism | 100% | Same `Compilation` always produces the same `Precept` |
@@ -195,7 +195,7 @@ The builder reads all three analysis artifacts:
 |---|---|
 | `SemanticIndex` | Typed declarations: `TypedField`, `TypedState`, `TypedEvent`, `TypedArg`, `TypedTransitionRow`, `TypedRule`, `TypedEnsure`, `TypedAction`, `TypedExpression` |
 | `StateGraph` | Topology: `GraphState`, `GraphEdge`, `ReachableStates`, `EventCoverage` |
-| `ProofLedger` | Proof results: `FaultSiteLinks`, `ConstraintInfluenceEntries` |
+| `ProofLedger` | Proof results: `ConstraintInfluenceEntries` |
 
 ### Output
 
@@ -221,7 +221,6 @@ public sealed class Precept
     internal ReachabilityIndex ReachabilityIndex { get; }
     internal ConstraintPlanIndex ConstraintPlanIndex { get; }
     internal ConstraintInfluenceMap ConstraintInfluenceMap { get; }
-    internal ImmutableArray<FaultSiteDescriptor> FaultBackstops { get; }
 }
 ```
 
@@ -280,9 +279,7 @@ The builder executes six sequential passes, each producing artifacts consumed by
                                    │
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Pass 6: Fault Backstop Pass                                         │
-│  • Materialize Precept.FaultBackstops from per-opcode annotations     │
-│  • Plant FaultSiteDescriptor tooling array from FaultSiteAnnotation   │
+│  Pass 6: Constraint Influence Pass                                   │
 │  • Build ConstraintInfluenceMap from ConstraintInfluenceEntries      │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
@@ -301,7 +298,7 @@ The builder executes six sequential passes, each producing artifacts consumed by
 | Pass 3 (Dispatch Index) | Pass 1, `StateGraph` | `TransitionDispatchIndex`, `ReachabilityIndex` |
 | Pass 4 (Execution Plan) | Pass 1 (slot indexes) | `ExecutionPlan`, `ActionPlan`, `ExecutionRow` |
 | Pass 5 (Constraint Plan) | Pass 4 (compiled expressions) | `ConstraintPlanIndex` |
-| Pass 6 (Fault Backstop) | Pass 4 (opcode annotations), `ProofLedger` | `FaultSiteDescriptor[]` (tooling), `ConstraintInfluenceMap` |
+| Pass 6 (Constraint Influence) | `ProofLedger` | `ConstraintInfluenceMap` |
 
 **Valid execution order:** 1 → 2 (parallel with 3) → 4 → 5 → 6 → assemble `Precept`
 
@@ -423,34 +420,7 @@ public sealed record ReachabilityIndex(
 
 Compile typed action chains and typed guard/constraint expressions from the `SemanticIndex` into flat opcode arrays.
 
-**Fault backstop planting (CC#6):** During expression compilation, the builder stamps `FaultSiteAnnotation` on opcodes compiled from expressions with unresolved proof obligations. For each `TypedExpression` being compiled, the builder checks whether `ProofLedger.FaultSiteLinks` contains a link whose `Obligation.Site` matches the expression. If found, the resulting opcode carries a non-null `FaultSite`; if not found, `FaultSite` is null (proven safe — structural absence). This is the canonical planting contract; see `proof-engine.md §2` for the output shape and `evaluator.md §7.3` for the consumption contract.
-
-```csharp
-/// Annotation on an opcode for a defense-in-depth fault backstop.
-/// Present ONLY for Unresolved proof obligations. Null = proven safe.
-public sealed record FaultSiteAnnotation(
-    FaultCode Code,           // Runtime fault to fire if reached
-    DiagnosticCode PreventedBy, // Authoring-time diagnostic that would prevent this
-    SourceSpan Site           // Source location for diagnostics/logging
-);
-```
-
-**Planting pseudocode:**
-
-```csharp
-Opcode CompileExpression(TypedExpression expr, ProofLedger ledger)
-{
-    var opcode = EmitOpcode(expr);
-
-    // Match by TypedExpression identity — the proof obligation's Site
-    var link = ledger.FaultSiteLinks
-        .FirstOrDefault(l => l.Obligation.Site == expr);
-
-    return link is not null
-        ? opcode with { FaultSite = new FaultSiteAnnotation(link.FaultCode, link.DiagnosticCode, link.Site) }
-        : opcode;  // FaultSite = null — proven safe
-}
-```
+**Nothing is stamped on an opcode for a fault.** An obligation the proof engine could not discharge rejects the definition, so no `Compilation` reaching the builder carries an unproven site, and there is nothing for the builder to annotate. The compiled opcode array carries only what the evaluator computes with (`precept-language-spec.md` §0.7).
 
 **Opcode Inventory:**
 
@@ -483,11 +453,7 @@ public sealed record ExecutionPlan(
     int MaxStackDepth           // computed at build time; compiler enforces ≤ 32
 );
 
-public abstract record Opcode
-{
-    /// Nullable fault-site annotation (CC#6). Null = proven safe; non-null = unresolved obligation backstop.
-    public FaultSiteAnnotation? FaultSite { get; init; }
-}
+public abstract record Opcode { }
 public sealed record LoadSlot(int SlotIndex) : Opcode;
 public sealed record LoadArg(int ArgSlotIndex) : Opcode;  // pre-resolved at build time; name resolution complete before execution
 public sealed record LoadLit(PreceptValue Value) : Opcode;  // literals pre-wrapped at build time
@@ -588,27 +554,9 @@ public abstract record ConstraintMeta(...)
 
 The builder's 5-way bucket switch routes to all five concrete leaf types. The `StateAnchored` abstract intermediate node is available for "is this state-scoped?" grouping checks in the type checker and proof engine (`meta is ConstraintMeta.StateAnchored`) without requiring a separate flag. The catalog is the source of truth; the builder never hardcodes the DU shape.
 
-### Pass 6 — Fault Backstop Pass
+### Pass 6 — Constraint Influence Pass
 
-**Note (CC#6):** Expression-site fault backstops are now planted during Pass 4 as `FaultSiteAnnotation?` on each opcode (see above). Pass 6 retains ownership of the `ConstraintInfluenceMap` construction and any residual fault-site bookkeeping.
-
-The `Precept.FaultBackstops` flat array is a **derived/tooling artifact** — it materializes all non-null `FaultSiteAnnotation` entries across all execution plans for diagnostic enumeration ("what backstops does this precept carry?"). It is NOT the execution-path contract; the evaluator reads `op.FaultSite` inline during dispatch.
-
-```csharp
-public sealed record FaultSiteDescriptor(
-    FaultCode Code,
-    DiagnosticCode PreventedBy,         // from [StaticallyPreventable] attribute
-    SourceSpan Site
-);
-```
-
-**`FaultSiteDescriptor` and `FaultSiteAnnotation` relationship:** `FaultSiteDescriptor` is the materialized tooling/query shape derived from the per-opcode `FaultSiteAnnotation` annotations. Both carry the same three fields. `FaultSiteDescriptor` exists on `Precept.FaultBackstops` for inspection; `FaultSiteAnnotation` lives on opcodes for execution routing.
-
-Fault backstops are defense-in-depth. A correctly-proven program never reaches them at runtime. When reached, they fire the `FaultCode`'s runtime behavior (log + graceful failure) via `Faults.Create(descriptor, context)`.
-
-**ConstraintInfluenceMap:**
-
-Also during this pass, build the `ConstraintInfluenceMap` from `ProofLedger.ConstraintInfluence`. This is a direct reshaping of `ConstraintInfluenceEntry` records into a query-friendly map:
+Build the `ConstraintInfluenceMap` from `ProofLedger.ConstraintInfluence`. This is a direct reshaping of `ConstraintInfluenceEntry` records into a query-friendly map:
 
 ```csharp
 public sealed record ConstraintInfluenceMap(
@@ -631,7 +579,7 @@ This enables causal reasoning: "which fields affect which constraints?" — a fi
 |---|---|---|
 | **Type Checker** | `SemanticIndex` | `TypedField`, `TypedState`, `TypedEvent`, `TypedArg`, `TypedTransitionRow`, `TypedRule`, `TypedEnsure`, `TypedAction`, `TypedExpression` subtypes |
 | **Graph Analyzer** | `StateGraph` | `GraphState`, `GraphEdge`, `ReachableStates`, `EventCoverage` |
-| **Proof Engine** | `ProofLedger` | `FaultSiteLinks`, `ConstraintInfluenceEntries` |
+| **Proof Engine** | `ProofLedger` | `ConstraintInfluenceEntries` |
 
 ### Catalog Dependencies
 
@@ -650,7 +598,7 @@ The builder reads catalog metadata for classification and dispatch:
 
 | Consumer | What it reads from `Precept` |
 |---|---|
-| **Evaluator** | `SlotLayout`, `TransitionDispatchIndex`, `ConstraintPlanIndex`, `ExecutionRow`, `ExecutionPlan`, `FaultBackstops` |
+| **Evaluator** | `SlotLayout`, `TransitionDispatchIndex`, `ConstraintPlanIndex`, `ExecutionRow`, `ExecutionPlan` |
 | **Language Server** | `Fields`, `States`, `Events`, `Constraints`, `ReachabilityIndex` — for preview and inspection |
 | **MCP Tools** | `Fields`, `States`, `Events`, `Constraints` — for `precept_compile` output; `Precept` instance for `precept_fire`, `precept_inspect`, `precept_update` |
 | **Version (entity instance)** | `SlotLayout.FieldCount` — allocates slot array; `FieldDescriptor.SlotIndex` — accesses fields |
@@ -685,6 +633,16 @@ if (compilation.HasErrors)
 
 **Rationale:** An executable model from a broken program would be unsafe to execute. The builder does not attempt partial builds or error recovery. The correct fix is to resolve the compilation errors and retry.
 
+### The Certificate Gate
+
+The `HasErrors` guard is not the only condition `Precept.From` has to satisfy. `runtime-api.md` § Definition Load and the Certificate Gate says the method also runs the certificate checker over the proof record the compiler emits alongside the definition, and refuses to return a usable `Precept` when that record does not verify. That is the check standing behind the runtime's trust in the compiler, and it catches the case the `HasErrors` guard cannot: a definition that was tampered with after compilation, or that is stale with respect to the checker, and therefore carries no diagnostics to guard on.
+
+> **Not yet built, and its failure shape is unsettled.** No certificate is emitted and no checker exists, so `Precept.From` performs no such gate today — `runtime-api.md` states this in the same words. Whether a verification failure throws or returns a structured result, whether it names the derivation step that failed to replay, and whether verification is cached across loads are all undecided. What is settled is that the failure must explain itself; an unexplained refusal is not an admissible shape.
+>
+> **Where the certificate arrives from is part of what is unsettled.** The `Compilation` record above carries five things and a certificate is not one of them; `runtime-api.md` describes the proof record as emitted *alongside* the definition rather than inside the compiler's analysis output. So the input contract's certificate condition is a condition on something `Precept.From` does not receive today, and whether it becomes a sixth member of `Compilation`, a separate argument, or a file the method is pointed at is decided with the rest of the shape.
+
+Until that is decided, the rest of this section describes only the `HasErrors` guard and the builder's own invariants.
+
 ### Builder Invariant Violations
 
 If the builder detects internal invariant violations (e.g., a `TypedTransitionRow` references a state that doesn't exist in `SemanticIndex.States`), it throws `InvalidOperationException` with diagnostic context. These indicate bugs in upstream stages — the builder assumes the `Compilation` is internally consistent.
@@ -699,12 +657,14 @@ There is no partial `Precept`. The builder either produces a complete, valid exe
 
 ### Recovery Path
 
-If `Precept.From` throws:
+If `Precept.From` refuses because the `Compilation` carries errors:
 
 1. Examine the `Compilation.Diagnostics` for errors
 2. Fix the source causing the errors
 3. Recompile to produce a new `Compilation`
 4. Retry `Precept.From`
+
+That path does not fit a definition the certificate gate refuses, because such a definition carries no diagnostics to examine — the recovery is to recompile the definition from its source with the current compiler, not to fix errors that are not there. The precise recovery advice waits on the gate's failure shape being decided.
 
 ---
 
@@ -715,6 +675,7 @@ If `Precept.From` throws:
 - `Precept.From(compilation)` requires `!compilation.HasErrors`
 - The `Compilation` must be internally consistent (no dangling references, no duplicate names)
 - The `SemanticIndex`, `StateGraph`, and `ProofLedger` must all be present and non-null
+- The definition's proof certificate must verify — see § The Certificate Gate. A definition can satisfy all three conditions above and still be one the compiler never proved; the certificate is what distinguishes them. The condition is stated here because it belongs to the input contract; the mechanism is not built and its failure shape is not settled.
 
 ### Output Contract
 
@@ -725,7 +686,6 @@ If `Precept.From` throws:
 - Every `EventDescriptor` has a unique `Name` within the precept
 - Every `TransitionDispatchIndex` entry corresponds to a `TypedTransitionRow` in `SemanticIndex`
 - Every `ConstraintDescriptor` in `ConstraintPlanIndex` corresponds to a `TypedRule` or `TypedEnsure` in `SemanticIndex`
-- Every `FaultSiteAnnotation` (on opcodes) and `FaultSiteDescriptor` (on `Precept.FaultBackstops`) has a `FaultCode` with a `[StaticallyPreventable(DiagnosticCode)]` attribute
 
 ### Slot Index Invariants
 
@@ -888,6 +848,8 @@ This enables causal reasoning about constraint satisfaction without re-analyzing
 - Every `Precept` has complete, consistent internal state
 - No defensive programming required in consumers — a `Precept` is always valid
 
+The last of those rests on both conditions the factory imposes, not on the `HasErrors` guard alone: the guard rules out a definition the compiler rejected, and the certificate gate rules out a definition the compiler never proved. Only the guard is built today (§ The Certificate Gate).
+
 ---
 
 ## 13. Implementation Notes
@@ -896,7 +858,7 @@ This enables causal reasoning about constraint satisfaction without re-analyzing
 
 1. **`Precept.From` stub:** Currently throws `NotImplementedException` after the `HasErrors` guard — transformation logic not implemented.
 
-2. **Descriptor types:** `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` shapes are defined in `docs/runtime/descriptor-types.md` but not yet implemented as C# types.
+2. **Descriptor types:** `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor` shapes are defined in `docs/runtime/descriptor-types.md` but not yet implemented as C# types.
 
 3. **Opcode types:** The `Opcode` DU and its subtypes are designed in this document but not yet implemented.
 
@@ -964,7 +926,7 @@ These were validated by the type checker. The builder trusts the `SemanticIndex`
 | Precept executable model design | `docs/compiler-and-runtime-design.md §10` |
 | SemanticIndex input shape | `docs/compiler/type-checker.md` |
 | StateGraph input shape | `docs/compiler/graph-analyzer.md` |
-| ProofLedger input (FaultSiteLinks, ConstraintInfluenceEntries) | `docs/compiler/proof-engine.md` |
+| ProofLedger input (ConstraintInfluenceEntries) | `docs/compiler/proof-engine.md` |
 | Evaluator that consumes the executable model | `docs/runtime/evaluator.md` |
 | Descriptor type shapes | `docs/runtime/descriptor-types.md` |
 | Catalog system architecture | `docs/language/catalog-system.md` |
@@ -978,7 +940,7 @@ These were validated by the type checker. The builder trusts the `SemanticIndex`
 |---|---|
 | `src/Precept/Runtime/Precept.cs` | `Precept.From` factory + structural query surfaces (`Fields`, `States`, `Events`, `Constraints`) |
 | `src/Precept/Runtime/PreceptBuilder.cs` | Builder implementation — six-pass transformation pipeline (planned) |
-| `src/Precept/Runtime/Descriptors.cs` | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` (planned) |
+| `src/Precept/Runtime/Descriptors.cs` | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor` (planned). The file also declares `FaultSiteDescriptor`, which no builder pass produces and which is on its way out |
 | `src/Precept/Runtime/SlotLayout.cs` | `SlotLayout` register file specification (planned) |
 | `src/Precept/Runtime/DispatchIndex.cs` | `TransitionDispatchIndex`, `ReachabilityIndex` (planned) |
 | `src/Precept/Runtime/ConstraintPlanIndex.cs` | `ConstraintPlanIndex` with five anchor-family buckets (planned) |
@@ -986,5 +948,5 @@ These were validated by the type checker. The builder trusts the `SemanticIndex`
 | `src/Precept/Runtime/ExecutionPlan.cs` | `ExecutionPlan`, `Opcode` DU, `ExecutionRow`, `ActionPlan` (planned) |
 | `src/Precept/Pipeline/SemanticIndex.cs` | `TypedField`, `TypedState`, `TypedEvent`, etc. — builder input |
 | `src/Precept/Pipeline/StateGraph.cs` | `GraphState`, `GraphEdge`, etc. — builder input |
-| `src/Precept/Pipeline/ProofLedger.cs` | `FaultSiteLink`, `ConstraintInfluenceEntry` — builder input |
+| `src/Precept/Pipeline/ProofLedger.cs` | `ConstraintInfluenceEntry` — builder input. The file also declares `FaultSiteLink` and `FaultSiteAnnotation`, and the `ProofLedger` record still carries a `FaultSiteLinks` field; no builder pass reads any of the three, and their removal has not been made |
 

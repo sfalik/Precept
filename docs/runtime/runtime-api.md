@@ -80,7 +80,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 **OWNS:** Public API surface (`Precept` and `Version`); executable model lifecycle (construction from `Compilation`, validation); entity construction (`Create`, `InspectCreate`); entity restoration (`Restore`); operation dispatch (`Fire`, `Update`); inspection surface (`InspectFire`, `InspectUpdate`); definition-level structural queries (`States`, `Fields`, `Events`, `Constraints`); constraint exposure model (all three tiers); field access surface (`FieldAccess`, `AvailableEvents`, `RequiredArgs`, `ApplicableConstraints`).
 
-**Does NOT OWN:** Compilation (owned by the compiler pipeline); evaluation logic (owned by the `Evaluator`); executable model internals / dispatch table layouts (pending D8/R4); result type definitions (`EventOutcome.cs`, `UpdateOutcome.cs`); descriptor type definitions (`Descriptors.cs`); fault system (`Fault` and fault site taxonomy).
+**Does NOT OWN:** Compilation (owned by the compiler pipeline); evaluation logic (owned by the `Evaluator`); executable model internals / dispatch table layouts (pending D8/R4); result type definitions (`EventOutcome.cs`, `UpdateOutcome.cs`); descriptor type definitions (`Descriptors.cs`); fault system (`Fault` and the fault classes).
 
 ---
 
@@ -168,7 +168,7 @@ If the precept declares an `initial` event, `Create` fires it atomically: valida
 | `Created` | Construction succeeded. Entity now exists in the initial state (stateful) or with `State = null` (stateless). | A mutation row matched and its action chain ran to completion. |
 | `Rejected` | Intake refused. Entity was NOT created. | An authored `reject` row matched, OR all `when` guards failed with no unconditional fallback (synthesized reason: `"No construction row matched arguments"`). |
 | `InvalidArgs` | Ingress validation failed, before row matching — collect-all, so every failing argument is reported. | Wrong type, unknown key, missing required argument, or an argument value that violates a constraint declared on it. |
-| `Faulted` | Evaluator impossible path / runtime fault. | The evaluator encountered an impossible condition that the compiler should have prevented. |
+| `Faulted` | A breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. | Nothing constructs one today; whether anything ever will is undecided (`fault-system.md` Q3). |
 
 **Structurally impossible outcomes from `Create()`:**
 - `Transitioned` — the grammar excludes `transition` from construction rows. Construction always terminates in the initial state.
@@ -274,7 +274,7 @@ Version version = outcome switch
 };
 ```
 
-`Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately and recomputes computed fields. It does **not** re-validate constraints: restored state is trusted as valid at the time it was persisted — like a direct database read — and re-checking would block data written under an earlier definition (spec §0.7; evaluator.md Decision 5). Migration on schema change is the caller's responsibility. Nothing re-governs a stale value later either: there is no pass over the finished working copy that a subsequent operation could catch it in (spec §0.7, §3A.4). What restore trusts is the data; what the runtime verifies for itself is the *definition* — see § Definition Load and the Certificate Gate.
+`Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately and recomputes computed fields. It does **not** re-validate constraints: restored state is trusted as valid at the time it was persisted — like a direct database read — and re-checking would block data written under an earlier definition (spec §0.7; evaluator.md Decision 5). Handling data written under an older definition is the post-MVP job of the restore path itself, through migration. Nothing re-governs a stale value later either: there is no pass over the finished working copy that a subsequent operation could catch it in (spec §0.7, §3A.4). What restore trusts is the data; what the runtime verifies for itself is the *definition* — see § Definition Load and the Certificate Gate.
 
 > ⚠️ **Design note:** The implementation uses `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — and returns a structured `RestoreOutcome` rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
 >
@@ -667,15 +667,13 @@ Because execution has no constraint-evaluation phase, inspection has none to pre
 
 **Survey grounding:** XState's `transition()` / `getNextSnapshot()` pair — same code path, different output. CEL's `ExhaustiveEval` — same `Interpretable` tree, different evaluation mode. K8s dry-run — same controller logic, different commit behavior.
 
-### Three-Layer Enforcement Model
+### Two-Layer Enforcement Model
 
-Precept enforces field constraints across three layers:
+Precept enforces field constraints across two layers:
 
 1. **Compile-time diagnostics** — 132 diagnostic codes catch invalid configurations statically. The proof engine resolves interval-containment obligations and emits `NumericOverflow` for values that demonstrably exceed declared bounds. Unit-aware normalization (UCUM scale factors) prevents false positives on cross-unit assignments.
 
 2. **Ingress governance** — `TypeRuntimeMeta` / `TypeRuntime` enforce a field's *declared* constraints (qualifiers, bounds) on every externally-sourced value at runtime ingress (event firing, field assignment). This is governance, not deferral: it upholds the declared contract on values that enter at runtime — values the compiler never saw — and is *not* a fallback for fault-safety the compiler couldn't prove. Fault-safety is always proven or rejected at compile time (spec §0.7).
-
-3. **Defense-in-depth evaluator faults** — 15 `[StaticallyPreventable]` fault codes exist at evaluation time as a backstop. For data that entered through the contract they are unreachable; they are reachable only for out-of-contract data (state restored under a different definition, host injection bypassing the engine). A fault firing for contract data indicates a proof-engine gap — a defect to fix, not the enforcement path (spec §0.7).
 
 ### Thread Safety
 
@@ -903,11 +901,11 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 ## Deliberate Exclusions
 
 - **No `IReadOnlyDictionary<string, object?>` overloads.** Fully obsolete. The two-lane ingress (JSON + typed) covers all callers. No dictionary-based convenience extensions exist or will be added.
-- **No fault type definitions.** `Fault` and fault site taxonomy are in `fault-system.md`. The runtime API surface produces structured outcomes only; an evaluator fault surfaces as the `EventOutcome.Faulted(Fault)` variant — a backstop for impossible-path bugs — never thrown.
+- **No fault type definitions.** `Fault` and the fault classes are in `fault-system.md`. The runtime API surface produces structured outcomes only; a breach of one of the engine's own invariants would surface as the `EventOutcome.Faulted(Fault)` variant, never thrown.
 - **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.
 - **No build-time analysis.** Graph analysis, type checking, and compilation are owned by the compiler pipeline. `Precept.From()` accepts only an error-free `Compilation` — it does not re-analyze.
-- **No migration logic.** If the definition changed since data was stored, migration is the caller's responsibility. Restore does **not** re-validate — restored state is trusted as valid at persistence time (spec §0.7), so schema drift is not detected on load. It is not detected later either: no subsequent operation re-governs a value that did not enter through the contract (spec §0.7). A host that restores data written under an older definition has stepped outside the guarantee, and nothing inside the engine will notice.
+- **No migration logic.** If the definition changed since data was stored, nothing in the current restore path transforms it; handling that is the post-MVP job of the restore path itself. Restore does **not** re-validate — restored state is trusted as valid at persistence time (spec §0.7), so schema drift is not detected on load. It is not detected later either: no subsequent operation re-governs a value that did not enter through the contract (spec §0.7). A host that restores data written under an older definition has stepped outside the guarantee, and nothing inside the engine will notice.
 
 ---
 

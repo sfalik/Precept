@@ -11,7 +11,7 @@ Design documents for the Precept runtime — the boundary between compiled prece
 |----------|---------|--------|
 | [runtime-api.md](runtime-api.md) | Public runtime API surface — `Precept.From()`, entity representation, event firing, field updates, inspect/preview | Design |
 | [result-types.md](result-types.md) | Result type taxonomy — three type families for representing operation outcomes (success, violation, fault) | Design |
-| [fault-system.md](fault-system.md) | Runtime fault codes and classification — the runtime mirror of the compiler's diagnostic system | Draft |
+| [fault-system.md](fault-system.md) | Fault codes and classification — each names a class of failure and the compiler diagnostic that prevents it, paired at build time | Draft |
 | [precept-builder.md](precept-builder.md) | Precept Builder — compile-to-runtime transformation; descriptor tables, dispatch indexes, execution plans | Stub |
 | [evaluator.md](evaluator.md) | Evaluator — plan executor for all four runtime operations (Create, Fire, Update, Restore) | Stub |
 | [descriptor-types.md](descriptor-types.md) | Descriptor types — first-class runtime identity for all declared program elements | Stub |
@@ -34,7 +34,7 @@ Design documents for the Precept runtime — the boundary between compiled prece
 
 ## Cross-cutting concerns
 
-- **Fault system mirrors diagnostic system.** Runtime faults are the runtime-side mirror of compile-time diagnostics — same code namespace conventions, same severity model. See [`fault-system.md`](fault-system.md) and [`../compiler/diagnostic-system.md`](../compiler/diagnostic-system.md).
+- **Fault system mirrors diagnostic system.** The fault classes are shaped as a mirror of the compile-time diagnostics — same code namespace conventions, same severity model — and each names the diagnostic that prevents it. The mirroring is a build-time pairing, not a pair of things happening at compile time and at run time. See [`fault-system.md`](fault-system.md) and [`../compiler/diagnostic-system.md`](../compiler/diagnostic-system.md).
 - **Inspectability.** Every runtime behavior must be inspectable at compile time — which actions would fire on a hypothetical event, what proof obligations the proof engine discharged, what diagnostics each transition surfaces. The runtime never produces opaque outcomes. See [philosophy.md § Inspectability](../philosophy.md).
 - **Public-surface stability vs. implementation maturity.** `runtime-api.md` is "Design — public surface locked"; consumer code can be written against the designed surface, but operation bodies are stubs until v1. This is intentional — the designed surface is the contract; the implementation comes second.
 

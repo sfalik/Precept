@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Stub |
-| Implementation state | Implemented — `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` defined in `Descriptors.cs`; `ConstraintDescriptor` in `SharedTypes.cs`. Builder population pending (R3/R6). |
+| Implementation state | Implemented — `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor` defined in `Descriptors.cs`; `ConstraintDescriptor` in `SharedTypes.cs`. Builder population pending (R3/R6). `Descriptors.cs` also declares a fifth record, `FaultSiteDescriptor`, which this document no longer describes — see § Source Files. |
 | Source | `src/Precept/Runtime/Descriptors.cs`, `src/Precept/Runtime/SharedTypes.cs` |
 | Upstream | Precept Builder (constructs descriptors), SemanticIndex (source shapes) |
 | Downstream | All runtime operations, Precept structural query API, Version API, MCP DTOs |
@@ -35,7 +35,7 @@
 
 ## Overview
 
-Descriptor types are the runtime face of declarations. They represent declared program elements (fields, states, events, args, constraints, fault sites) as first-class sealed types — not string aliases. Every runtime API surface routes through descriptor identity. Descriptors are produced by the Precept Builder from `SemanticIndex` declarations and survive in the `Precept` executable model.
+Descriptor types are the runtime face of declarations. They represent declared program elements (fields, states, events, args, constraints) as first-class sealed types — not string aliases. Every runtime API surface routes through descriptor identity. Descriptors are produced by the Precept Builder from `SemanticIndex` declarations and survive in the `Precept` executable model.
 
 ---
 
@@ -102,12 +102,6 @@ sealed record ArgDescriptor(
     bool IsOptional,
     string? DefaultExpression,
     int SourceLine);
-
-// FaultSiteDescriptor — planted by builder, read by evaluator backstops
-sealed record FaultSiteDescriptor(
-    FaultCode FaultCode,
-    DiagnosticCode PreventedBy,  // derived from [StaticallyPreventable] at Precept Builder time
-    int SourceLine);
 ```
 
 `ConstraintDescriptor` exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy will replace it when the constraint evaluation attribution model is implemented.
@@ -137,7 +131,7 @@ MCP DTOs in `tools/Precept.Mcp/Tools/` currently use string representations. The
 
 - **Precept Builder** (upstream): constructs descriptors from `SemanticIndex` typed declarations
 - **SemanticIndex** (upstream via Builder): `TypedField`, `TypedState`, `TypedEvent`, `TypedArg` → descriptor shapes
-- **Evaluator** (downstream): reads `FieldDescriptor.SlotIndex` for slot array access; reads `StateDescriptor.Modifiers` for dispatch; uses `FaultSiteDescriptor` for backstop routing
+- **Evaluator** (downstream): reads `FieldDescriptor.SlotIndex` for slot array access; reads `StateDescriptor.Modifiers` for dispatch
 - **Precept structural query API** (downstream): `Precept.Fields`, `Precept.States`, `Precept.Events` return descriptor lists
 - **Version API** (downstream): `Version.AvailableEvents` returns `EventDescriptor` list; `RequiredArgs` returns `ArgDescriptor` list
 - **MCP DTOs** (downstream): serialized descriptor content exposed via MCP tools
@@ -154,7 +148,6 @@ Descriptor types are pure data — no failure modes. Descriptor construction fai
 
 - Every descriptor is a sealed immutable record — no mutation after construction.
 - Every `FieldDescriptor` has a unique `SlotIndex` within `[0, FieldCount)`.
-- Every `FaultSiteDescriptor.PreventedBy` corresponds to the `DiagnosticCode` in the `[StaticallyPreventable]` attribute of `FaultSiteDescriptor.FaultCode`.
 - `ConstraintDescriptor` exists and is stable — do not change its shape without updating all consumers.
 
 ---
@@ -169,7 +162,6 @@ Descriptors are the "no string aliasing" principle applied at the runtime API bo
 
 - **First-class runtime identity:** Declarations become typed, named values rather than string tokens. This is the fundamental shift from "dynamic dispatch on strings" to "statically typed entity lifecycle management."
 - **Descriptor-keyed API surfaces:** Every runtime API route goes through descriptor identity. This makes the API refactoring-safe and IDE-navigable.
-- **`FaultSiteDescriptor` as the proof/runtime link:** The connection between compile-time proof obligations and runtime backstops is reified as a first-class type, not a comment or convention.
 
 ---
 
@@ -200,7 +192,7 @@ Descriptors are the "no string aliasing" principle applied at the runtime API bo
 
 | File | Purpose |
 |---|---|
-| `src/Precept/Runtime/Descriptors.cs` | Implemented — all 5 descriptor sealed records |
+| `src/Precept/Runtime/Descriptors.cs` | Implemented — the 4 descriptor sealed records this document describes, plus a fifth, `FaultSiteDescriptor`, which it does not. That record is the runtime residue of an obligation the compiler could not discharge, and there is no such residue: an obligation that cannot be discharged refuses the definition, so nothing is left to plant. It is still declared in code and its removal has not been made. |
 | `src/Precept/Runtime/SharedTypes.cs` | Contains existing `ConstraintDescriptor` |
 | `src/Precept/Runtime/Precept.cs` | Structural query surfaces to update to descriptor types |
 | `src/Precept/Runtime/Version.cs` | API surfaces to update to descriptor types |

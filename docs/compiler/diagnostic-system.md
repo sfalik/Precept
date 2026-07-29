@@ -32,7 +32,6 @@
   - [The chain](#the-chain)
   - [FaultCode enum](#faultcode-enum)
   - [Faults — exhaustive switch](#faults--exhaustive-switch)
-  - [Evaluator usage](#evaluator-usage)
   - [Enforcement: what catches what](#enforcement-what-catches-what)
   - [The full enforcement chain — no reflection](#the-full-enforcement-chain--no-reflection)
   - [Why PRECEPT0003 and PRECEPT0004 are both needed](#why-precept0003-and-precept0004-are-both-needed)
@@ -70,7 +69,7 @@ The Precept compiler pipeline produces diagnostics at six stages: lexing, parsin
 - The `DiagnosticMeta` record — stage, severity, message template, category, fix hint, related codes, fault prevention link
 - The `Severity` and `DiagnosticStage` enums
 - The `DiagnosticCategory` enum — thematic grouping orthogonal to stage
-- The `FaultCode` enum and `[StaticallyPreventable]` attribute — the runtime-to-compiler linkage
+- The `FaultCode` enum and `[StaticallyPreventable]` attribute — the pairing of each fault class with the diagnostic that prevents it, checked when the project is built
 - The `Faults` static class — exhaustive switch mapping every `FaultCode` to `FaultMeta`
 - The `Diagnostics.All` enumeration surface — consumed by MCP and LS without compilation
 
@@ -93,14 +92,14 @@ Roslyn's diagnostic system was surveyed as the primary reference. It introduces 
 
 **Inputs:**
 - Pipeline stage call sites — each stage calls `Diagnostics.Create(DiagnosticCode, SourceSpan, args...)` to produce located diagnostics
-- `FaultCode` — evaluator failure paths call `Fail(FaultCode)`, linked via `[StaticallyPreventable]` to the corresponding `DiagnosticCode` member
+- `FaultCode` — each member names a class of failure and, via `[StaticallyPreventable]`, the `DiagnosticCode` member responsible for preventing it
 - `DiagnosticCode` enum members — the closed registry that feeds the exhaustive switch
 
 **Outputs:**
 - `Diagnostic` value structs collected in `Compilation.Diagnostics` — consumed by the Language Server, MCP `precept_compile`, and downstream callers
 - `DiagnosticMeta` records enumerated by `Diagnostics.All` — consumed by MCP `precept_diagnostic` (per-code detail) and `precept_proofs` (proof/fault catalog) to surface rules without compiling
 - `string Code` derived from `nameof(DiagnosticCode.XYZ)` — used as the LSP `code` field and MCP rule identifier
-- `Fault` output records (from the evaluator) — consumed by MCP `precept_fire` and the preview inspector when a runtime fault occurs
+- `Fault` output records — consumed by MCP `precept_fire` and the preview inspector. Nothing constructs one today (`fault-system.md` Q3)
 
 ---
 
@@ -538,7 +537,7 @@ Every diagnostic is produced by `Diagnostics.Create(code, span, args…)`. The `
 2. **Catalog-mediated** — the code is read from a single `DiagnosticCode` field on a catalog-meta record, and the emission site reads `meta.<Field>`. This keeps the code-per-member association in catalog metadata rather than a parallel `*Kind → code` switch. The fields are:
    - `BinaryOperationMeta.CIDiagnosticCode` / `FunctionMeta.CIDiagnosticCode` — the case-insensitive variant code for a `~string` operator/function (presence of the code is what marks the operation as having a CI variant).
    - `ContentValidation.FormatErrorCode` / `SemanticErrorCode` — the typed-constant family's format vs. semantic code. A validator carries a typed `DiagnosticCode?` only when it owns a domain-specific code (e.g. a quantity dimension/qualifier mismatch); otherwise it carries `null` and the family's format/semantic field decides by error kind. There is no string round-trip — the code is typed end to end.
-   - `ProofRequirementMeta.DiagnosticCode` — the subtype-fixed proof obligation code. `CreateDiagnostic` reads this for the subtype-fixed kinds (the same field `CreateFaultSiteLink` reads), so the code lives in exactly one place.
+   - `ProofRequirementMeta.DiagnosticCode` — the subtype-fixed proof obligation code. `CreateDiagnostic` reads this for the subtype-fixed kinds, and it is the only reader, so the code lives in exactly one place.
 3. **Context-determined residue** — the code is a function of runtime context the stamped metadata cannot capture, with a bounded, statically-enumerable candidate set:
    - **Lexer mode-switch** — the unterminated-construct code is chosen from the open `LexerMode` at EOF drain (candidate set: the `Unterminated*` codes).
    - **Proof Numeric-by-site** — the same numeric obligation surfaces as `DivisionByZero` / `SqrtOfNegative` / `UnguardedCollectionAccess` / `UnguardedCollectionMutation` / `IndexBoundsGuard` by the discharge site's shape.
@@ -549,23 +548,25 @@ The scanner in `src/Precept.Analyzers/DiagnosticCoverageScanner.cs` detects the 
 
 ### The `[StaticallyPreventable]`-derived fault map
 
-The `DiagnosticCode → FaultCode` link a runtime fault site records is the inverse of the `[StaticallyPreventable(code)]` declarations on `FaultCode` (see the chain below). The bijective core of that map is **derived by reflecting the attribute** (`StaticallyPreventableMap`), not re-listed in pipeline code — the attribute is the single source of truth. The proof engine keeps two pieces of policy as explicit code because the attribute cannot express them: the collection-safety many-to-one collapse (`KeyPresenceSafety` / `KeyUniquenessGuard` / `IndexBoundsGuard` onto the shared empty-collection faults) and the conservative backstop for proof-only obligation families that have no representable runtime fault of their own.
+The `DiagnosticCode` ↔ `FaultCode` map is the inverse of the `[StaticallyPreventable(code)]` declarations on `FaultCode` (see the chain below). The bijective core of that map is **derived by reflecting the attribute** (`StaticallyPreventableMap`), not re-listed in pipeline code. The attribute is where that map is declared and the only place it is declared. The proof engine keeps one piece of policy as explicit code because the attribute cannot express it: the collection-safety many-to-one collapse (`KeyPresenceSafety` / `KeyUniquenessGuard` / `IndexBoundsGuard` onto the shared empty-collection faults).
 
 ---
 
 ## FaultCode → DiagnosticCode Chain
 
-Precept's philosophy: no runtime errors. The evaluator must never produce a failure that the compiler could have prevented. The `FaultCode` enum makes this structurally enforceable.
+Precept's philosophy: no runtime errors. Every class of failure the language admits is one the compiler is responsible for preventing, and the `FaultCode` enum makes that responsibility structurally enforceable — a member cannot exist without naming the diagnostic that discharges it.
 
 ### The chain
 
 ```
-Evaluator fails → FaultCode member → [StaticallyPreventable] → DiagnosticCode member → pipeline stage emits it
+FaultCode member → [StaticallyPreventable] → DiagnosticCode member → pipeline stage emits it
 ```
 
-If any link is missing, the build fails.
+If any link is missing, the build fails. The whole chain is checked when the project is built; none of it runs while an event is being evaluated.
 
 ### FaultCode enum
+
+Two members are shown to give the attribute shape. `docs/runtime/fault-system.md` declares the enum and is the only place its membership is listed; do not keep a second copy here.
 
 ```csharp
 [AttributeUsage(AttributeTargets.Field)]
@@ -582,38 +583,7 @@ public enum FaultCode
     [StaticallyPreventable(DiagnosticCode.SqrtOfNegative)]
     SqrtOfNegative             =  2,
 
-    [StaticallyPreventable(DiagnosticCode.TypeMismatch)]
-    TypeMismatch               =  3,
-
-    [StaticallyPreventable(DiagnosticCode.UndeclaredField)]
-    UndeclaredField            =  4,
-
-    [StaticallyPreventable(DiagnosticCode.NullInNonNullableContext)]
-    UnexpectedNull             =  5,
-
-    [StaticallyPreventable(DiagnosticCode.InvalidMemberAccess)]
-    InvalidMemberAccess        =  6,
-
-    [StaticallyPreventable(DiagnosticCode.FunctionArityMismatch)]
-    FunctionArityMismatch      =  7,
-
-    [StaticallyPreventable(DiagnosticCode.FunctionArgConstraintViolation)]
-    FunctionArgConstraintViolation =  8,
-
-    [StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]
-    CollectionEmptyOnAccess    =  9,
-
-    [StaticallyPreventable(DiagnosticCode.UnguardedCollectionMutation)]
-    CollectionEmptyOnMutation  = 10,
-
-    [StaticallyPreventable(DiagnosticCode.QualifierMismatch)]
-    QualifierMismatch          = 11,
-
-    [StaticallyPreventable(DiagnosticCode.NumericOverflow)]
-    NumericOverflow            = 12,
-
-    [StaticallyPreventable(DiagnosticCode.OutOfRange)]
-    OutOfRange                 = 13,
+    // … the remaining members, each naming its preventing diagnostic.
 }
 ```
 
@@ -629,31 +599,11 @@ public static class Faults
 {
     public static FaultMeta GetMeta(FaultCode code) => code switch
     {
-        FaultCode.DivisionByZero                 => new(nameof(FaultCode.DivisionByZero),                 "Divisor evaluated to zero"),
-        FaultCode.SqrtOfNegative                 => new(nameof(FaultCode.SqrtOfNegative),                 "sqrt() operand evaluated to a negative number"),
-        FaultCode.TypeMismatch                   => new(nameof(FaultCode.TypeMismatch),                   "Operator applied to incompatible type"),
-        FaultCode.UndeclaredField                => new(nameof(FaultCode.UndeclaredField),                "Referenced field does not exist"),
-        FaultCode.UnexpectedNull                 => new(nameof(FaultCode.UnexpectedNull),                 "Null value used in non-nullable context"),
-        FaultCode.InvalidMemberAccess            => new(nameof(FaultCode.InvalidMemberAccess),            "Member accessor not supported on this type"),
-        FaultCode.FunctionArityMismatch          => new(nameof(FaultCode.FunctionArityMismatch),          "Function called with wrong number of arguments"),
-        FaultCode.FunctionArgConstraintViolation => new(nameof(FaultCode.FunctionArgConstraintViolation), "Function argument violates constraint"),
-        FaultCode.CollectionEmptyOnAccess        => new(nameof(FaultCode.CollectionEmptyOnAccess),        "Accessor called on empty collection"),
-        FaultCode.CollectionEmptyOnMutation      => new(nameof(FaultCode.CollectionEmptyOnMutation),      "Dequeue/pop called on empty collection"),
-        FaultCode.QualifierMismatch              => new(nameof(FaultCode.QualifierMismatch),              "Value does not match required qualifier"),
-        FaultCode.NumericOverflow                => new(nameof(FaultCode.NumericOverflow),                "Numeric operation overflowed"),
-        FaultCode.OutOfRange                     => new(nameof(FaultCode.OutOfRange),                     "Value is out of the allowed range"),
+        FaultCode.DivisionByZero => new(nameof(FaultCode.DivisionByZero), "Divisor evaluated to zero"),
+        FaultCode.SqrtOfNegative => new(nameof(FaultCode.SqrtOfNegative), "sqrt() operand evaluated to a negative number"),
+        // … one arm per member, exhaustive. See `docs/runtime/fault-system.md`.
     };
 }
-```
-
-### Evaluator usage
-
-```csharp
-// Every failure path uses the enum — no bare string errors:
-case BinaryOperator.Divide:
-    if (IsZero(right))
-        return Fail(FaultCode.DivisionByZero);
-    return Success(left / right);
 ```
 
 ### Enforcement: what catches what
@@ -678,13 +628,14 @@ case BinaryOperator.Divide:
 
 ### The full enforcement chain — no reflection
 
+Adding a member `X` — a class of failure some pipeline stage can diagnose against the author's source text:
+
 ```
-Add FaultCode.StackUnderflow
-  → PRECEPT0001: Fail() must use FaultCode ← Roslyn
+Add FaultCode.X
   → PRECEPT0002: must have [StaticallyPreventable] ← Roslyn
-  → add [StaticallyPreventable(DiagnosticCode.StackUnderflow)]
-  → DiagnosticCode.StackUnderflow doesn't exist ← C# compiler
-  → add DiagnosticCode.StackUnderflow to the enum
+  → add [StaticallyPreventable(DiagnosticCode.X)]
+  → DiagnosticCode.X doesn't exist ← C# compiler
+  → add DiagnosticCode.X to the enum
   → Diagnostics.GetMeta() switch is non-exhaustive ← CS8509
   → add the switch arm with stage, severity, message template
   → Faults.GetMeta() switch is non-exhaustive ← CS8509
@@ -693,6 +644,8 @@ Add FaultCode.StackUnderflow
 ```
 
 Every step is compiler-enforced or Roslyn-enforced. One custom attribute. Two exhaustive switches. 24 Roslyn rules (PRECEPT0001–PRECEPT0024). The chain is unbreakable without making the build fail.
+
+**What the chain rules out.** It runs from a failure class to the diagnostic that prevents it, so a member is admissible only when such a diagnostic genuinely exists — one a pipeline stage emits against source text, carrying a stage, a severity and a message template. A defect in the engine itself — a stack underflow in the opcode loop, say — has no such diagnostic: there is no source text an author could change in response to it, so the diagnostic the chain demands would have nothing to put in its message template. That category cannot be added to `FaultCode` as the rules stand. Whether the enum is therefore closed at the members it has, or PRECEPT0002 is relaxed for an engine-defect category, is undecided — see `fault-system.md` Q3.
 
 ### Why PRECEPT0003 and PRECEPT0004 are both needed
 
@@ -712,22 +665,23 @@ The typed `FaultCode Code` field on `Fault` prevents one bypass — you can't us
 
 ### The divide-by-zero example, end to end
 
-```
-1. Evaluator: a / b where b == 0
-        → Fail(FaultCode.DivisionByZero)
+Take a definition containing `a / b`, where the compiler cannot show `b` is non-zero.
 
-2. FaultCode.DivisionByZero
+```
+1. FaultCode.DivisionByZero — the failure class
         → [StaticallyPreventable(DiagnosticCode.DivisionByZero)]
 
-3. DiagnosticCode.DivisionByZero
+2. DiagnosticCode.DivisionByZero
         → Proof stage, Error, "Division is unsafe: '{0}' can be zero{1}"
 
-4. ProofEngine: analyzes every division expression
+3. ProofEngine: analyzes every division expression
         → if divisor interval includes zero:
             Diagnostics.Create(DiagnosticCode.DivisionByZero, range, "rate", " in the computed expression for field 'Average'")
 
-5. Compilation.HasErrors == true → no Precept produced → evaluator never runs
+4. Compilation.HasErrors == true → no Precept produced → evaluator never runs
 ```
+
+Step 4 is the point. The chain ends at a definition that does not compile. A definition that does compile carries no divisor test, because the proof is what makes the test unnecessary.
 
 ---
 
@@ -764,7 +718,7 @@ The `ArchitecturalCoherenceDesign.md` (PR #133) frames this as part of the broad
 
 ### Prevention applies inward
 
-The product prevents invalid entity configurations. The codebase must prevent invalid component configurations. The `FaultCode → DiagnosticCode` chain ensures that every way the evaluator can fail at runtime has a corresponding compile-time diagnostic — verified by the C# compiler's switch exhaustiveness and a single Roslyn rule. This is Precept's philosophy applied recursively to its own infrastructure.
+The product prevents invalid entity configurations. The codebase must prevent invalid component configurations. The `FaultCode → DiagnosticCode` chain ensures that every failure class the language admits has a corresponding compile-time diagnostic — verified by the C# compiler's switch exhaustiveness and a single Roslyn rule. This is Precept's philosophy applied recursively to its own infrastructure.
 
 ### D4 — Diagnostic Attribution
 
@@ -784,7 +738,7 @@ The prototype's diagnostic system (`DiagnosticCatalog` + `LanguageConstraint` + 
 
 The new compiler pipeline (Lexer → Parser → NameBinder → TypeChecker → GraphAnalyzer → ProofEngine) eliminates the N-Copy problem structurally. The lexer's token stream replaces all the regex-based keyword recognition. But the enumeration surface for consumer surfaces (MCP, LS, drift tests) remains necessary. The new design retains enumeration via the `DiagnosticCode` enum + `Diagnostics.All`, while replacing the runtime-registered `LanguageConstraint` records with compiler-enforced exhaustive switches. The "catalog" architectural concept is gone — `Diagnostics` is just a static helper class.
 
-The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarantee the prototype does not have: that every evaluator failure mode is covered by a compile-time diagnostic. This is the "prevention applies inward" principle from `ArchitecturalCoherenceDesign.md`.
+The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarantee the prototype does not have: that every failure class the language admits is covered by a compile-time diagnostic. This is the "prevention applies inward" principle from `ArchitecturalCoherenceDesign.md`.
 
 ---
 

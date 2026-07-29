@@ -698,10 +698,10 @@ ExampleAfter      : string?
 
 | Mechanism | What it enforces |
 |-----------|-----------------|
-| `DiagnosticMeta.PreventsFault` | Every diagnostic that prevents a runtime fault names which fault |
-| `[StaticallyPreventable(DiagnosticCode.X)]` on `FaultCode` | Every runtime fault names the compile-time rule that should prevent it — **PRECEPT0002** fires if a `FaultCode` member lacks this attribute |
+| `DiagnosticMeta.PreventsFault` | Every diagnostic that prevents a class of failure names which one |
+| `[StaticallyPreventable(DiagnosticCode.X)]` on `FaultCode` | Every failure class names the compile-time rule that prevents it — **PRECEPT0002** fires if a `FaultCode` member lacks this attribute |
 
-The pair is bidirectional by design: diagnostics are the compile-time face, faults are the runtime face. Every fault that can be statically prevented has a corresponding diagnostic, and every diagnostic that prevents a fault names it. Any gap in the linkage is a build error.
+The pair is bidirectional by design: a `FaultCode` member names a class of failure, and a `DiagnosticCode` member names the rule that prevents it. Both halves are checked when the project is built; neither is consulted while an event is being evaluated. Every fault class has a corresponding diagnostic, and every diagnostic that prevents one names it. Any gap in the linkage is a build error.
 
 ---
 

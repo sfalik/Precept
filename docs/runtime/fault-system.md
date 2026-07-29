@@ -4,11 +4,11 @@
 
 | Property | Value |
 |----------|-------|
-| Doc maturity | Draft — type definitions documented; evaluator integration sections pending |
-| Implementation state | Partial — `FaultCode`, `FaultMeta`, `Faults`, `Fault`, `FaultSeverity` implemented; evaluator integration pending |
+| Doc maturity | Draft — type definitions documented; what, if anything, produces a `Fault` is undecided |
+| Implementation state | Partial — `FaultCode`, `FaultMeta`, `Faults`, `Fault`, `FaultSeverity` implemented; nothing constructs a `Fault` |
 | Source | `src/Precept/Language/FaultCode.cs`, `src/Precept/Language/Fault.cs`, `src/Precept/Language/Faults.cs` |
 | Upstream | `docs/compiler/diagnostic-system.md` — every `FaultCode` member references a `DiagnosticCode` via `[StaticallyPreventable]` |
-| Downstream | `docs/runtime/result-types.md` — a fault is returned as the `EventOutcome.Faulted(Fault)` variant; `docs/runtime/evaluator.md` — the evaluator produces `Fault` values |
+| Downstream | `docs/runtime/result-types.md` — the `EventOutcome.Faulted(Fault)` variant |
 
 ## Contents
 
@@ -27,56 +27,56 @@
 - [Design Rationale and Decisions](#design-rationale-and-decisions)
   - [Exhaustive switch, not attributes + reflection](#exhaustive-switch-not-attributes-reflection)
   - [Recovery hints are on FaultMeta, not Fault](#recovery-hints-are-on-faultmeta-not-fault)
-  - [Defense-in-depth, not a primary error path](#defense-in-depth-not-a-primary-error-path)
   - [Relationship to prototype](#relationship-to-prototype)
 - [Open Questions / Implementation Notes](#open-questions-implementation-notes)
   - [Q1 — Evaluator result type](#q1-evaluator-result-type)
   - [Q2 — Fault context](#q2-fault-context)
-  - [Q3 — Fault vs. structural impossibility](#q3-fault-vs-structural-impossibility)
+  - [Q3 — How far the evaluator asserts about its own state](#q3-how-far-the-evaluator-asserts-about-its-own-state)
 - [Deliberate Exclusions](#deliberate-exclusions)
 - [Cross-References](#cross-references)
 - [Source Files](#source-files)
 
 ## Overview
 
-The runtime fault system classifies and communicates evaluator failure modes. It is the runtime mirror of the compiler's diagnostic system.
+The fault system names the classes of failure the compiler is responsible for preventing, and pairs each one with the diagnostic that prevents it. It is shaped as a mirror of the compiler's diagnostic system, and the pairing it carries is checked when the project is built.
 
-| Compiler (pipeline) | Runtime (evaluator) |
-|---------------------|---------------------|
+| Diagnostic system | Fault system |
+|-------------------|--------------|
 | `DiagnosticCode` | `FaultCode` |
 | `DiagnosticMeta(Code, Stage, Severity, MessageTemplate)` | `FaultMeta(Code, MessageTemplate, Severity, RecoveryHint)` |
 | `Diagnostics` | `Faults` |
 | `Diagnostic(Severity, Stage, string Code, Message, Range)` | `Fault(FaultCode Code, string CodeName, Message)` |
 
-The relationship between the two systems is structural, not incidental. Every `FaultCode` member carries a `[StaticallyPreventable(DiagnosticCode.X)]` attribute — a compiler-enforced assertion that there exists a pipeline diagnostic which, if emitted, guarantees this fault can never occur at runtime. See [diagnostic-system.md](../compiler/diagnostic-system.md) for the full enforcement chain.
+The relationship between the two systems is structural, not incidental. Every `FaultCode` member carries a `[StaticallyPreventable(DiagnosticCode.X)]` attribute — a compiler-enforced assertion that there exists a pipeline diagnostic responsible for making that class of failure impossible. Nothing checks the pairing at evaluation time; the check runs when the project is built. See [diagnostic-system.md](../compiler/diagnostic-system.md) for the full enforcement chain.
 
 ## Responsibilities and Boundaries
 
 ### OWNS
 
-- The closed registry of all evaluator failure modes (`FaultCode` enum)
+- The closed registry of the failure classes the compiler must prevent (`FaultCode` enum)
 - `FaultMeta` — per-code message template, severity, and recovery hint
 - `Faults` factory — `Create()`, `GetMeta()`, `All` enumeration
-- `Fault` output type — the value produced when the evaluator hits a failure path
+- `Fault` output type — the name for a breach of one of the engine's own invariants
 - `FaultSeverity` enum — currently a single `Fatal` variant
 - `StaticallyPreventableAttribute` — the attribute linking each `FaultCode` member to its corresponding `DiagnosticCode`
 
 ### Does NOT OWN
 
-- `EventOutcome`, `UpdateOutcome` result hierarchies — see `result-types.md`; a fault is surfaced as the `EventOutcome.Faulted(Fault)` variant defined there
-- How the evaluator produces `Fault` values and returns them as the `EventOutcome.Faulted` variant — see `evaluator.md`
+- `EventOutcome`, `UpdateOutcome` result hierarchies — see `result-types.md`; the `EventOutcome.Faulted(Fault)` variant is defined there
 - `DiagnosticCode` definitions and compiler pipeline diagnostics — see `diagnostic-system.md`
 - Roslyn analyzer rules (PRECEPT0001–PRECEPT0004, PRECEPT0016) that enforce the chain — see `src/Precept.Analyzers/`
 
 ## Right-Sizing
 
-The fault system mirrors the compiler's diagnostic system but is trimmed for the evaluator's narrower surface.
+The fault system mirrors the compiler's diagnostic system but is trimmed to what a classification without an evaluation-time path needs.
 
-`DiagnosticMeta` carries `Stage` and a three-level `Severity` (`Info`, `Warning`, `Error`) because the compiler produces diagnostics at six stages with meaningfully different severity levels. The evaluator has no pipeline stages — every fault is fatal (the transition is aborted, no state changes are committed) — so `FaultMeta` replaces the stage axis entirely and uses a single-variant `FaultSeverity.Fatal` for severity. `FaultSeverity` is not collapsed to a boolean because a second variant (e.g. non-aborting `Warning` faults) may be needed as the evaluator design matures.
+`DiagnosticMeta` carries `Stage` and a three-level `Severity` (`Info`, `Warning`, `Error`) because the compiler produces diagnostics at six stages with meaningfully different severity levels. The fault classes have no pipeline stages to distinguish and every one of them is fatal — an operation that returned `Faulted` did not finish, so its working copy is discarded and nothing it would have changed is committed. `FaultMeta` therefore replaces the stage axis entirely and uses a single-variant `FaultSeverity.Fatal` for severity. `FaultSeverity` is not collapsed to a boolean because a second variant (e.g. non-aborting `Warning` faults) may be needed as the evaluator design matures.
 
 `FaultMeta` adds two fields `DiagnosticMeta` does not have:
 
-- **`RecoveryHint`** — actionable per-code guidance telling the precept author how to fix the definition to prevent the fault. Recovery hints appear in `precept_fire` output and the VS Code preview inspector. They are omitted from `DiagnosticMeta` because compiler diagnostic messages already include enough structural information for code fixes; the fault system targets runtime operators who may not be reading source.
+- **`RecoveryHint`** — actionable per-code guidance telling the precept author how to fix the definition so the fault class cannot arise. Recovery hints appear in `precept_fire` output and the VS Code preview inspector.
+
+  > **Open — where this guidance belongs.** The field was added because a fault could be reached at evaluation time and an operator would need to be told what to do about it. Nothing is reached at evaluation time now, so the hint's only remaining reader is the precept author, and authoring guidance already lives on the diagnostic. Keeping it here, moving it to the diagnostic, and deleting it are all open; each changes a catalog and the MCP formatters. The field is left as it is until that is decided.
 - **`FaultSeverity Severity`** — placeholder for the second severity variant; currently always `Fatal`.
 
 `Fault` omits `SourceSpan` — at runtime there is no source text in scope; expression context (if needed) will be a separate field tracked in open question Q2.
@@ -85,20 +85,20 @@ The fault system mirrors the compiler's diagnostic system but is trimmed for the
 
 **Inputs to the fault system:**
 
-- A `FaultCode` enum member selected by the evaluator at a failure site
-- Zero or more format args (`params object?[]`) for message template interpolation
+- A `FaultCode` enum member naming a failure class
+- Zero or more format args (`params object?[]`) for message template interpolation, should anything ever construct a `Fault` (Q3)
 
 **Outputs:**
 
 | Output | Consumer |
 |--------|----------|
-| `Fault` (readonly record struct) | Evaluator → `EventOutcome.Faulted(Fault)` → caller |
-| `FaultMeta` | MCP `precept_proofs` enumerates `Faults.All` to list all evaluator fault codes; `precept_diagnostic <CODE>` returns per-code detail |
+| `Fault` (readonly record struct) | The `EventOutcome.Faulted(Fault)` variant → caller |
+| `FaultMeta` | MCP `precept_proofs` enumerates `Faults.All` to list all fault codes; `precept_diagnostic <CODE>` returns per-code detail |
 | `Faults.All` | Language server and drift tests enumerate all registered fault codes |
 
 ## FaultCode — The Registry
 
-`FaultCode` is the closed set of all evaluator failure modes. Every member carries `[StaticallyPreventable(DiagnosticCode.X)]`, asserting that the named diagnostic, if emitted by the compiler, makes the fault impossible at runtime.
+`FaultCode` is the closed set of failure classes the compiler is responsible for preventing. Every member carries `[StaticallyPreventable(DiagnosticCode.X)]`, naming the diagnostic that prevents that class.
 
 ```csharp
 // src/Precept/Language/FaultCode.cs
@@ -208,9 +208,7 @@ Same shape as `Diagnostics`: exhaustive switch, factory, enumeration. `Create()`
 
 ```csharp
 // src/Precept/Language/Fault.cs
-// TODO: Stub — shape will be finalized when the evaluator result type is designed.
-// Expected additions: expression context (what was being evaluated), input values that
-// triggered the fault, and linkage back to the DiagnosticCode that should have prevented it.
+// TODO: Stub — the shape is not final and waits on what, if anything, constructs a Fault.
 public readonly record struct Fault(
     FaultCode Code,
     string    CodeName,  // nameof-derived via Faults.Create() — stable identity for logging / MCP
@@ -218,16 +216,16 @@ public readonly record struct Fault(
 );
 ```
 
-`Fault` is the output type the evaluator produces when a failure path is reached. Currently a minimal stub — three fields matching the simplest consumer needs (identity, human-readable description).
+`Fault` is the name for a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. Currently a minimal stub — three fields matching the simplest consumer needs (identity, human-readable description). Nothing constructs one; whether anything ever will is undecided (Q3).
 
 `Fault` is a `readonly record struct` — value-typed, zero-allocation-friendly, matching `Diagnostic`'s struct choice. The fault is a data carrier, not a behavior object; struct semantics fit.
 
 ## The StaticallyPreventable Chain
 
-The `FaultCode → DiagnosticCode` chain is the structural guarantee connecting the fault system to the diagnostic system. It enforces that for every way the evaluator can fail at runtime, there exists a compile-time diagnostic that prevents it.
+The `FaultCode → DiagnosticCode` chain is the structural guarantee connecting the fault system to the diagnostic system. It enforces that for every class of failure named here, there exists a compile-time diagnostic that prevents it.
 
 ```
-Evaluator fails → FaultCode member → [StaticallyPreventable] → DiagnosticCode member → pipeline stage emits it
+FaultCode member → [StaticallyPreventable] → DiagnosticCode member → pipeline stage emits it
 ```
 
 If any link is missing, the build fails. The chain is enforced across five layers:
@@ -243,26 +241,25 @@ If any link is missing, the build fails. The chain is enforced across five layer
 
 ### The divide-by-zero example, end to end
 
-```
-1. Evaluator: a / b where b == 0
-       → Fail(FaultCode.DivisionByZero)
+Take a definition containing `a / b`, where the compiler cannot show `b` is non-zero.
 
-2. FaultCode.DivisionByZero
+```
+1. FaultCode.DivisionByZero — the failure class
        → [StaticallyPreventable(DiagnosticCode.DivisionByZero)]
 
-3. DiagnosticCode.DivisionByZero
+2. DiagnosticCode.DivisionByZero
        → Proof stage, Error, "Division is unsafe: '{0}' can be zero{1}"
 
-4. ProofEngine: analyzes every division expression
+3. ProofEngine: analyzes every division expression
        → if divisor interval includes zero:
            Diagnostics.Create(DiagnosticCode.DivisionByZero, range, "rate", " in the computed expression for field 'Average'")
 
-5. Compilation.HasErrors == true → no Precept produced → evaluator never runs
+4. Compilation.HasErrors == true → no Precept produced → evaluator never runs
 ```
 
-The chain means `FaultCode.DivisionByZero` is defense-in-depth: it classifies a failure that should never occur in a correctly compiled precept, but must be handled if data arrives from external sources that bypassed compile-time checking.
+Step 4 is the point of the example. `FaultCode.DivisionByZero` names a class of failure and names the diagnostic that prevents it; it does not name anything that happens while an event is being evaluated. A definition whose divisor cannot be shown non-zero never becomes an executable model, and one that does become an executable model carries no divisor test.
 
-For the complete enforcement chain walkthrough (adding a new `FaultCode` member end to end), see [diagnostic-system.md § FaultCode — The Runtime-to-Compiler Chain](../compiler/diagnostic-system.md).
+For the complete enforcement chain walkthrough (adding a new `FaultCode` member end to end, and what that rules out), see [diagnostic-system.md § FaultCode → DiagnosticCode Chain](../compiler/diagnostic-system.md).
 
 ## Design Rationale and Decisions
 
@@ -281,19 +278,15 @@ See [diagnostic-system.md § Why an exhaustive switch, not attributes + reflecti
 
 Recovery hints are per-code guidance, not per-instance guidance. Moving `RecoveryHint` onto `Fault` would add it to every `Fault` value and all downstream consumers. Because the hint is the same for every instance of a given `FaultCode`, it belongs on `FaultMeta`, where consumers that need it (MCP `precept_proofs` / `precept_diagnostic`, preview inspector) can look it up by code without carrying it through the evaluator's output path.
 
-### Defense-in-depth, not a primary error path
-
-When the compiler emits errors, `Precept.From(Compilation)` cannot produce a `Precept` — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* for data that entered through the contract. They are reachable only for **out-of-contract** data — values loaded from external sources that bypassed compile-time checking. A fault on *contract* data would instead indicate a **proof-engine gap** — a defect to fix, not a condition to design around (spec §0.7). See also Q3 below.
-
 ### Relationship to prototype
 
-The prototype evaluator throws `ConstraintViolationException` on rule violations and returns structured errors from `CompileFromTextResult`. There is no equivalent of `FaultCode` — failure modes are unclassified. The `FaultCode → DiagnosticCode` chain is entirely new to the redesign.
+The prototype evaluator throws `ConstraintViolationException` on rule violations and returns structured errors from `CompileFromTextResult`. There is no equivalent of `FaultCode` — failure classes are unclassified and unpaired. The `FaultCode → DiagnosticCode` chain is entirely new to the redesign.
 
 ## Open Questions / Implementation Notes
 
 ### Q1 — Evaluator result type (resolved)
 
-**Resolved:** a fault is returned as the `EventOutcome.Faulted(Fault)` variant — a structured value inside the outcome hierarchy, never thrown. `Version.Fire` surfaces it exactly like any other outcome; callers pattern-match `Faulted` alongside `Transitioned`, `Applied`, and the rest. There is no `FaultException` control-flow path.
+**Resolved:** should anything ever construct a `Fault` (Q3), it is returned as the `EventOutcome.Faulted(Fault)` variant — a structured value inside the outcome hierarchy, never thrown. `Version.Fire` surfaces it exactly like any other outcome; callers pattern-match `Faulted` alongside `Transitioned`, `Applied`, and the rest. There is no `FaultException` control-flow path.
 
 The options weighed before settling on the outcome-variant shape:
 
@@ -308,20 +301,21 @@ The prototype used exceptions (`ConstraintViolationException`); the redesign doe
 
 ### Q2 — Fault context
 
-When a fault occurs, what context is useful to a consumer?
+If anything ever constructs a `Fault` (Q3), what context should it carry? A `Fault` names a breach of one of the engine's own invariants, so the useful context is about what the engine was doing, not about the author's data:
 
-- **Expression context:** which expression was being evaluated (`a / rate` — which subexpression triggered it)?
-- **Input values:** what were the concrete values at fault time (`rate = 0`)?
-- **DiagnosticCode linkage:** should `Fault` carry a reference back to the `DiagnosticCode` that should have prevented it (via `[StaticallyPreventable]`)?
-- **Event context:** which event fire triggered evaluation?
+- **Where in the plan** the breach was detected — which execution row or opcode the evaluator had reached?
+- **What the engine's own state was** — the slot index, stack depth or dispatch entry the invariant was asserted over?
+- **Which operation** was running when it was detected?
 
-The current stub carries none of this. The answers depend on what MCP `precept_fire` needs to return and what the preview inspector needs to display.
+The current stub carries none of this. What it should carry depends on what MCP `precept_fire` needs to return and what the preview inspector needs to display — and there is nothing to decide until Q3 settles, because if nothing constructs a `Fault` there is no context to fill in.
 
-### Q3 — Fault vs. structural impossibility
+### Q3 — How far the evaluator asserts about its own state
 
-When the compiler emits errors, `Precept.From(Compilation)` cannot produce a `Precept` — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* for data that entered through the contract. They are reachable only for **out-of-contract** data — values loaded from external sources that bypassed compile-time checking. A fault on *contract* data would instead indicate a **proof-engine gap** — a defect to fix, not a condition to design around (spec §0.7).
+The half of this question that was about the author's data is closed: a fault-prone operation is proven safe or the definition is refused, so there is no evaluation-time fault check and nothing to weigh against an assertion.
 
-This affects how aggressively the evaluator should assert vs. gracefully fault. Decision needed at evaluator design time.
+What remains is about the engine's own state rather than the author's. A slot-index range assertion, or a stack-depth assertion, is not a check about a divisor or a bound — it is the evaluator checking that it has not been handed a model that violates its own construction invariants. Two accounts of that already exist and they do not agree: `precept-builder.md` § Builder Invariant Violations and `evaluator.md` § No Unclassified Exceptions both say a corrupted model is an unrecoverable exception, while `compiler-and-runtime-design.md` names the evaluator as where an engine-invariant breach would surface as a `Fault`. Whether the evaluator asserts, faults, or does neither — and therefore whether anything ever constructs a `Fault` — is undecided.
+
+This is a design decision rather than something a build settles: the two accounts above have to be reconciled before either can be implemented, and it belongs with the work that builds the evaluator.
 
 ## Deliberate Exclusions
 
@@ -329,11 +323,11 @@ This affects how aggressively the evaluator should assert vs. gracefully fault. 
 
 **`Fault.SourceSpan`** — excluded from the current `Fault` struct. At runtime, there is no source text in scope; the expression being evaluated is an in-memory execution plan, not a construct manifest. If expression context is needed it will be a different field shape (see Q2).
 
-**Non-fatal fault severity** — all faults are currently `FaultSeverity.Fatal`. Informational or warning-level evaluator faults are excluded until a concrete consumer use case emerges. `FaultSeverity` is kept as an enum (not a bool) to leave this open without a breaking change.
+**Non-fatal fault severity** — all fault classes are currently `FaultSeverity.Fatal`. Informational or warning-level fault classes are excluded until a concrete consumer use case emerges. `FaultSeverity` is kept as an enum (not a bool) to leave this open without a breaking change.
 
 **`DiagnosticStage` analog** — the fault system has no pipeline stage axis. The evaluator is a single-stage executor; stage classification would always be the same value and adds no information.
 
-**Fault suppression** — the diagnostic system suppresses downstream diagnostics when upstream pipeline stages fail. The fault system has no equivalent: a fault aborts the current transition immediately, and there is no multi-stage fault pipeline to suppress.
+**Fault suppression** — the diagnostic system suppresses downstream diagnostics when upstream pipeline stages fail. The fault system has no equivalent: a `Faulted` outcome ends the operation where it stands, and there is no multi-stage fault pipeline to suppress.
 
 ## Cross-References
 
@@ -341,7 +335,7 @@ This affects how aggressively the evaluator should assert vs. gracefully fault. 
 |----------|-------------|
 | [diagnostic-system.md](../compiler/diagnostic-system.md) | Mirror document — every `FaultCode` member links to a `DiagnosticCode` via `[StaticallyPreventable]`; the full enforcement chain, end-to-end example, and PREC rule rationale are documented there |
 | [result-types.md](result-types.md) | Defines `EventOutcome` and `UpdateOutcome`; a fault is returned as the `EventOutcome.Faulted(Fault)` variant within this hierarchy |
-| [evaluator.md](evaluator.md) | The evaluator is the primary consumer of the fault system; calls `Fail(FaultCode.X)` at each failure site |
+| [evaluator.md](evaluator.md) | Declares `Fail(FaultCode)` and states that a compiled definition has no fault path at evaluation time |
 | [runtime-api.md](runtime-api.md) | Public API surface that exposes fault information to host applications |
 
 ## Source Files

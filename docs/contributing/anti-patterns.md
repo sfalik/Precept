@@ -333,7 +333,7 @@ The catalog-driven checklist's "Red flags" section ([`docs/contributing/catalog-
 
 **Why it's wrong.** "Prevention, not detection" — the structural guarantee. Pushing enforcement to runtime when compile-time enforcement was achievable weakens the central commitment. See [`philosophy.md`](../philosophy.md) and [`compiler/proof-engine.md`](../compiler/proof-engine.md).
 
-**Correct alternative.** Encode as a proof obligation; the proof engine discharges it at compile time. Only obligations the proof engine genuinely cannot discharge become runtime fault-site backstops (defense-in-depth, not primary error path).
+**Correct alternative.** Encode as a proof obligation; the proof engine discharges it at compile time. An obligation the proof engine cannot discharge refuses the definition — there is no runtime enforcement to fall back to, and adding one would be this anti-pattern rather than the fix for it.
 
 ### PROC-4. Treating philosophy.md as immutable but downstream docs as inconsistent with it
 

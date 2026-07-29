@@ -5,17 +5,17 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Base engine implemented; the prove-or-reject MVP (three-way `ProofVerdict`, certificate format, §1a multi-term / §2 case-by-case / §3 money / §6 field-vs-constant strategies, and the Slice-0 fail-open soundness fixes) is **designed, not yet implemented** — see §13 |
+| Implementation state | Base engine implemented; the prove-or-reject MVP (three-way `ProofVerdict`, certificate format, §1a multi-term / §2 case-by-case / §3 money / §6 field-vs-constant strategies, and the Slice-0 fail-open soundness fixes) is **designed, not yet implemented** — see §13. The shipped `ProofLedger` also still carries a `FaultSiteLinks` field that this document no longer describes — see § Output |
 | Source | `src/Precept/Pipeline/ProofEngine.cs`, `src/Precept/Pipeline/ProofLedger.cs` |
 | Upstream | SemanticIndex + StateGraph, catalog metadata (Operations, Functions, Types, Modifiers, Actions, Diagnostics, Faults) |
-| Downstream | Compilation (proof ledger), Precept Builder (fault backstops, constraint influence map) |
+| Downstream | Compilation (proof ledger), Precept Builder (constraint influence map) |
 
 > [!IMPORTANT]
 > **Non-Negotiable Rules — Read Before Implementing**
 >
 > - **Instantiate obligations from catalog metadata** — proof obligations come from the `ProofRequirement` catalog records stamped into typed artifacts, not from a hardcoded engine-side list. See [§6. Architecture](#6-architecture) and [§Catalog-Driven Obligation Instantiation](#catalog-driven-obligation-instantiation).
 > - **Extend proof kinds through the catalog DU** — `ProofRequirement` is a discriminated union, so adding a new proof kind requires a new catalog entry and DU subtype rather than another identity-based switch arm. See [§ProofRequirement Catalog DU](#proofrequirement-catalog-du) and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
-> - **Never guess** — the engine proves an obligation, rejects it with diagnostics/fault linkage, or leaves it explicitly unresolved; it does not approximate hidden certainty. See [§7. Component Mechanics](#7-component-mechanics), [§9. Failure Modes and Recovery](#9-failure-modes-and-recovery), and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
+> - **Never guess** — the engine proves an obligation, rejects it with a diagnostic that refuses the definition, or leaves it explicitly unresolved; it does not approximate hidden certainty. See [§7. Component Mechanics](#7-component-mechanics), [§9. Failure Modes and Recovery](#9-failure-modes-and-recovery), and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
 
 ## Contents
 
@@ -37,7 +37,7 @@
   - [ProofSatisfaction DU](#proofsatisfaction-du)
   - [Carrier Types](#carrier-types)
   - [Qualifier Resolution Reference](#qualifier-resolution-reference)
-  - [Proof/Fault Chain](#prooffault-chain)
+  - [Requirement-to-Diagnostic Chain](#requirement-to-diagnostic-chain)
   - [Constraint Influence Analysis](#constraint-influence-analysis)
   - [Initial-State Satisfiability](#initial-state-satisfiability)
   - [Collection Non-Empty Proof](#collection-non-empty-proof)
@@ -54,7 +54,6 @@
 - [10. Contracts and Guarantees](#10-contracts-and-guarantees)
   - [Obligation Completeness](#obligation-completeness)
   - [Disposition Exhaustiveness](#disposition-exhaustiveness)
-  - [Fault Chain Integrity](#fault-chain-integrity)
   - [Determinism](#determinism)
   - [Catalog Correspondence](#catalog-correspondence)
 - [11. Design Rationale and Decisions](#11-design-rationale-and-decisions)
@@ -99,12 +98,12 @@ Source Text → Lexer → Parser → Name Binder → Type Checker → Graph Anal
                               SemanticIndex    StateGraph       ProofLedger
 ```
 
-The proof engine consumes the `SemanticIndex` (typed expressions with attached `ProofRequirement` records) and `StateGraph` (structural analysis facts including `ProofForwardingFact` entries). It produces a `ProofLedger` — the complete obligation inventory with dispositions, fault-site links, constraint influence analysis, and initial-state satisfiability results.
+The proof engine consumes the `SemanticIndex` (typed expressions with attached `ProofRequirement` records) and `StateGraph` (structural analysis facts including `ProofForwardingFact` entries). It produces a `ProofLedger` — the complete obligation inventory with dispositions, constraint influence analysis, and initial-state satisfiability results.
 
 **Key design choices:**
 
 1. **Proof is bounded** — a closed strategy set, enumerated in § Proof Strategies, and no general SMT solver. Predictable, auditable, zero external dependencies.
-2. **Proof ledger does NOT cross the compile-runtime boundary** — only `FaultSiteDescriptor` residue (defense-in-depth backstops) crosses into runtime. The proof engine is purely a compile-time analysis stage.
+2. **Proof ledger does NOT cross the compile-runtime boundary** — nothing from it crosses into runtime. The proof engine is purely a compile-time analysis stage.
 3. **Catalog-driven obligations** — the proof engine reads `ProofRequirement` records stamped by the type checker from catalog metadata. It does NOT maintain its own list of what needs to be proved.
 
 > **Quantity-normalization precision note:** When proof obligations depend on UCUM quantity normalization or interval scaling, the proof engine operates on `decimal` magnitudes specifically to avoid binary-floating-point rounding drift. The guarantee is exact only for the supported business-domain units whose UCUM scale factors and affine offsets are representable in the design's `UcumExactFactor` + `decimal` model; logarithmic/reference-level units such as `dB` and `[pH]` are outside that proof guarantee.
@@ -120,7 +119,6 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 | **Obligation instantiation** | Create `ProofObligation` records from `ProofRequirement` attachments on typed expressions and actions |
 | **Obligation discharge** | Apply the proof strategies in order to resolve each obligation |
 | **Diagnostic emission** | Emit diagnostics for unresolved obligations with semantic site attribution |
-| **FaultSiteLink production** | Link unresolved obligations to their corresponding `FaultCode` for Precept Builder backstops |
 | **Constraint influence analysis** | Traverse constraint expressions to record field/arg dependencies for causal reasoning |
 | **Initial-state satisfiability** | Verify that declared initial-state constraints are satisfiable given default field values |
 | **ProofForwardingFact consumption** | Incorporate structural violations forwarded from graph analysis into proof obligations |
@@ -133,7 +131,6 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 | **Graph topology** | Reachability, dominance, and edge sets are the graph analyzer's responsibility. The proof engine receives structural facts, not the topology itself. |
 | **Expression evaluation** | The evaluator handles runtime values. The proof engine performs static analysis only. |
 | **Constraint enforcement** | Holding an incoming value to the constraints declared on the slot it enters — event arguments and editable-field writes — is the evaluator's responsibility at ingress. The proof engine verifies satisfiability statically. Nothing evaluates a rule against the configuration an operation commits (language spec §0.7). |
-| **Runtime fault handling** | The proof engine identifies what *could* fault; the evaluator and `FaultSiteDescriptor` backstops handle actual runtime failures. |
 
 ---
 
@@ -260,9 +257,6 @@ public sealed record ProofLedger(
     // All obligations with their dispositions
     ImmutableArray<ProofObligation> Obligations,
     
-    // Fault sites for unresolved obligations — consumed by Precept Builder
-    ImmutableArray<FaultSiteLink> FaultSiteLinks,
-    
     // Constraint influence analysis — consumed by Precept Builder
     ImmutableArray<ConstraintInfluenceEntry> ConstraintInfluence,
     
@@ -273,6 +267,9 @@ public sealed record ProofLedger(
     ImmutableArray<Diagnostic> Diagnostics
 );
 ```
+
+> **The shipped record is one field wider than this, and the field is on its way out.**
+> `src/Precept/Pipeline/ProofLedger.cs` declares `ImmutableArray<FaultSiteLink> FaultSiteLinks` on the record, and declares the `FaultSiteLink` and `FaultSiteAnnotation` types the field is built from. `ProofEngine.Diagnostics.cs` populates it, and the language server reads it when it looks for the obligation behind a diagnostic squiggle. The record above is the shape the ledger takes once that comes out, which is a code change nobody has made yet. Nothing about the field's contents is a live design commitment — an obligation the engine cannot discharge refuses the definition, so a link to what would have failed at evaluation time has nothing to point at.
 
 #### ProofObligation
 
@@ -317,56 +314,14 @@ public enum ProofStrategy
 }
 ```
 
-> **Resolved (CC#6):** `ProofObligation.Site` identity — reference equality
-> The proof engine stores the same `TypedExpression` object reference that exists in the `SemanticIndex`. No copies are made. The builder resolves structural binding during Pass 4 (expression compilation). When the builder visits a `TypedExpression` to emit an opcode, it matches against `ProofLedger.FaultSiteLinks` by `ProofObligation.Site` identity using `ReferenceEqualityComparer.Instance`. The structural binding is the opcode itself — a nullable `FaultSiteAnnotation?` is stamped directly on the emitted opcode.
+> **`ProofObligation.Site` identity — reference equality**
+> The proof engine stores the same `TypedExpression` object reference that exists in the `SemanticIndex`. No copies are made.
 >
-> **Matching mechanism:**
-> ```csharp
-> // Builder internals:
-> var faultSites = new HashSet<TypedExpression>(
->     proof.FaultSiteLinks.Select(l => l.Obligation.Site),
->     ReferenceEqualityComparer.Instance);
+> **Invariant:** The proof engine MUST NOT use `with { ... }` on `obligation.Site` or create new `TypedExpression` instances — it must preserve the original object reference. The `ProofObligation` itself can use `with { ... }` (it's a separate record), but the `Site` field must point to the original `SemanticIndex` expression.
 >
-> // During expression walk:
-> if (faultSites.TryGetValue(expr, out var matched))
-> {
->     // Stamp FaultSiteDescriptor on this opcode
-> }
-> ```
+> **Why:** reference identity is the only thing that tells two identical-but-distinct expressions apart. The same text written into two transition rows produces two `TypedExpression` values that compare equal structurally, so a consumer matching on structure attributes an obligation to whichever of them it meets first. Copying the `Site` with `with { }` discards the distinction.
 >
-> **Invariant:** The proof engine MUST NOT use `with { ... }` on `obligation.Site` or create new `TypedExpression` instances — it must preserve the original object reference. The `ProofObligation` itself can use `with { ... }` (it's a separate record), but the `Site` field must point to the original `SemanticIndex` expression. Reference identity prevents false positives from structural equality matching identical-but-distinct expressions in different transition rows.
-
-#### FaultSiteLink
-
-Links unresolved obligations to their runtime fault codes:
-
-```csharp
-public sealed record FaultSiteLink(
-    ProofObligation Obligation,  // the unresolved obligation
-    FaultCode FaultCode,         // the runtime fault that would fire
-    DiagnosticCode DiagnosticCode, // the authoring-time diagnostic
-    SourceSpan Site              // source location for the backstop
-);
-```
-
-The Precept Builder consumes these to plant `FaultSiteAnnotation` backstops — defense-in-depth runtime checks for operations that could not be proven safe.
-
-> **Resolved (CC#6):** `FaultSiteLink.Site` to runtime binding
-> The builder resolves `FaultSiteLink` to a structural binding during Pass 4 (expression compilation). When the builder compiles a `TypedExpression` into an opcode, it matches `ProofObligation.Site` (the `TypedExpression`) against the expression being compiled. If a matching `FaultSiteLink` exists, the builder stamps a `FaultSiteAnnotation` on the opcode. The `FaultSiteLink.Site` (`SourceSpan`) is carried forward in the annotation for diagnostics/logging; the structural binding is the opcode itself.
->
-> **Canonical annotation shape:**
->
-> ```csharp
-> public sealed record FaultSiteAnnotation(
->     FaultCode Code,           // Runtime fault to fire if reached
->     DiagnosticCode PreventedBy, // Authoring-time diagnostic that would prevent this
->     SourceSpan Site           // Source location for diagnostics/logging
-> );
-> // On each Opcode — null = proven safe
-> FaultSiteAnnotation? FaultSite
-> ```
->
-> **Structural elision model:** Proved obligations produce no `FaultSiteLink` → no annotation → zero evaluator overhead. This matches the SPARK Ada model (strip proven checks) realized through Precept's gate architecture. See `precept-builder.md §Pass 4` for the planting contract and `evaluator.md §7.3` for the consumption contract.
+> **What is not settled is whether any consumer needs the distinction.** Diagnostic emission matches on the span, and so does the language server when it looks for the obligation behind a squiggle. Until something has to separate two structurally identical sites, the invariant costs nothing and buys nothing, and the argument above is a reason to keep it rather than a demonstration that anything would break without it. The specification of the certificate checker is where this closes: a checker that replays a discharge has to find the expression the discharge was about, and how it identifies that expression decides whether `Site` must be a reference or may be a span.
 
 #### ConstraintInfluenceEntry
 
@@ -472,7 +427,6 @@ The proof engine operates in two sequential passes:
 │   (requirement-dispatched: KeyPresence and IndexBounds use            │
 │    guard-derived bounds, both reported under ProofStrategy.GuardInPath)│
 │  • If all fail → mark Unresolved, emit diagnostic.                   │
-│  • Build FaultSiteLinks for unresolved obligations.                  │
 │  • Run constraint influence analysis.                                │
 │  • Run initial-state satisfiability check.                           │
 └─────────────────────────────────────────────────────────────────────┘
@@ -480,7 +434,7 @@ The proof engine operates in two sequential passes:
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                            ProofLedger                               │
-│  (Diagnostics + Obligations + FaultSiteLinks + ProducedFacts)        │
+│  (Diagnostics + Obligations + ProducedFacts)                         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1897,9 +1851,9 @@ _ => UnknownSentinel
 
 A constant zero denominator therefore does **not** produce a proved `true`/`false` result. The fold returns `UnknownSentinel`, which `ConstantFold` maps to `null` (unknown). This is a conservative guard: the proof engine refuses to "evaluate through" divide-by-zero or modulo-by-zero during initial-state satisfiability analysis. Because `int`, `long`, and `decimal` all feed the same numeric path, the guard applies equally to integer and decimal division.
 
-### Proof/Fault Chain
+### Requirement-to-Diagnostic Chain
 
-The proof engine threads obligations through a chain that connects compile-time analysis to runtime defense:
+The proof engine threads obligations through a chain that connects a catalog-declared requirement to the diagnostic that refuses the definition when it cannot be discharged. The chain ends there. Each diagnostic in it is paired with a fault class in the catalogs, and that pairing is checked when the project is built — it is not another link the chain travels along:
 
 ```text
 ┌──────────────────┐      ┌────────────────────┐      ┌────────────────────┐
@@ -1915,35 +1869,23 @@ The proof engine threads obligations through a chain that connects compile-time 
                           └─────────────────┘                                    └─────────────────┘
                                     │                                                       │
                                     ▼                                                       ▼
-                            No runtime check                                     ┌─────────────────┐
-                               needed                                            │ DiagnosticCode  │
+                              Nothing further                                    ┌─────────────────┐
+                                                                                 │ DiagnosticCode  │
                                                                                  │ (authoring-time)│
                                                                                  └─────────────────┘
                                                                                            │
                                                                                            ▼
                                                                                  ┌─────────────────┐
-                                                                                 │   FaultCode     │
-                                                                                 │ (runtime)       │
-                                                                                 └─────────────────┘
-                                                                                           │
-                                                                                           ▼
-                                                                                 ┌─────────────────┐
-                                                                                 │ FaultSiteLink   │
-                                                                                 │ → Precept Builder│
-                                                                                 └─────────────────┘
-                                                                                           │
-                                                                                           ▼
-                                                                                 ┌─────────────────┐
-                                                                                 │FaultSiteDescriptor│
-                                                                                 │ (defense-in-depth)│
+                                                                                 │  Definition     │
+                                                                                 │   refused       │
                                                                                  └─────────────────┘
 ```
 
 **Key invariants:**
 
 1. Every `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to its prevention diagnostic
-2. Roslyn analyzers (PRECEPT0001, PRECEPT0002) enforce that every evaluator failure path routes through a classified `FaultCode`
-3. Every unresolved, non-error-tainted obligation produces both a diagnostic (for the author) and a `FaultSiteLink` (for the Precept Builder)
+2. Roslyn analyzers (PRECEPT0001, PRECEPT0002) enforce the build-time shape of that pairing: every `FaultCode` member names a valid `DiagnosticCode`, and every `Fail()` call classifies with a `FaultCode`
+3. Every unresolved, non-error-tainted obligation produces a diagnostic, and the definition does not compile
 
 ### Constraint Influence Analysis
 
@@ -2137,7 +2079,7 @@ Collection non-empty obligations arise from several sources:
 
 **Ownership (PE-G9):** Collection non-empty requirements are encoded as `NumericProofRequirement(SelfSubject(CollectionCountAccessor), GreaterThan, 0)` in the catalog. The proof engine discharges them through the same bounded Strategies 1/2/3 it uses for other numeric obligations; the only collection-specific branch is final diagnostic/fault projection.
 
-If the obligation is unresolved after all strategies, the proof-site shape determines the projected failure surface: `TypedMemberAccess` sites emit `UnguardedCollectionAccess` and map to `FaultCode.CollectionEmptyOnAccess`; field-target action sites (`dequeue`, `pop`) emit `UnguardedCollectionMutation` and map to `FaultCode.CollectionEmptyOnMutation`.
+If the obligation is unresolved after all strategies, the proof-site shape determines which diagnostic is emitted: `TypedMemberAccess` sites emit `UnguardedCollectionAccess`; field-target action sites (`dequeue`, `pop`) emit `UnguardedCollectionMutation`. The failure classes those two diagnostics are paired with in the catalog are `FaultCode.CollectionEmptyOnAccess` and `FaultCode.CollectionEmptyOnMutation` respectively — the pairing is a build-time correspondence, not something the emitted diagnostic carries into runtime.
 
 **Modifier-proof strategy:** A statically-literal `mincount N` (`N ≥ 1`) discharges collection non-empty requirements. `mincount`'s `count >= DeclarationValue` satisfaction resolves conservatively to null in `SatisfactionCovers` (no runtime value), so the discharge instead reads the field's resolved `TypedField.DeclaredMinCount` and discharges `count > 0` when it is `≥ 1`; `mincount 0` / no `mincount` does not discharge. (`notempty` is string-only and no longer carries a `count > 0` satisfaction — it does not discharge collection non-emptiness; in inner-type position it constrains each element.)
 
@@ -2208,28 +2150,15 @@ The proof engine runs for ALL precepts, including stateless ones.
 | Consumer | What It Receives |
 |---|---|
 | **Compilation** | `ProofLedger` as one of the sealed pipeline artifacts; `Diagnostics` merged into final diagnostic stream |
-| **Precept Builder** | `FaultSiteLinks` → plants `FaultSiteDescriptor` backstops; `ConstraintInfluence` → builds `ConstraintInfluenceMap`; `InitialStateResults` → gates runtime model production |
+| **Precept Builder** | `ConstraintInfluence` → builds `ConstraintInfluenceMap`; `InitialStateResults` → gates runtime model production |
 | **Language Server** | Proof diagnostics with semantic site attribution for Problems panel |
 | **MCP compile output** | Obligation dispositions and constraint influence for AI tooling |
 
 #### Builder Proof-Consumption Contract (PE-G11)
 
-The Precept Builder (pipeline stage 7, after ProofEngine) consumes `ProofLedger` to produce runtime backstops and indices, and to enforce the initial-state gate:
+The Precept Builder (pipeline stage 7, after ProofEngine) consumes `ProofLedger` to produce runtime indices and to enforce the initial-state gate:
 
-**1. FaultSiteDescriptor Backstops (from `ProofLedger.FaultSiteLinks`)**
-
-For each `FaultSiteLink` (one per unresolved, non-error-tainted obligation):
-
-```csharp
-// Builder transforms:
-//   FaultSiteLink(obligation, faultCode, diagnosticCode, SourceSpan site)
-// Into:
-//   FaultSiteDescriptor(faultCode, diagnosticCode, site.StartLine)
-```
-
-**Builder rule:** Every `FaultSiteLink` produced for an unresolved, non-error-tainted obligation MUST produce a `FaultSiteDescriptor`. Error-tainted unresolved obligations are suppressed earlier in `ProofEngine` and therefore never reach the builder.
-
-**2. ConstraintInfluenceMap (from `ProofLedger.ConstraintInfluence`)**
+**1. ConstraintInfluenceMap (from `ProofLedger.ConstraintInfluence`)**
 
 ```csharp
 public sealed record ConstraintInfluenceMap(
@@ -2242,16 +2171,15 @@ Inverted index: given a field or arg, which constraints mention it? Used at ingr
 
 **It is not a re-check index.** The runtime does not re-evaluate the definition's rules against a changed configuration — every handler was proven at compile time to preserve every rule, so there is no pass after the mutation for an index of affected constraints to drive (spec §0.7, §3A.4; `docs/runtime/evaluator.md` § Ingress Validation Guarantees). Whether ingress routing is served by this map or by the evaluator's own bucket index is the same open question the bucket index carries, and neither document answers it yet.
 
-**3. InitialStateSatisfiabilityResults (from `ProofLedger.InitialStateResults`)**
+**2. InitialStateSatisfiabilityResults (from `ProofLedger.InitialStateResults`)**
 
 The builder reads `InitialStateResults` and, if any `IsSatisfiable == false`, prevents the production of a runtime `Precept` model. An unsatisfiable initial state is a structural defect.
 
-**4. ProofLedger.Obligations (diagnostic-only, not consumed by builder)**
+**3. ProofLedger.Obligations (diagnostic-only, not consumed by builder)**
 
 | ProofLedger Field | Builder Consumption | Runtime Artifact |
 |---|---|---|
 | `Obligations` | Not consumed by builder | Diagnostic-only (LS, MCP) |
-| `FaultSiteLinks` | Transforms to `FaultSiteDescriptor` per opcode | Runtime backstops |
 | `ConstraintInfluence` | Inverts to `ConstraintInfluenceMap` | Field-and-arg → constraint index, read at ingress; not a re-check index |
 | `InitialStateResults` | Gate: blocks runtime model if unsatisfiable | Compile-time gate |
 | `Diagnostics` | Merged into `Compilation.Diagnostics` | Authoring-time feedback |
@@ -2293,7 +2221,7 @@ Template parameter population for proof-stage diagnostics:
 
 **Field name resolution:** Use `GetFieldName(requirement.Subject, obligation.Site)`. If the subject resolves to a field, use the field name. If resolution fails, use `"<unknown>"`.
 
-**Diagnostic-code selection:** For the subtype-fixed obligation kinds, `CreateDiagnostic` reads the code from `ProofRequirementMeta.DiagnosticCode` (`ProofRequirements.GetMeta(kind).DiagnosticCode`) — the same catalog field `CreateFaultSiteLink` reads — so the code lives in exactly one place. The per-subtype arms keep only message-argument formatting. The genuinely context-determined kinds select their code explicitly because it is a function of the discharge site rather than a per-kind constant: `Numeric` (via `GetNumericRequirementDiagnosticCode`, by site shape), `KeyPresence` (by the requirement's absence flag), and the `QualifierChain` compound-period override.
+**Diagnostic-code selection:** For the subtype-fixed obligation kinds, `CreateDiagnostic` reads the code from `ProofRequirementMeta.DiagnosticCode` (`ProofRequirements.GetMeta(kind).DiagnosticCode`), which is the one place the code lives — `CreateDiagnostic` is its only reader. The per-subtype arms keep only message-argument formatting. The genuinely context-determined kinds select their code explicitly because it is a function of the discharge site rather than a per-kind constant: `Numeric` (via `GetNumericRequirementDiagnosticCode`, by site shape), `KeyPresence` (by the requirement's absence flag), and the `QualifierChain` compound-period override.
 
 ### Partial Results
 
@@ -2303,7 +2231,6 @@ The proof engine always produces a complete `ProofLedger`, regardless of how man
 public static ProofLedger Prove(SemanticIndex semantics, StateGraph graph)
 {
     var obligations = new List<ProofObligation>();
-    var faultSiteLinks = new List<FaultSiteLink>();
     var diagnostics = new List<Diagnostic>();
     
     // Pass 1: Obligation Instantiation — explicit walk-target enumeration (PE-G4)
@@ -2338,7 +2265,7 @@ public static ProofLedger Prove(SemanticIndex semantics, StateGraph graph)
         if (ContainsErrorExpression(obligation.Site))
         {
             obligations[i] = obligation with { Disposition = ProofDisposition.Unresolved };
-            continue;  // No diagnostic, no fault link — error already reported upstream
+            continue;  // No diagnostic — error already reported upstream
         }
         
         var (disposition, strategy) = TryDischarge(obligation, semantics);
@@ -2347,14 +2274,12 @@ public static ProofLedger Prove(SemanticIndex semantics, StateGraph graph)
         if (disposition == ProofDisposition.Unresolved)
         {
             diagnostics.Add(CreateDiagnostic(obligation));
-            faultSiteLinks.Add(CreateFaultSiteLink(obligation));
         }
     }
     
     // Always return complete ledger
     return new ProofLedger(
         obligations.ToImmutableArray(),
-        faultSiteLinks.ToImmutableArray(),
         ProjectConstraintInfluence(semantics),
         CheckInitialStateSatisfiability(semantics),
         diagnostics.ToImmutableArray()
@@ -2405,15 +2330,6 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 **Enforcement:** The strategy dispatch loop is exhaustive — after trying every enumerated strategy, the obligation is marked `Unresolved`; non-error-tainted obligations emit diagnostics, while error-tainted obligations are suppressed per PE-G13.
 
-### Fault Chain Integrity
-
-**Contract:** Every `FaultSiteLink` in the `ProofLedger` has a 1:1 correspondence with an `Unresolved` obligation and a `FaultCode` that carries `[StaticallyPreventable(DiagnosticCode)]`.
-
-**Enforcement:**
-1. `FaultSiteLink` is created only for `Unresolved` obligations
-2. The `FaultCode` lookup uses the Roslyn-enforced `[StaticallyPreventable]` attribute
-3. Roslyn analyzers PRECEPT0001/PRECEPT0002 enforce attribute presence at build time
-
 ### Determinism
 
 **Contract:** Same input (`SemanticIndex` + `StateGraph`) always produces same output (`ProofLedger`).
@@ -2443,22 +2359,19 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 **Trade-off accepted:** The proof engine deliberately forgoes strategies that could prove more but cannot carry a legible certificate or do not earn their place (e.g. multi-hop fact combination — deferred, see §13). This is acceptable because:
 1. Such relationships are rare in business state machines
 2. Authors can add guards to make obligations statically dischargeable
-3. Defense-in-depth backstops catch any runtime failures
+3. An obligation no admissible strategy can discharge refuses the definition. That is the harder half of the trade-off and it is stated plainly: a program that is in fact safe, but safe for a reason no strategy can certify, does not compile.
 
 **Precedent:** The surveyed verification systems (SPARK Ada/GNATprove, Dafny, Liquid Haskell, CBMC) all depend on external solvers. Precept deliberately chooses bounded proof over general verification.
 
 ### Decision 2: ProofLedger Does NOT Cross Compile-Runtime Boundary
 
-**Decision:** The `ProofLedger` is a compile-time artifact. Only `FaultSiteAnnotation` records (stamped on opcodes by the Precept Builder per CC#6) cross into runtime.
+**Decision:** The `ProofLedger` is a compile-time artifact. Nothing from it crosses into runtime.
 
 **Rationale:**
 - **Separation of concerns:** Proof is analysis; runtime is execution. The runtime model should contain only what's needed for execution.
-- **Memory efficiency:** Runtime instances don't carry proof baggage. A deployed precept includes only field descriptors, transition tables, and backstops.
-- **Defense-in-depth:** `FaultSiteAnnotation` backstops are defense-in-depth — they should never fire if proof is correct. They exist for belt-and-suspenders safety, not as a proof continuation mechanism.
+- **Memory efficiency:** Runtime instances don't carry proof baggage. A deployed precept includes only field descriptors, transition tables and execution plans.
 
-**What crosses:**
-- `FaultSiteAnnotation` — nullable annotation on each opcode: fault code + preventing diagnostic code + source location (CC#6)
-- Constraint execution plans (from evaluator, not proof engine)
+The constraint execution plans the runtime model carries do not contradict this: they reach runtime by a different route, and the proof engine does not produce them.
 
 **What does not cross:**
 - `ProofObligation` records
@@ -2579,12 +2492,12 @@ public enum FaultCode
 ```
 
 Roslyn analyzers PRECEPT0001 and PRECEPT0002 enforce:
-- Every evaluator failure path routes through a classified `FaultCode`
+- Every `Fail()` call classifies with a `FaultCode` rather than an unclassified failure
 - Every `FaultCode` links to its prevention `DiagnosticCode`
 
 This makes fault–diagnostic correspondence a **build-time invariant**. A fault cannot be added without declaring its prevention diagnostic. A diagnostic cannot be removed while its fault still exists.
 
-The attribute is also the **single source of truth for the `DiagnosticCode → FaultCode` map** that `CreateFaultSiteLink` records on each fault site: the bijective core is derived by reflecting `[StaticallyPreventable]` (`StaticallyPreventableMap`), not re-listed in the proof engine. Two pieces of policy remain explicit code because the attribute cannot express them — the collection-safety many-to-one collapse (`KeyPresenceSafety` / `KeyUniquenessGuard` / `IndexBoundsGuard` onto the shared empty-collection faults) and the conservative backstop for proof-only obligation families with no representable runtime fault of their own.
+The attribute is also **the only place the `DiagnosticCode` ↔ `FaultCode` map is declared**: the bijective core is derived by reflecting `[StaticallyPreventable]` (`StaticallyPreventableMap`), not re-listed in the proof engine. One piece of policy remains explicit code because the attribute cannot express it — the collection-safety many-to-one collapse (`KeyPresenceSafety` / `KeyUniquenessGuard` / `IndexBoundsGuard` onto the shared empty-collection faults).
 
 ### Bounded, Non-Extensible Strategy Set
 
@@ -2671,11 +2584,10 @@ If an obligation cannot be discharged by an admissible strategy, the compiler **
 
 ### No Runtime Obligation Checking
 
-The `ProofLedger` does NOT cross the compile-runtime boundary. Only `FaultSiteAnnotation` records (stamped on opcodes by the Precept Builder per CC#6) cross into runtime.
+The `ProofLedger` does NOT cross the compile-runtime boundary.
 
 **Why not pass obligations to runtime?**
 - Runtime instances would carry proof baggage that's never used in execution
-- Defense-in-depth backstops already provide runtime safety
 - Proof is a compile-time activity — mixing it with runtime would blur responsibilities
 
 ### No Evaluation of Rules Against Values
@@ -2717,7 +2629,6 @@ Unlike SPARK Ada's `pragma Annotate` or Dafny's `assert`/`assume`, Precept does 
 | Proof engine overview (§8) | `docs/compiler-and-runtime-design.md §8` |
 | SemanticIndex shape, typed expression records | `docs/compiler/type-checker.md §7.1` |
 | StateGraph output, ProofForwardingFact shapes | `docs/compiler/graph-analyzer.md §4` |
-| FaultSiteDescriptor planting | `docs/runtime/precept-builder.md` |
 | ProofRequirement catalog and DU structure | `docs/language/catalog-system.md` |
 | Modifier catalog (ValueModifierMeta) | `docs/language/catalog-system.md` |
 | Diagnostic infrastructure and error-accumulation contract | `docs/compiler/diagnostic-system.md` |

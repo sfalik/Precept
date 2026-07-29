@@ -654,7 +654,7 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode ↔
 > - **Structured "why not" explanations.** Constraint violations carry structured explanation depth — the failing expression, evaluated field values, guard context, and failing sub-expression — not just a boolean status. This transforms MCP tools from status reporters to causal reasoning engines.
 > - **Bounded, non-extensible strategy set.** A closed set of strategies, each a simple predicate function — not a general solver framework. This makes the proof engine predictable, auditable, and implementable without external dependencies.
 
-See [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md) for the full stage design including strategy details and the proof/fault chain.
+See [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md) for the full stage design including strategy details and § Requirement-to-Diagnostic Chain.
 
 ## 9. Compilation
 
@@ -703,7 +703,7 @@ flowchart LR
 | `Version` | runtime operations | runtime entity snapshot |
 | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` | Evaluator | runtime results |
 | `ConstraintResult`, `ConstraintViolation` | Evaluator | runtime results |
-| `Fault` | Evaluator | engine-invariant breach only |
+| `Fault` | — nothing constructs one | engine-invariant breach only; declared, with no producer (`runtime/fault-system.md` Q3) |
 
 ### Incremental compilation model
 
@@ -821,9 +821,9 @@ flowchart TD
 
 | **Input** | `Precept`, `Version`, descriptor-keyed arguments or patches, prebuilt execution plans, constraint-plan indexes |
 |---|---|
-| **Output** | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` (commit); `EventInspection`, `UpdateInspection`, `RowInspection` (inspect); `Fault` (engine-invariant breach only) |
+| **Output** | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` (commit); `EventInspection`, `UpdateInspection`, `RowInspection` (inspect) |
 
-Valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections. `Fault` is reserved for classifying a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. It is not a fault-prevention check standing behind the proof; the evaluator carries none.
+Valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections. `Fault` is reserved for classifying a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. It is not a fault-prevention check standing behind the proof; the evaluator carries none. Nothing constructs a `Fault` today, and whether the evaluator should detect an engine-invariant breach at all — rather than letting it stay an unrecoverable exception, which is what `precept-builder.md` and `evaluator.md` say — is undecided (`runtime/fault-system.md` Q3).
 
 ### Per-operation validation and dispatch matrix
 
@@ -871,7 +871,7 @@ There is no `*ConstraintsFailed` outcome in any of these families, and there can
 | Business prohibition or rule failure | may have no compile-time issue | structured domain outcome |
 | Routing/availability result | may have no compile-time issue | structured boundary outcome |
 | Caller input/data mismatch | descriptor/type contracts exist | structured boundary-validation outcome |
-| Engine-invariant breach | compiler-owned prevention rule | `Fault` (an engine defect; should be unreachable) |
+| Engine-invariant breach | compiler-owned prevention rule | `Fault` (an engine defect; nothing constructs one today) |
 
 ### Commit outcomes by operation
 

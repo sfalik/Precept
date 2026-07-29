@@ -658,7 +658,7 @@ Interval hover answers: **is this value's range safe?** It uses the existing bad
 | Result escapes bound | Arithmetic result interval exceeds target | Tighten operand bounds OR add guard that narrows the input |
 | Presence uncertainty | Optional field used in arithmetic without guard | Add presence guard before arithmetic |
 
-**Routing nuance — unbounded field shows `⚠️ Gap`, not `⚡ Enforced`.** Even though a runtime overflow check exists, the hover reflects static proof status. The runtime check is a fallback, not a guarantee — collapsing the distinction would teach users to trust runtime safety nets as proof.
+**Routing nuance — unbounded field shows `⚠️ Gap`, not `⚡ Enforced`.** The hover reports static proof status and nothing else, because there is nothing else: no check runs at evaluation time to catch an overflow the compiler did not rule out (`precept-language-spec.md` §0.1, Principle 11). `⚡ Enforced` would be a claim the engine does not make, and `⚠️ Gap` is the accurate one — the arithmetic overflow model is in scope and not yet implemented, so an unbounded operand is genuinely unprotected today.
 
 **Propagation chain compactness.** Compact form shows the full chain on one `🔬` line using `→` between steps: `[0..8 000] − [0..2 000] → [−2 000..8 000] × [0.05..0.20] → [−400..1 600]`. Expanded form (lines 4–5) uses one `🔬 Step N:` line per operator and ends with the containment verdict (`[result] ⊆ [target]`). Cap expansion at five lines total.
 

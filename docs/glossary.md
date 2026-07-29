@@ -75,7 +75,7 @@ The metadata record for a `Construct` catalog entry. Carries leading tokens, slo
 ## D
 
 ### Descriptor [Runtime]
-A first-class runtime identity for a declared program element (field, state, event, arg, constraint, fault site). The runtime references program elements by descriptor rather than name. Canonical: [`runtime/descriptor-types.md`](runtime/descriptor-types.md).
+A first-class runtime identity for a declared program element (field, state, event, arg, constraint). The runtime references program elements by descriptor rather than name. Canonical: [`runtime/descriptor-types.md`](runtime/descriptor-types.md).
 
 ### Descriptor [Tooling]
 In TextMate grammar / LSP semantic tokens, a "scope descriptor" classifies tokens for visual display. Unrelated to runtime descriptors. Canonical: [`compiler/tooling-surface.md`](compiler/tooling-surface.md).
@@ -84,7 +84,7 @@ In TextMate grammar / LSP semantic tokens, a "scope descriptor" classifies token
 Same definition + same data + same operation produces the same outcome every time. No hidden state, no time-dependent behavior, no platform-dependent floating-point. Canonical: [philosophy.md](philosophy.md), [`precept-language-spec.md § 0.1 Principle 3`](language/precept-language-spec.md).
 
 ### Diagnostic [Pipeline] [Catalog]
-A compile-time message reporting a violation or condition. Each diagnostic carries a code (e.g., `PRE0123`), severity, message template, and (often) recovery steps. Declared in the `Diagnostics` catalog. The runtime mirror is **Fault**. Canonical: [`compiler/diagnostic-system.md`](compiler/diagnostic-system.md).
+A compile-time message reporting a violation or condition. Each diagnostic carries a code (e.g., `PRE0123`), severity, message template, and (often) recovery steps. Declared in the `Diagnostics` catalog. Each prevention diagnostic is paired at build time with the **Fault** class it exists to prevent. Canonical: [`compiler/diagnostic-system.md`](compiler/diagnostic-system.md).
 
 ### Domain expert primary author [Philosophy]
 See **Audience**.
@@ -110,7 +110,7 @@ A catalog entry for a kind of expression the parser recognizes — literal, iden
 ## F
 
 ### Fault [Runtime] [Catalog]
-A runtime failure mode — the runtime counterpart of a compile-time diagnostic. Each fault carries a code, severity, and message template. Declared in the `Faults` catalog. Faults are emitted when invariants the compiler couldn't prove are violated at runtime. Canonical: [`runtime/fault-system.md`](runtime/fault-system.md).
+A class of failure the compiler is responsible for preventing, paired with the diagnostic that prevents it. Each carries a code, severity, and message template, and is declared in the `Faults` catalog. Nothing produces a fault while an event is being evaluated: an operation is proven safe or the definition is refused. The `Fault` type itself names a breach of one of the engine's own invariants, and whether anything ever constructs one is undecided. Canonical: [`runtime/fault-system.md`](runtime/fault-system.md).
 
 ### Field [Language]
 A typed data slot on a precept — `field PlanName as string nullable`. Carries a type, optional modifiers (default, nullable, nonnegative, maxplaces, etc.), and optional computed expression. Canonical: [`precept-language-spec.md § Fields`](language/precept-language-spec.md).

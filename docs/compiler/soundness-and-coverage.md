@@ -110,8 +110,7 @@ bounds that escape the obligation.
 site out of the proof. Such a marker is directly corrosive to the guarantee: it reintroduces exactly the
 bypassable, uncheckable path that governance-not-validation exists to eliminate. Where the engine cannot
 derive a bound, the author's recourse is §6 — state the consequence as *one rule* the engine then applies
-— not a bypass. (The `[StaticallyPreventable]` evaluator traps are defense-in-depth for out-of-contract
-entry, not an author-facing opt-out.)
+— not a bypass.
 
 **Sources.** Proof-engine decision ledger #1 (prove-or-reject over fault-floor) and #9 (no escape hatch);
 the boundary ruling that retired old D2; the prove-or-reject position paper. These Working artifacts are
@@ -229,7 +228,7 @@ discharges it, or the pre-proof stage that owns it.
 | `FunctionArgConstraintViolation` | `FunctionArgConstraintViolation` | *(no per-argument constraint machinery exists)* | **deferred** — owner-fork: remove-scaffolding vs. build. Re-open trigger: owner chooses "build" → routes to `/design` (new language surface). No locked spec grounds it today. |
 | `CollectionEmptyOnAccess` | `UnguardedCollectionAccess` | collection non-empty / `IndexBounds` / `KeyPresence` | **in** for indexed/`.at` access; **deferred** for `lookup for K` key-presence reads (obligation never created; re-open trigger: key-presence enrollment work) |
 | `CollectionEmptyOnMutation` | `UnguardedCollectionMutation` | collection non-empty (mutation) | **in** |
-| `QualifierMismatch` | `QualifierMismatch` | `QualifierCompatibility` / `QualifierChain` / `AssignmentQualifier` / `DimensionalProduct` | **in** *(runtime fault-identity collapse to a single backstop is a separate runtime-only concern — see §3.2)* |
+| `QualifierMismatch` | `QualifierMismatch` | `QualifierCompatibility` / `QualifierChain` / `AssignmentQualifier` / `DimensionalProduct` | **in** |
 | `NumericOverflow` | `NumericOverflow` | `IntervalContainment` (computed-field bound) | **in-scope, not-yet-implemented** — the arithmetic-overflow (representable-range) lane is GATE-O, post-MVP (see §6). The declared-bound containment obligation is in; the overflow enforcement lane is deferred by build-order. |
 | `OutOfRange` | `OutOfRange` | `IntervalContainment` (assignment into declared bounds) | **in** |
 | `LengthBoundViolation` | `LengthBoundViolation` | `LengthContainment` | **in** |
@@ -263,12 +262,10 @@ created are **deferred (in-scope, not-yet-implemented)** with a re-open/complete
 | Constraint `.Message` interpolation holes — **presence** (e.g. `because "value {OptionalField}"`) | `Presence` | **in-scope, not-yet-implemented** — **owner ruling, 2026-07-24: refuse uniformly.** An interpolation hole is a *read*; reading an optional at a hole enrolls presence identically to any value position, with no split by string position — a `because`/`reject` message and a `set` RHS obey one rule. The earlier "presence-tolerant rendering" recommendation was refuted (no language-chosen sentinel is sound against the length-interval machinery, and it would revive the silent empty-string coercion deleted at `literal-system.md:145`). The stale claim that enrolling presence "would force authors to guard the field they are reporting on" is corrected: measured demand is ≤11/808 corpus holes and both originally-cited samples do not motivate; an author renders an optional via the shipped `if X is set then X else "…"` conditional (no new surface). Decision record: the locked presence-tolerant-rendering design (2026-07-24). Complete trigger: obligation-creation sweep (shared with the value-fault arm above), after its dependencies close (state-`ensure` and conditional-field presence narrowing, optional event-arg holes). |
 | Unary op (numeric negation) | *(no `ProofRequirements` slot on `UnaryOperationMeta`)* | **explicitly-out** — the sole unary fault (MinValue-negation overflow) is subsumed by the enclosing containment site. Re-open trigger: if the ratified overflow model makes a unary op *independently* faultable (verify against the overflow spec), the empty slot must be re-activated, not assumed safe. |
 
-> **Runtime-only residue (not a compile-time coverage gap).** Two known items are runtime-surfacing
-> defects, not obligation-coverage holes: (1) assignment-out-of-declared-bounds currently borrows the
-> `NumericOverflow` wording rather than surfacing `OutOfRange`'s own template (message precision only —
-> prevention holds); (2) the runtime `FaultSiteLink` identity collapses to a single backstop code for
-> `OutOfRange` and `QualifierMismatch`. Both re-open when runtime fault-surfacing / carries-proof identity
-> is built and the reported code becomes observable. Compile-time prevention is fully live for both.
+> **A message-template defect, not a compile-time coverage gap.** One known item is a reporting defect
+> rather than an obligation-coverage hole: assignment-out-of-declared-bounds currently borrows the
+> `NumericOverflow` wording rather than surfacing `OutOfRange`'s own template. Message precision only —
+> prevention holds, and this is a compile-time diagnostic defect with a compile-time fix.
 
 ### 3.3 The admissibility disqualifier — leg 4 is the scope-creep gate
 
