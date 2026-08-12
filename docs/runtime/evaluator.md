@@ -1618,7 +1618,7 @@ public readonly record struct Fault(
 );
 ```
 
-Faults are **never thrown** — they are returned as structured outcome variants. This maintains the pattern-matchable, composable outcome model.
+Should anything ever construct a `Fault` (see the open question below), it is **never thrown** — it is returned as a structured outcome variant. This maintains the pattern-matchable, composable outcome model. The shape is settled; whether anything produces a value of it is not.
 
 > **Open — whether anything constructs a `Fault`.** The case in question is a defect in Precept itself — in the compiler, the builder or the evaluator — not anything an author can write in a definition. `Fault` and `EventOutcome.Faulted` are declared, and `compiler-and-runtime-design.md` names the evaluator as where such a breach would surface. Against that, § No Unclassified Exceptions below and `precept-builder.md` § Builder Invariant Violations both say a corrupted model is an unrecoverable exception. Whether the evaluator carries a detection mechanism at all, or whether these stay declared classifications with no producer while engine defects remain exceptions, is undecided.
 >
@@ -1629,13 +1629,15 @@ Faults are **never thrown** — they are returned as structured outcome variants
 | Failure Type | Recovery |
 |---|---|
 | In-domain failure | Caller handles the outcome appropriately (display error, retry, etc.) |
-| Engine-invariant breach | Log the fault with `FaultCode` and `CodeName`; investigate the compiler, builder or evaluator defect; do not retry |
+| Engine-invariant breach | Investigate the compiler, builder or evaluator defect; do not retry. Should the breach ever arrive as a `Fault` rather than as a thrown exception — undecided, see § Fault Production — log it with its `FaultCode` and `CodeName` |
 
 ### No Unclassified Exceptions
 
 The evaluator does not throw exceptions for in-domain operations. Every in-domain failure path produces a structured outcome variant.
 
 The only exception paths are truly exceptional: out-of-memory, corrupted `Precept` model, etc. These are unrecoverable and should not be caught.
+
+The corrupted-model half of that is one of the two accounts canon carries of what happens when Precept itself is broken, and it is written here as this document has always written it. Whether it stands, or whether the evaluator instead detects the breach and reports a `Fault`, is undecided — see the open note in § Fault Production above, and `fault-system.md` § Q3.
 
 ---
 

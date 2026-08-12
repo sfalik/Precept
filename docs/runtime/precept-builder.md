@@ -648,6 +648,8 @@ Until that is decided, the rest of this section describes only the `HasErrors` g
 
 If the builder detects internal invariant violations (e.g., a `TypedTransitionRow` references a state that doesn't exist in `SemanticIndex.States`), it throws `InvalidOperationException` with diagnostic context. These indicate bugs in upstream stages — the builder assumes the `Compilation` is internally consistent.
 
+This is one of the two accounts canon carries of what happens when Precept itself is broken; `compiler-and-runtime-design.md` names the evaluator as where such a breach would surface as a `Fault` instead. Which of the two holds is undecided — see `fault-system.md` § Q3, indexed in § 13 Open Questions.
+
 ### No Partial Builds
 
 There is no partial `Precept`. The builder either produces a complete, valid executable model or throws. This is a deliberate design choice:

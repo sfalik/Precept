@@ -881,6 +881,12 @@ There is no `*ConstraintsFailed` outcome in any of these families, and there can
 | `Update` | `FieldWriteCommitted` | `AccessDenied` | `InvalidInput` | `Fault` |
 | `Restore` | `Restored` | — | `RestoreInvalidInput` | `Fault` |
 
+The invariant-breach column says which classification an engine defect would fall under, not what any
+operation returns today: nothing constructs a `Fault`, and whether an engine defect is reported as one at
+all is undecided (`runtime/fault-system.md` Q3). The column also runs ahead of `result-types.md` and
+`runtime-api.md`, which give `UpdateOutcome` and `RestoreOutcome` no fault variant — that gap closes when
+the producer question does.
+
 **Inspection** shares the same prebuilt plans as commit — it is not a second evaluator. `InspectFire` / `InspectUpdate` preview every possible transition (or field-edit outcome) — which rows match, which guards hold, and whether the supplied values pass ingress — using the same plans in report mode rather than enforce mode. What inspection does *not* do is predict a post-mutation constraint verdict, because no such check runs; a rule that a proof already discharged has nothing to report at runtime beyond the premises it was proven from. The full shape of `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, and `FieldSnapshot` lives in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md).
 
 ### Constraint query contract
@@ -900,7 +906,7 @@ When `Fire` returns `Rejected` or `InvalidArgs`, or `Update` returns `InvalidInp
 The multi-span attribution pattern from the Rust borrow checker provides relevant precedent for this design: a single borrow-checker diagnostic carries multiple labeled source spans (primary span for the conflict, secondary spans for the causal chain — "first mutable borrow occurs here," "second mutable borrow occurs here," "first borrow later used here"). Precept's `ConstraintViolation` follows the same structural principle — the failing expression, the contributing field values, and the guard context form a labeled causal chain, not a single error site. Infer (Meta) takes a similar approach with `bug_trace` — an ordered array of inter-procedural trace steps, each attributed to a source location with a description of what the analysis observed.
 
 > **Precept Innovations**
-> - **Structured outcomes taxonomy.** Every runtime operation communicates through a structured outcome — success, domain rejection, boundary validation, or engine-invariant fault. There are no exceptions, no error codes, no untyped failures. An AI agent or host application can pattern-match on outcome type and always know what happened and why.
+> - **Structured outcomes taxonomy.** Every runtime operation communicates through a structured outcome — success, domain rejection, or boundary validation. There are no exceptions, no error codes, no untyped failures on any of those paths. An AI agent or host application can pattern-match on outcome type and always know what happened and why. The one case outside that is a defect in Precept itself: `Fault` is the declared classification for an engine-invariant breach, nothing constructs one, and whether such a breach is reported as a structured outcome or stays an unrecoverable exception is undecided (`runtime/fault-system.md` Q3).
 > - **Inspection API.** `InspectFire` and `InspectUpdate` preview every possible action and its outcome without executing anything — using the same prebuilt plans as commit. No other state machine library or rules engine provides read-only preview of every row's guard outcome and ingress result before committing.
 > - **Causal violation explanations.** Constraint violations carry structured explanation depth — evaluated field values, guard context, failing sub-expression — not just a boolean. This makes MCP tools causal reasoning engines, not status reporters.
 > - **Trusted hydration on `Restore`.** Persisted data is not re-checked on the way back in — it was governed when it was written, so hydration reconstitutes the entity rather than making a second pass over the whole configuration, exactly as a direct database read trusts the rows it loads. `Restore` does recompute computed fields, so a derived value is re-derived from the restored inputs rather than read back as stored.

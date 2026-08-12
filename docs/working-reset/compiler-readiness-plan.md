@@ -23,7 +23,7 @@ a picture that was not true.
 
 ## 1. Where we are
 
-**Phase 2 — in progress. Last touched 2026-07-28.**
+**Phase 2 — in progress. Last touched 2026-08-11.**
 
 **This section was stale from 2026-07-25 to 2026-07-28**, saying phase 1 slice 1.1 had not started while
 phase 1 had been finished for two days and phase 2 had run five correction passes. Five commits updated
@@ -31,18 +31,45 @@ the board at § 2 and left this section, the one the plan tells you to read firs
 finished a week earlier. The rule that a slice is unfinished until its tracker row is updated covers § 2
 and this section equally.
 
-**Where phase 2 actually is.** The contradiction register holds **145 distinct rows**. 97 carry a commit
-hash and 14 more say "executed, uncommitted at the time of writing" and were never stamped once their
-pass landed, so about 111 are done. Three conditions are open.
+**It went stale a second time, from 2026-07-28 to 2026-08-11, and the second lapse is worse than the
+first.** `3a561dad` stamped the register and `f2a58fb6` re-ran condition 3; neither touched this file at
+all, which is the ordinary way facts get ahead of a tracker. Then `bc35e479` rewrote the board row from
+"97 carry a commit hash, 14 more are executed but were never stamped" to "133 carry a commit hash … the
+rest state a reason. **Condition 2 passes**" — and edited this section, three lines below, in the same
+commit, while leaving its copy of the old counts exactly as it found them. So the plan carried both
+numbers, in two sections, from one commit. **And the pass of 2026-08-11 that closed condition 6 changed
+the "last touched" date at the top of this section without reading what sat under it**, which briefly put
+a current date over text known to be wrong. The date and the paragraphs under it move together or neither
+moves; a section is not updated because something in it was.
 
-**Condition 2 fails** — those 14 rows do not name the commit that executed them, and every one of the
-three passes involved has since committed, so the hashes exist and nobody went back for them. Stamping
-them means checking each edit is actually in the commit its cell names, not trusting the label.
+**Where phase 2 actually is.** The contradiction register holds **145 distinct rows**, all executed or
+dispositioned. **133 carry a commit hash and the other 12 state a reason** — that count is
+[`phase-2/register-stamping.md`](phase-2/register-stamping.md) § 5, and § 2 records the same figures. On
+the board's own record every exit condition now passes or holds. Each carries a caveat, and the caveats
+are the part worth reading:
 
-**Condition 3** holds only as of a stated commit, for the reason written into the condition itself.
+- **Condition 2 passes**, as of `3a561dad`. Thirty-four rows said they had been executed and named the
+  pass that did it without naming a commit. That pass wrote the hashes in and checked each row against
+  the commit's parent and the commit itself rather than trusting the label.
+- **Condition 3 holds as of `3a561dad`**, re-run at HEAD in `f2a58fb6` with no regression found — six
+  patterns had rotted, five of them broken by that day's own corrections. It holds as of a stated commit
+  rather than permanently, for the reason written into the condition itself, and it is self-refereed:
+  each pattern is written by the same person who made the correction it tests.
+- **Condition 6 passes as of 2026-08-11**, on `N82` being executed and the `Fault`-producer question
+  being ruled. Both are set out below.
+- **Conditions 1, 4 and 5 are recorded as passing** by the fifth pass and the confirmation run, and have
+  not been independently recounted since. The cold read on § 5 is what would test condition 4 properly,
+  and it has not run.
 
-**Condition 6's 22 rows were 22 until 2026-07-28; 21 of them are now disposed of and uncommitted.** Nineteen
-were the runtime fault-backstop family — `R9`, `N22`, `N23`, `R10`, `N24`, `N25`, `R14`, `N26`, `R11`,
+**Where the fourteen went.** This section and § 5 both said fourteen rows were unstamped, and the stamping
+pass stamped thirty-four. Those are not in conflict: its § 2 is "the fourteen rows that named a pass" and
+its § 3 "the twenty rows that landed in `c9193ec8`" — the second group being the fault-backstop family,
+which was uncommitted when the fourteen was written and so could not yet be described as a row whose pass
+had landed. The step from 97 rows with a hash to 133 does not close on thirty-four alone, and nothing in
+this pass re-derived it; 133 is what both the board and the stamping record give.
+
+**Condition 6's 22 rows were 22 until 2026-07-28; 21 of them are now disposed of, and committed in
+`c9193ec8`.** Nineteen were the runtime fault-backstop family — `R9`, `N22`, `N23`, `R10`, `N24`, `N25`, `R14`, `N26`, `R11`,
 `R12`, `N27`, `R13`, `N28`, `N29`, `C1`, `C2`, `N30`, `N34`, `N35`, on register lines 292–315 — deferred
 by four passes because each owned two or three of the nine documents they span. Deciding the model came
 first, in [`phase-2/fault-backstop-model.md`](phase-2/fault-backstop-model.md), and the nineteen then ran
@@ -58,17 +85,24 @@ Decision 14 by number corrected with it. Record in
 [`phase-2/period-ordering-reconciliation.md`](phase-2/period-ordering-reconciliation.md). The mechanism is
 not built and is not this phase's; it is folded into phase 5.
 
-**What still holds condition 6 open is not a register row.** The fault-backstop pass left two questions
-open inside canon, and both need owners meeting the condition's own bar. One has an owning phase. The
-other does not, and that is recorded as the result rather than assigned to the nearest phase — it is on
-§ 4 as a question about ownership. Both are set out under exit condition 6 below.
+**What held condition 6 open after the last register row was not a register row, and it closed on
+2026-08-11.** The fault-backstop pass left two questions open inside canon, and both needed owners meeting
+the condition's own bar. One has an owning phase — phase 5, for the reference-identity invariant on
+`ProofObligation.Site`. The other, whether anything ever constructs a `Fault`, has none, because no phase
+of this plan builds the runtime; rather than assign it to the nearest phase it went to Shane as a question
+about ownership, and **he ruled on 2026-08-11 that it is deferred until the runtime is being built**. That
+makes it a named exception under § No phase closes with an open deferral that has no owner, which is now
+the only place the question is written down. Both are set out under exit condition 6 below.
 
 **The twenty-second was the one the board had never counted**: `N82`, same-basis period ordering, ruled at
 the walk against locked Decision 14 and never carried into the documents. **Done 2026-07-29** — see above.
 The row split the work correctly, the mechanism going through `/design` and the document reconciliation
 belonging to this phase, and the mechanism is now folded into phase 5.
 
-Then Shane's sign-off on the register, which is the phase's actual finish line.
+**What is left is not an exit condition.** Two items on § 5 bear on the close — the trace, which justifies
+every change to canon in this phase from `git diff` rather than from the register, and the cold read of
+the runtime and compiler documents, which is the honest test of condition 4. Then Shane's sign-off on the
+register, which is the phase's actual finish line.
 
 **Landed ahead of phase 1, 2026-07-25.** Three files were pulled out of the cell bundle before slice 1.6
 deletes it, and they are now depended on: `block-inventory.workflow.js` with its
@@ -82,7 +116,7 @@ step 1 assumes all three already exist.
 |---|---|---|---|---|
 | 0 | Make the instructions true | **Done** 2026-07-25, `355d9b37` `89392acd` | 1 | — |
 | 1 | Work out what is actually decided, and by whom | **Done** 2026-07-26, `f813e709` `a240a788` `183c2569` `714c7e8d` `7e224b9a` (slice 1.6 disposal deferred to phase 8 and does not block) | 1 | — |
-| 2 | Settle every place canon and the want document disagree | **In progress** 2026-07-29 — **145 rows, all executed or dispositioned**. 133 carry a commit hash; the rest state a reason. **Condition 2 passes**, verified row by row on 2026-07-28: each stamp was checked against the commit rather than taken from its own cell. **Condition 3 holds as of `3a561dad`**, re-run at HEAD with no regression found — six patterns had rotted, five of them broken by that day's own corrections. **Condition 6 no longer fails on any register row**: `N82` was executed 2026-07-29. It fails on **one open item with no owning phase** — whether anything ever constructs a `Fault`. See exit condition 6. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed | 1 | Phase 1 |
+| 2 | Settle every place canon and the want document disagree | **In progress** 2026-08-11 — **145 rows, all executed or dispositioned**. 133 carry a commit hash; the rest state a reason. **Condition 2 passes**, verified row by row on 2026-07-28: each stamp was checked against the commit rather than taken from its own cell. **Condition 3 holds as of `3a561dad`**, re-run at HEAD with no regression found — six patterns had rotted, five of them broken by that day's own corrections. **Condition 6 passes as of 2026-08-11**: `N82` was executed 2026-07-29, and the one open item with no owning phase — whether anything ever constructs a `Fault` — was ruled by Shane on 2026-08-11 and is now a named exception. See exit condition 6. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed | 1 | Phase 1 |
 | 3 | Corrected statement of the language, and the catalog drift check | Not started | 0 | Phase 2 |
 | 4 | Draft the certificate step list and count it | Not started | 0 | Phase 3; ends on **Shane's** recorded word |
 | 5 | Settle the obligation families and the discharge procedure | Not started | 0 | Phases 3, 4 |
@@ -143,18 +177,22 @@ verbatim quotations phase 1 requires. Phase 1's walk removes any row you did not
 
 ## 4. Waiting on Shane
 
-**Fourteen items, two of them ruled — one on 2026-07-28, one on 2026-07-29 — and both kept struck
-through so the rulings are not lost. Twelve open. One blocks phase 2 from closing; one blocks phase 5
-outright and two reach phase 4; the rest stall named pieces of phase 5. Nothing now
-blocks committing the fault-backstop work in the working tree.** The first open row predates the phase-1
-walk. Most of the rest were raised by the walk of 2026-07-26 or
+**Fourteen items, four of them ruled — 2026-07-26, 2026-07-28, 2026-07-29 and 2026-08-11 — and all four
+kept struck through so the rulings are not lost. Ten open, and none of them now blocks phase 2's exit
+condition 6. One blocks phase 5 outright, one reaches phase 4 as well as phase 5, one names phase 2's
+disputed scope note in the spec alongside phase 5's premise set, and the rest stall named pieces of
+phase 5 — one of those closing at phase 3.** *(The count said twelve open until 2026-08-11, and it was
+wrong in both directions: the 2026-07-26 refusal ruling had been struck through in the table for a
+fortnight without the header counting it, and the `Fault`-producer row was ruled on 2026-08-11.)*
+The first open row predates the
+phase-1 walk. Most of the rest were raised by the walk of 2026-07-26 or
 were standing questions recorded in the walk file that had never been carried into this table. **The
 three at the top were created on 2026-07-28.**
 
 | What you are asked | Stalled until you answer | Reasoning |
 |---|---|---|
 | **~~Is "The engine does not fault" scoped or unqualified?~~ RULED 2026-07-28 — it is aspirational.** His words: *"obviously we can't say that piece of software has no bugs. it's aspirational."* `philosophy.md:8` already says the same in the document's own voice — it states commitments rather than the current build, and gaps are tracked in the compiler and runtime documents. A bug in Precept is outside the guarantee, not a case the guarantee has to model. So `philosophy.md:46` is unchanged, and so are the six canonical places recording the engine-defect question as undecided (`compiler-and-runtime-design.md:826`, `fault-system.md` Q3, `evaluator.md` § Fault Production, `result-types.md` § `Faulted` semantics, `runtime-api.md:171`, `precept-language-spec.md:1963`). **The commit is unblocked. What is still open is narrower, and is the row below** | Nothing further | Raised by the independent review of the fault-backstop diff, 2026-07-28; ruled in conversation the same day |
-| **Who owns "does anything ever construct a `Fault`"?** Not what the answer is — who decides it. The question is whether the evaluator detects a breach of its own construction invariants and reports it as a `Fault`, or lets it stay an unrecoverable exception, which is what `precept-builder.md` and `evaluator.md` say today while `compiler-and-runtime-design.md` says the other thing. **No phase of this plan has a scope that reaches it**: phase 11 builds the compiler against red tests phase 10 wrote and an undecided design question cannot have one, § What closes when stops at the compiler, and nothing here builds the evaluator. Under § No phase closes with an open deferral that has no owner it therefore needs your word — either that the evaluator's behaviour on an engine defect is not being decided until the runtime is built, which makes it a named exception, or which phase you want to carry it | **Phase 2's close.** Exit condition 6 now fails on this alone — `N82`, the other row it was failing on, was executed 2026-07-29 | Same review; the ownership gap is what the philosophy ruling above does not close |
+| **~~Who owns "does anything ever construct a `Fault`"?~~ RULED 2026-08-11 — nobody owns it yet, and that is deliberate: it is deferred until the runtime is being built.** His words: *"do we need to decide this now?  seems like something we can defer until we start building the runtime"*, and *"yes"* to writing it up. The question was whether the evaluator detects a breach of its own construction invariants and reports it as a `Fault`, or lets it stay an unrecoverable exception — which is what `precept-builder.md` § Builder Invariant Violations and `evaluator.md` § No Unclassified Exceptions say today, while `compiler-and-runtime-design.md` names the evaluator as where such a breach would surface as a `Fault`. **The reasoning**: no phase of this plan builds the runtime, so no phase's scope reaches the question and picking a phase would have been a label rather than an owner. A ruling that the work is not being done is the second of the three forms § No phase closes with an open deferral that has no owner accepts, so the item is now a **named exception** in that section, which is the only place it stays written down and is what the next plan inherits it from. **The standing position does not change**: the lean is exception, a lean is not a ruling, and nothing may be built or written as though exception were the answer. The six canonical places go on recording the question as undecided; what was corrected on the same day is the wording elsewhere in canon that stated the outcome shape flatly, as though the question had already been answered | Nothing further. Exit condition 6 no longer fails on it | Same review; ruled in conversation 2026-08-11. The write-up of the flat-versus-conditional wording it left behind is in [`phase-2/fault-outcome-wording.md`](phase-2/fault-outcome-wording.md) |
 | **~~Period ordering — ship the operator, or record Decision 14 as sound-but-refused?~~ RULED 2026-07-29 — ship it, both halves.** His words: *"build both."* He was asked the capability question, not the readability one: on two scalar fields `A.days <= B.days` already compiles and computes the identical predicate, but on a `set of period in 'days'` there is no route at all — `.min`/`.max` legality is a trait of the element type and Precept has no element-wise projection that could supply it from outside. So the collection half is in scope, and with it the change that replaces the flat orderable flag with a qualifier-aware condition on the type entry, across four types. **Second ruling the same day: the comparator-survey research gate is waived.** His words: *"waive it, we're built on noda."* **His reason, which is not the one the adversarial review offered**: the gate is about not having surveyed *comparators*, and for this decision they are not comparators — Precept does not choose between temporal models, it ships NodaTime's `Period` as the value it holds, so what Joda-Time or chrono does has no bearing on whether that value can be ordered. The waiver is for this decision on this type; it does not close the gap at `research/INDEX.md:48`. **The document half was already executed 2026-07-29** — see the bullet below. **What is left is build work**, and the design is assessed lockable: [`phase-2/period-ordering-design.md`](phase-2/period-ordering-design.md) § Is this lockable | Nothing further. Register row `N82` is executed and no longer holds condition 6 open | [`phase-2/period-ordering.md`](phase-2/period-ordering.md), [`phase-2/period-ordering-design.md`](phase-2/period-ordering-design.md), [`phase-2/period-ordering-adversarial-review-2026-07-28.md`](phase-2/period-ordering-adversarial-review-2026-07-28.md); ruled in conversation 2026-07-29 |
 
 | What you are asked | Stalled until you answer | Reasoning |
@@ -236,15 +274,15 @@ the row says so. A row leaves this list when it is done or when it becomes a pha
 
 | What | Why it exists | Blocked on |
 |---|---|---|
-| **Commit the fault-backstop diff** | The findings from the two independent reviews were applied on 2026-07-28 and are recorded in [`phase-2/fault-backstop-fixes.md`](phase-2/fault-backstop-fixes.md). The substance of the pass held in both reviews; the tail was paraphrases the exact-term sweep could not see ("fault-site links", "fault site taxonomy", "the runtime mirror", "the runtime-to-compiler linkage", "diagnostics/fault linkage"), a deleted reason for the reference-identity invariant on `ProofObligation.Site`, three documents claiming "Implemented" against code that disagrees, and the 21-versus-20 count. All applied; the tree is still dirty | Nothing. The philosophy question is ruled and no longer blocks the commit |
-| **Stamp fourteen register rows with their commits** | They say "executed, uncommitted at the time of writing" and were never revisited once their pass landed. Condition 2 fails on exactly these. Stamping means checking each edit really is in the commit its cell names, not trusting the label | Nothing |
+| **~~Commit the fault-backstop diff~~ Done — landed in `c9193ec8`** | The findings from the two independent reviews were applied on 2026-07-28 and are recorded in [`phase-2/fault-backstop-fixes.md`](phase-2/fault-backstop-fixes.md). The substance of the pass held in both reviews; the tail was paraphrases the exact-term sweep could not see ("fault-site links", "fault site taxonomy", "the runtime mirror", "the runtime-to-compiler linkage", "diagnostics/fault linkage"), a deleted reason for the reference-identity invariant on `ProofObligation.Site`, three documents claiming "Implemented" against code that disagrees, and the 21-versus-20 count. **This row said "the tree is still dirty" until 2026-08-11, three commits after the work landed**, while the closing paragraph below it already said it had — one more instance of the failure this plan opens by naming. **One thing the commit did not carry**: the register's `W5` index row for this pass's non-row edits still reads *uncommitted, 2026-07-28* in its Commit cell and needs `c9193ec8` written into it | Nothing |
+| **~~Stamp fourteen register rows with their commits~~ Done 2026-07-28, landed in `3a561dad`** | They said "executed, uncommitted at the time of writing" and were never revisited once their pass landed, and condition 2 failed on exactly these. The pass stamped **thirty-four** rather than fourteen — the fourteen that named a pass, plus the twenty of the fault-backstop family, which had landed in `c9193ec8` by then — and verified each row against the commit's parent and the commit itself rather than trusting the label. Record: [`phase-2/register-stamping.md`](phase-2/register-stamping.md), whose § 5 gives 133 rows with a hash, 12 with a stated reason, 0 with neither. **Condition 2 passes** | Nothing |
 | **~~Send the period-ordering design back with the three cases~~ Done — and overtaken by the 2026-07-29 rulings** | Its recommendation turned on the claim that the operator only changes spelling. That is true of a single pinned unit and false of the other two cases, measured 2026-07-28 against the compiler: on `period in 'years + months'`, `A.months <= B.months` compiles clean and is **wrong** (`'1 year'` has `.months == 0`) while the hand-normalised `A.years * 12 + A.months <= …` compiles clean and is right, with nothing distinguishing them; on `period in 'months + days'`, `A.days <= B.days` compiles clean and **no arithmetic exists that makes it correct**, because a month has no fixed day count. So for two cases of three the language today accepts a comparison that is wrong or unfixable, with no diagnostic. **The design carries all three** — the first is § Ship now item 2, whose accessor-completeness rule admits a component accessor in an ordering comparison only when the accessed component is the whole value, which refuses both unsound spellings and keeps the single-pinned-unit one legal. Note what else it refuses: the rule has to reach through arithmetic, so the hand-normalised `A.years * 12 + A.months` is refused too, correct though it is. The design says so and takes that cost. And the recommendation the row was written to unstick no longer decides anything: he ruled *"build both"* on 2026-07-29 | Nothing |
 | **File the six repairs the period-ordering design found**, four of which are not about periods | The one to read first: a declared qualifier does not constrain the value on the binding path — `dequeue Q into X` puts an arbitrary period into a `period in 'days'` field with no obligation raised, and it reproduces on `queue of money` into `money in 'USD'`. Also `.min`/`.max` dropping the element qualifier in both directions, `of 'date'` / `of 'time'` unenforced, and `date + '12 months'` raising an error that tells the author to write what they just wrote — which breaks the literal spelling of Decision 14's own prescribed workaround. **The 2026-07-29 ruling to build the ordering mechanism raises the stakes on the first of the six**: the ordering rule's whole correctness argument reads a declared qualifier and assumes it constrains the value, so shipping the operators before that binding path is fixed would make the prevention claim false on arrival. It has to land first, not merely get filed | Nothing |
 | **Take `FaultSiteDescriptor`, `FaultSiteLink`, `FaultSiteAnnotation` and `ProofLedger.FaultSiteLinks` out of the code** | The drift is now recorded — `descriptor-types.md`, `evaluator.md`, `precept-builder.md` and `proof-engine.md` each say the type exists in code, is described nowhere in the design, and is on its way out. What has not happened is the removal. `src/Precept/Runtime/Descriptors.cs:60` declares `FaultSiteDescriptor`; `src/Precept/Pipeline/ProofLedger.cs` declares the other two types and the field; `ProofEngine.Diagnostics.cs:452` builds them; and **`tools/Precept.LanguageServer/Handlers/RichHoverFactory.cs:292` reads the field** to find the obligation behind a squiggle, falling back to `ProofLedger.Obligations` when it finds nothing — so the hover behaviour `docs/tooling/language-server.md` documents survives the removal. Tests in `test/Precept.Tests/DescriptorsTests.cs` and `FaultMapDerivationTests.cs` come with it | Nothing. The removal itself is phase 11 |
-| **The trace** — a justification for every change to canon in this phase, taken from `git diff` rather than from the register, with the short list of hunks that trace to nothing Shane wrote or ruled | Five passes checked whether corrections were *made*. None checked whether each was *warranted*, and the register's bookkeeping has been wrong repeatedly while its corrections held. Taking ground truth from git removes the dependency on the bookkeeping. It is also what would let Shane sign the phase without reading nine hundred changed lines | The fault-backstop commit, so the diff is stable and the trace runs once |
+| **The trace** — a justification for every change to canon in this phase, taken from `git diff` rather than from the register, with the short list of hunks that trace to nothing Shane wrote or ruled | Five passes checked whether corrections were *made*. None checked whether each was *warranted*, and the register's bookkeeping has been wrong repeatedly while its corrections held. Taking ground truth from git removes the dependency on the bookkeeping. It is also what would let Shane sign the phase without reading nine hundred changed lines | Nothing — the fault-backstop work landed in `c9193ec8`, so the diff is stable and the trace runs once. It has to take in the wording pass of 2026-08-11 as well ([`phase-2/fault-outcome-wording.md`](phase-2/fault-outcome-wording.md)) |
 | **~~Reconcile the two period documents to the 2026-07-26 ruling~~ Done 2026-07-29** | Register row `N82`. Decision 14 rewritten in place and renamed, alignment directive item 4 amended on the owner's approved wording, `collection-types.md:533` reconciled, and four further sites that cite Decision 14 by number corrected with it — six sites, where the row scoped two. Record in [`phase-2/period-ordering-reconciliation.md`](phase-2/period-ordering-reconciliation.md), which also lists what was read and deliberately left alone. The row no longer holds condition 6 open. **Two things it names are still outstanding**: BUG-047's re-check against the ruling, and the register row's own recorded reason, which was wrong before this pass | — |
-| **A cold read of the runtime and compiler documents** — one reader, the want document and canon, no register and no search procedure, listing every disagreement, then diffed against the register | Condition 4 asks for the search procedure to be re-run, and a procedure cannot find its own scope holes: the fifth pass widened fifteen patterns with synonyms and found nothing, while the thing actually missing was an unsearched folder. Scoped to the runtime and compiler documents because phase 3 rereads every language document and so provides a second net there, and none anywhere else | The fault-backstop commit |
-| **~~Two questions left open inside canon need owners that meet condition 6's bar~~ Done 2026-07-28, with one of the two unowned** | The reference-identity invariant on `ProofObligation.Site` got its reason back and is now owned by **phase 5**, whose stated output includes the specification of the certificate checker. Whether anything ever constructs a `Fault` has **no owning phase** — checked against every phase entry, not assumed — and is on § 4 for a ruling. Both are written up under exit condition 6 | — |
+| **A cold read of the runtime and compiler documents** — one reader, the want document and canon, no register and no search procedure, listing every disagreement, then diffed against the register | Condition 4 asks for the search procedure to be re-run, and a procedure cannot find its own scope holes: the fifth pass widened fifteen patterns with synonyms and found nothing, while the thing actually missing was an unsearched folder. Scoped to the runtime and compiler documents because phase 3 rereads every language document and so provides a second net there, and none anywhere else | Nothing — the fault-backstop work landed in `c9193ec8` |
+| **~~Two questions left open inside canon need owners that meet condition 6's bar~~ Done — the second of the two closed 2026-08-11** | The reference-identity invariant on `ProofObligation.Site` got its reason back on 2026-07-28 and is owned by **phase 5**, whose stated output includes the specification of the certificate checker. Whether anything ever constructs a `Fault` has **no owning phase** — checked against every phase entry, not assumed — and Shane ruled on 2026-08-11 that it is deferred until the runtime is being built, which makes it a named exception rather than an unowned deferral. Both are written up under exit condition 6, and the exception is written down in § No phase closes with an open deferral that has no owner | — |
 
 **Both of the things this paragraph used to say were uncommitted have landed** — the fault-backstop
 correction in `c9193ec8`, and [`phase-2/period-ordering-design.md`](phase-2/period-ordering-design.md).
@@ -298,6 +336,33 @@ states is what got it done and stands independently of it.
 - **Arithmetic overflow.** Ruled by the owner: the model is in scope and its build is sequenced after the
   MVP. It is not owned by a phase because it is not being built yet, and that is a decision rather than an
   oversight. Every document that names it says so.
+- **Whether anything ever constructs a `Fault`.** The question is what the evaluator does when Precept
+  itself is broken — a defect in the compiler, the builder or the evaluator, not anything an author can
+  write. Does the evaluator detect that it has been handed a model that violates its own construction
+  invariants and report a structured `Fault`, or does that stay an unrecoverable thrown exception? Canon
+  carries both accounts: `precept-builder.md` § Builder Invariant Violations and `evaluator.md` § No
+  Unclassified Exceptions say exception; `compiler-and-runtime-design.md` names the evaluator as where
+  such a breach would surface as a `Fault`.
+
+  **Ruled by the owner, 2026-08-11**, when the disagreement was put to him. His words: *"do we need to
+  decide this now?  seems like something we can defer until we start building the runtime"*. Asked whether
+  to write the deferral up, he said *"yes"*. That is a ruling that the work is not being done now, so the
+  item stops being an unowned deferral and becomes an exception here.
+
+  **The honest consequence.** No phase of this plan builds the runtime — § What closes when stops at the
+  compiler, and every phase entry was read before this was concluded. So no later phase inherits the
+  question by doing its own work, and this list is the only place it stays written down. Whatever plan
+  follows this one inherits it from here, and the runtime design work is where it gets answered.
+
+  **The standing position, unchanged.** His stated lean is exception and it remains a lean. Nothing may be
+  built, written or planned as though exception were the answer, and whoever takes the question up may
+  land the other way. Six canonical places record the question as undecided and go on doing so:
+  `compiler-and-runtime-design.md:826`, `fault-system.md` Q3, `evaluator.md` § Fault Production,
+  `result-types.md` § `Faulted` semantics, `runtime-api.md:171`, `precept-language-spec.md:1963`. What
+  changed on 2026-08-11 is elsewhere: canon stated the outcome shape flatly in several places, which reads
+  as though the question had been answered, and those statements now say what would happen *if* a `Fault`
+  were ever constructed. Every site is listed in
+  [`phase-2/fault-outcome-wording.md`](phase-2/fault-outcome-wording.md).
 
 Anything else claiming exception status gets added here, with the ruling that made it one. An exception
 nobody wrote down is an unowned deferral wearing a better name.
@@ -845,24 +910,35 @@ different person running it reaches the same list.
    actually reaches it, or a ruling the owner has given that the work is not being done. Check: open rows
    with neither = 0. See § No phase closes with an open deferral that has no owner.
 
-   **As of 2026-07-28 this condition fails, on one row and one open item.**
+   **As of 2026-08-11 this condition no longer fails.** It failed from 2026-07-28 on one row and one open
+   item, and both are now disposed of.
 
-   The nineteen fault-backstop rows and the two `docs/tooling/` rows are disposed of and uncommitted, so
-   they are no longer open. What is left:
+   The nineteen fault-backstop rows and the two `docs/tooling/` rows are disposed of, and landed in
+   `c9193ec8`, so they are no longer open. What was left, and what closed it:
 
    - ~~**`N82`, same-basis period ordering**~~ — **executed 2026-07-29.** Both rulings it was waiting on
      were given: the operator ships, both halves, and the research gate is waived. Decision 14, the
      alignment directive and `collection-types.md:533` are reconciled, and four further sites that cite
      Decision 14 by number went with them.
-   - **Whether anything ever constructs a `Fault`** — the fault-backstop pass left this open in six
-     canonical places, and **no phase of this plan has a scope that reaches it**. The question is whether
-     the evaluator detects a breach of its own construction invariants and reports it as a `Fault`, or
-     lets it stay an unrecoverable exception. That is an evaluator design decision. Phase 11 builds the
-     compiler against red tests phase 10 wrote, and an undecided design question cannot have a red test
-     written for it; phase 12 confirms the compiler is finished. § What closes when stops at the
-     compiler, and nothing in this plan builds the evaluator. So the honest position is that the item has
-     no owning phase and needs one of the other two forms — a ruling from Shane that the work is not
-     being done, or a named exception. It is on § 4 as the former.
+   - ~~**Whether anything ever constructs a `Fault`**~~ — **ruled 2026-08-11 and now a named exception.**
+     The fault-backstop pass left this open in six canonical places, and no phase of this plan has a scope
+     that reaches it: phase 11 builds the compiler against red tests phase 10 wrote and an undecided
+     design question cannot have a red test written for it, phase 12 confirms the compiler is finished,
+     § What closes when stops at the compiler, and nothing in this plan builds the evaluator. That left
+     the item needing one of the condition's other two forms, and the owner gave one — the question is
+     deferred until the runtime is being built. His words are on § 4 and in § No phase closes with an open
+     deferral that has no owner, where the exception is written down. The six canonical places go on
+     recording the question as undecided; the lean towards exception is still a lean and nothing may be
+     written as though it were the answer. A separate wording pass the same day brought canon's flat
+     statements of the outcome shape into the conditional form — see
+     [`phase-2/fault-outcome-wording.md`](phase-2/fault-outcome-wording.md).
+
+   **What the condition now rests on.** Every register row is executed or dispositioned with a reason, and
+   the two items the fault-backstop pass left open inside canon both carry an owner: the reference-identity
+   invariant on `ProofObligation.Site` on phase 5, and the `Fault`-producer question on the owner's ruling
+   recorded as a named exception. What it does **not** rest on is a fresh enumeration — nothing has re-read
+   the register looking for a *new* unowned deferral since 2026-07-28, so the condition is met against the
+   items known then plus the two disposed of since.
 
    One item the pass left open **does** have an owner. The reference-identity invariant on
    `ProofObligation.Site` now carries its reason again — reference identity is what tells two structurally

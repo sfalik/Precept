@@ -317,13 +317,13 @@ What remains is about the engine's own state rather than the author's. A slot-in
 
 This is a design decision rather than something a build settles: the two accounts above have to be reconciled before either can be implemented, and it belongs with the work that builds the evaluator.
 
-**Parked by the owner.** He has held this question until the runtime design is done. His stated lean is **exception** — that a defect in Precept itself reaches the caller as a thrown exception rather than as a structured outcome. **A lean is not a ruling.** Nothing here is decided: whoever takes this up at runtime design time makes the call, and may land the other way. Until then, no document, no code and no plan may treat exception as the answer, and the commitment that a fault is returned as a structured value inside the outcome hierarchy and never thrown — Q1 above, `result-types.md` § Overview, `runtime-api.md` § Deliberate Exclusions — stands as written.
+**Parked by the owner.** He has held this question until the runtime design is done. His stated lean is **exception** — that a defect in Precept itself reaches the caller as a thrown exception rather than as a structured outcome. **A lean is not a ruling.** Nothing here is decided: whoever takes this up at runtime design time makes the call, and may land the other way. Until then, no document, no code and no plan may treat exception as the answer, and the commitment that a fault, if one is ever constructed, is returned as a structured value inside the outcome hierarchy and never thrown — Q1 above, `result-types.md` § Overview, `runtime-api.md` § Deliberate Exclusions — stands. Those three sites state it conditionally on this question rather than flatly, which is the same commitment: the shape a `Fault` takes when it reaches a caller is settled, and whether one ever does is what is parked.
 
 `evaluator.md` § Fault Production states this same question from the evaluator's side, as whether anything ever constructs a `Fault`. **It is one question, not two.** The remaining half of Q3 — whether the evaluator asserts, faults, or does neither about its own state — reduces to exactly what `evaluator.md` asks, cites the same two disagreeing accounts, and cannot be answered one way there and another way here. Both statements are kept because each is written for the reader of its own document; neither is the junior copy, and answering the question closes both.
 
 ## Deliberate Exclusions
 
-**`FaultException` type** — deliberately excluded. Faults are returned as the `EventOutcome.Faulted(Fault)` variant, never thrown (Q1, resolved), so no fault-carrying exception type exists in the design.
+**`FaultException` type** — deliberately excluded. Should anything ever construct a `Fault` (Q3), it is returned as the `EventOutcome.Faulted(Fault)` variant and never thrown (Q1, resolved), so no fault-carrying exception type exists in the design.
 
 **`Fault.SourceSpan`** — excluded from the current `Fault` struct. At runtime, there is no source text in scope; the expression being evaluated is an in-memory execution plan, not a construct manifest. If expression context is needed it will be a different field shape (see Q2).
 
@@ -338,7 +338,7 @@ This is a design decision rather than something a build settles: the two account
 | Document | Relationship |
 |----------|-------------|
 | [diagnostic-system.md](../compiler/diagnostic-system.md) | Mirror document — every `FaultCode` member links to a `DiagnosticCode` via `[StaticallyPreventable]`; the full enforcement chain, end-to-end example, and PREC rule rationale are documented there |
-| [result-types.md](result-types.md) | Defines `EventOutcome` and `UpdateOutcome`; a fault is returned as the `EventOutcome.Faulted(Fault)` variant within this hierarchy |
+| [result-types.md](result-types.md) | Defines `EventOutcome` and `UpdateOutcome`; should a fault ever be constructed it is returned as the `EventOutcome.Faulted(Fault)` variant within this hierarchy |
 | [evaluator.md](evaluator.md) | Declares `Fail(FaultCode)` and states that a compiled definition has no fault path at evaluation time |
 | [runtime-api.md](runtime-api.md) | Public API surface that exposes fault information to host applications |
 

@@ -48,7 +48,7 @@ The runtime uses three type families to represent operation results:
 2. **UpdateOutcome** (4 variants) — returned by `Version.Update`. One committed result.
 3. **Inspection types** (EventInspection, UpdateInspection) — returned by `Version.InspectFire` and `Version.InspectUpdate`. Progressive annotated landscape.
 
-A `Fault` — a breach of one of the engine's own invariants — is returned as the `EventOutcome.Faulted(Fault)` variant, a structured value inside the outcome hierarchy, never thrown. See `fault-system.md`.
+A `Fault` — a breach of one of the engine's own invariants — has its shape settled: should anything ever construct one, it is returned as the `EventOutcome.Faulted(Fault)` variant, a structured value inside the outcome hierarchy, never thrown. Nothing constructs one today and whether anything ever will is undecided (`fault-system.md` Q3). See `fault-system.md`.
 
 ## Responsibilities and Boundaries
 
@@ -69,7 +69,7 @@ A `Fault` — a breach of one of the engine's own invariants — is returned as 
 
 The result type families are scoped to exactly the operations the `Version` exposes: two commit operations (`Fire`, `Update`) and two inspection counterparts (`InspectFire`, `InspectUpdate`). Each commit operation returns its own sealed hierarchy so callers pattern-match exactly the variants their operation can produce. Inspection operations return an annotated landscape without committing state.
 
-A breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator — surfaces as the single `EventOutcome.Faulted(Fault)` variant rather than as a thrown exception. Confining it to one variant keeps the rest of the hierarchy business-meaningful while still letting a caller pattern-match the engine-defect case explicitly, with no hidden control flow.
+A breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator — has one place to go in this hierarchy should it ever arrive as a structured value: the single `EventOutcome.Faulted(Fault)` variant, rather than a thrown exception. Confining it to one variant keeps the rest of the hierarchy business-meaningful while still letting a caller pattern-match the engine-defect case explicitly, with no hidden control flow. Whether an engine defect reaches the caller that way at all, or stays an unrecoverable exception, is undecided (`fault-system.md` Q3).
 
 ## Inputs and Outputs
 
@@ -126,7 +126,7 @@ What does fail at runtime is ingress: an argument value that violates a constrai
 
 **`Unmatched` trace:** `EvaluatedRows` uses the same `TransitionInspection` type as `EventInspection.Transitions`, making inspect and commit paths type-consistent. Callers who want to understand why no row matched get the full per-candidate guard trace at no extra cost — guard evaluation was already running during the commit pass.
 
-**`Faulted` semantics:** A `Fault` names a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. `Faulted` surfaces it as a structured outcome variant rather than a raw exception at the runtime boundary. Nothing constructs one today; whether anything ever will is undecided (`fault-system.md` Q3). See `fault-system.md` for the `Fault` type definition. MCP `precept_fire` serializes `Faulted` as `{ "outcome": "Faulted", "fault": { ... } }`.
+**`Faulted` semantics:** A `Fault` names a breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. `Faulted` is where it would surface if it were reported as a structured outcome variant rather than as a raw exception at the runtime boundary. Nothing constructs one today; whether anything ever will is undecided (`fault-system.md` Q3). See `fault-system.md` for the `Fault` type definition. MCP `precept_fire` serializes `Faulted` as `{ "outcome": "Faulted", "fault": { ... } }`.
 
 ---
 
@@ -433,7 +433,7 @@ Guard evaluation under partial args must use Kleene three-value logic. Compariso
 
 - `compiler-and-runtime-design.md` — compiler/runtime architecture overview
 - `executable-model.md` (D8/R4) — arg-dependency sets and evaluator contract
-- `fault-system.md` — `Fault`/`FaultCode`; a breach of one of the engine's own invariants is returned as the `EventOutcome.Faulted(Fault)` variant
+- `fault-system.md` — `Fault`/`FaultCode`; should a breach of one of the engine's own invariants ever be reported as a structured value, it is returned as the `EventOutcome.Faulted(Fault)` variant
 - `runtime-api.md` — full `Version` API spec; § Constraint Exposure Model (three-tier model, Tier 3 = `ConstraintResult.Constraint`)
 
 ---

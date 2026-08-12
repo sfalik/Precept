@@ -901,7 +901,7 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 ## Deliberate Exclusions
 
 - **No `IReadOnlyDictionary<string, object?>` overloads.** Fully obsolete. The two-lane ingress (JSON + typed) covers all callers. No dictionary-based convenience extensions exist or will be added.
-- **No fault type definitions.** `Fault` and the fault classes are in `fault-system.md`. The runtime API surface produces structured outcomes only; a breach of one of the engine's own invariants would surface as the `EventOutcome.Faulted(Fault)` variant, never thrown.
+- **No fault type definitions.** `Fault` and the fault classes are in `fault-system.md`. The runtime API surface produces structured outcomes only; should a breach of one of the engine's own invariants ever be reported as a structured value, it surfaces as the `EventOutcome.Faulted(Fault)` variant and is never thrown. Whether it is reported that way at all, or stays an unrecoverable exception, is undecided (`fault-system.md` Q3).
 - **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.
 - **No build-time analysis.** Graph analysis, type checking, and compilation are owned by the compiler pipeline. `Precept.From()` accepts only an error-free `Compilation` — it does not re-analyze.
