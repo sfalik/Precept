@@ -27,6 +27,108 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-069: A sign modifier on a `period` field raises no obligation at all when the value comes from an expression (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-29 by the period-ordering design pass, filed 2026-08-11 on the owner's instruction. **Reproduced from scratch via `precept_compile` at HEAD `39f11e90` at filing time** — not carried across from the design document.
+- **Affected**: `nonnegative`, `positive` and `nonzero` on a `period` field whose value arrives from an expression rather than from a literal default — all three measured, not inferred from one. Both positions behave the same: a computed field (`<-`) and an ordinary stored field written by a `set` action.
+- **All three sign modifiers, in one file, zero obligations**:
+
+  ```precept
+  precept PeriodComputedSigns
+
+  field A as period in 'days' default '1 days' editable
+  field B as period in 'days' default '30 days' editable
+  field P as period positive <- A - B
+  field Z as period nonzero <- A - A
+  ```
+
+  → `success: true`, `"diagnostics":[]`, `"proofObligations":[]`. `A - B` is `-29 days` and `A - A` is the zero period, so both declarations are violated by the only configuration the file describes, and neither raises anything.
+- **Symptom — computed field.** Zero diagnostics, and the `proofObligations` array is **empty**:
+
+  ```precept
+  precept PeriodComputedNonneg
+
+  field A as period in 'days' default '1 days' editable
+  field B as period in 'days' default '30 days' editable
+  field D as period nonnegative <- A - B
+  ```
+
+  → `success: true`, `"diagnostics":[]`, `"proofObligations":[]`. From the declared defaults `A - B` is `-29 days`, so the one configuration the file describes already violates the declaration, and nothing anywhere asks it to hold.
+- **Symptom — stored field written by an action.** The same, so this is not a computed-field-only defect:
+
+  ```precept
+  precept PeriodStoredWrite
+
+  field A as period in 'months' default '1 months' editable
+  field B as period in 'days' default '30 days' editable
+  field D as period nonnegative optional
+
+  event Compute()
+
+  on Compute
+      -> set D = A - B
+  ```
+
+  → `success: true`, `"diagnostics":[]`, `"proofObligations":[]`. `'1 months' - '30 days'` is the mixed-sign value `P1M-30D`, which is exactly the value BUG-068 shows the sign check getting wrong — so the two defects meet on the same value from two directions.
+- **Why this is the more serious of the two.** BUG-068 can be closed by refusing mixed-sign literals in a default. That closes nothing here. `period − period` is the ordinary way a mixed-sign period comes into existence, it reaches a field declared `nonnegative`, and **no obligation is raised for any check to be wrong about**. A false proof is at least visible in the obligation list as a claim somebody can go and test; an absent obligation is invisible, and the declaration reads to an author as though it governs the value.
+- **Relationship to BUG-048, stated plainly because this is the closest neighbour and the two must not be silently merged.** BUG-048's second measured bullet already records that `nonzero`, `positive` and `nonnegative` raise no establishing obligation against *any* expression — it measured that on the `decimal` lane, and the decimal mirror of the file above (`field D as decimal nonnegative <- A - B`) was re-confirmed at HEAD during this filing to behave identically: zero diagnostics, empty obligations. So the establishment gap itself is **not new**, and this row does not claim it is. Three things make it worth its own entry rather than a line inside BUG-048:
+  - **BUG-048 never uses the word `period`.** A search of `bugs.md` for the period behaviour does not find it, which is how the period-ordering design came to record this as unfiled. An entry filed under the type an author is holding is the one that gets found.
+  - **The reach on `period` is total, and it is not on `decimal`.** Combining this with BUG-068 there is **no position left** in which a `period nonnegative` declaration is enforced correctly, except a literal default whose components all share one sign. Expression: nothing raised. Mixed-sign literal default: raised and falsely proved. On `decimal`, `min 0` still works and is the spelling BUG-048 records as behaving correctly; `period` has no such alternative, because `min`/`max` field constraints exclude every temporal type (`precept-language-spec.md:1696`).
+  - **BUG-048's fix does not finish this one.** Its stated fix is an establishment obligation over the expression. Raise that obligation on a `period` and the predicate it gets evaluated against is `ProjectPeriodSign`, which is the thing BUG-068 reports as broken. The two have to land together on this lane or the fix produces a `Proved` that is just as wrong.
+- **Distinct from BUG-047**, which is the period *divisor* path — a division's non-zero precondition on `MoneyDividePeriod` / `QuantityDividePeriod`. There is no division here and no `nonzero`; the file declares a plain field and writes to it.
+- **Root cause** (not traced to a line in this pass): no establishment obligation is minted for the sign modifiers over an expression. BUG-048 records the neighbouring mechanism on the numeric lane — `ProofEngine.Intervals.cs:405`, where the declared-bound switch handles `ModifierKind.Min` and `ModifierKind.Max` and returns `null` for everything else — and whether the period lane fails in the same place or a different one has not been checked.
+- **Scope / class**: SOUNDNESS, over-accept, by omission rather than by a wrong answer.
+- **Fix complexity**: design-required, and shared with BUG-048 — a declared constraint needs an establishment obligation over the expression that produces the value, which is the constraint-establishment machinery currently being redesigned. On the `period` lane it additionally needs a sign predicate that reads every component; see BUG-068.
+- **Priority**: blocks shipping. Until it closes, no proof may consume a sign modifier on a `period` field whose value comes from an expression.
+- **Status**: Active — soundness hole.
+
+### BUG-068: A mixed-sign `period` literal default is proved to satisfy `nonnegative` (SOUNDNESS hole — a definite `Proved` on a definite falsehood)
+
+- **Discovered**: 2026-07-29 by the period-ordering design pass, filed 2026-08-11 on the owner's instruction. **Reproduced from scratch via `precept_compile` at HEAD `39f11e90` at filing time** — not carried across from the design document.
+- **Affected**: the declaration-attribute check on a `period` field's literal default, where the literal's components disagree in sign. **All three sign modifiers, measured** — `field P as period positive default '1 months + -30 days'` and `field Z as period nonzero default '1 days + -24 hours'` in one file both report **Proved** by strategy `Literal`, alongside the `nonnegative` case below. `'1 days + -24 hours'` has an elapsed length of exactly zero, so `nonzero` is proved of a zero value.
+- **Symptom**: the file compiles, and the obligation that exists precisely to catch this reports **Proved**:
+
+  ```precept
+  precept PeriodMixedSignDefault
+
+  field J as period nonnegative default '1 months + -30 days'
+  ```
+
+  → the tool's own output, line-wrapped for reading and with its `\u0027` escapes rendered as apostrophes; nothing else altered and nothing omitted:
+
+  ```json
+  {"success":true,"diagnosticCount":1,
+   "diagnostics":[{"line":3,"column":7,"severity":"warning","code":"PRE0158",
+     "message":"Field 'J' has no write site — it can only hold its declared default or remain unset"}],
+   "summary":"PeriodMixedSignDefault: 0 states, 0 events, 0 transitions, 0 rules, 0 ensures, 0 type errors.",
+   "proofObligations":[{"kind":"Numeric","disposition":"Proved","strategy":"Literal",
+     "description":"Default value of 'J' must satisfy 'nonnegative'"}]}
+  ```
+
+  The only diagnostic is the unrelated no-write-site warning. `'1 months + -30 days'` moves a date forward from 2021-01-01 and backward from 2021-02-01, so there is no reading of `nonnegative` it satisfies.
+- **Control, run in the same pass — the check is live, and only the mixed-sign case slips.** `field K as period nonnegative default '-30 days'` is correctly **refused**:
+
+  ```json
+  {"success":false,"diagnosticCount":2,
+   "diagnostics":[{"line":3,"column":7,"severity":"warning","code":"PRE0158",
+     "message":"Field 'K' has no write site — it can only hold its declared default or remain unset"},
+    {"line":3,"column":39,"severity":"error","code":"PRE0079",
+     "message":"Default value '-30 days' for field 'K' violates declared 'nonnegative'"}],
+   "proofObligations":[{"kind":"Numeric","disposition":"Unresolved",
+     "description":"Default value of 'K' must satisfy 'nonnegative'"}]}
+  ```
+
+  So this is not a missing check. The check runs, has the whole literal in hand, and returns the wrong answer.
+- **Root cause**: `ProjectPeriodSign` returns the sign of the **first non-zero component** and never looks at the rest — for `'1 months + -30 days'` it reads `Months`, sees `1`, and stops. The source says so in its own summary (`src/Precept/Pipeline/TypedExpressionMagnitude.cs:22-:28`): *"Mixed-SIGN periods … **misclassify** … NOT suitable for min/max bound comparison. **Period bounds need a separate design.**"*
+- **Why the standing caveat about proof results does not absorb this.** `CLAUDE.md § Use the MCP Tools First` records the proof engine as untrustworthy generally, and names `field Bal as decimal nonnegative max 100` — which marks its interval obligation Proved while reporting the bound as `[−∞ .. 100]`. That is a different failure: a bound computed too wide, visible in the reported interval. This one reports no interval to inspect. It returns a plain `Proved`, by strategy `Literal`, on a value it fully evaluated. The general caveat is a reason to distrust the output; it is not a filing, and nothing about it says which concrete definitions are wrong. This one is concrete and reproducible in three lines.
+- **How it differs from BUG-047, which shares the mechanical cause and is not this.** BUG-047 is the period *divisor* path: `MoneyDividePeriod` and `QuantityDividePeriod`, where `ProjectPeriodSign` wrongly discharges a division's non-zero precondition, and whose primary defect is a compound-basis divisor slipping past the single-basis rule because the guard keys off the declared `in` basis. The file above contains no division, no `nonzero`, and no compound *declared* basis — the field is unqualified and the mixed sign is in the literal. Fixing BUG-047's basis guard leaves this untouched, and fixing this leaves BUG-047's basis guard untouched. What they share is one function, which is why both should be closed by the same repair to it.
+- **What is genuinely open behind it, and it is not this bug**: what non-negativity and non-zero-ness *mean* for a period whose components disagree in sign. That needs either a refusal on `period − period` and unary negation, or a sign domain over period components — the interval work deferred at `docs/language/temporal-type-system.md:1713`. **This entry does not wait on that decision**: the value above is wrong under every candidate reading, so `Proved` is wrong under every candidate reading.
+- **Scope / class**: SOUNDNESS, over-accept, a false proof on a declaration's own default check.
+- **Fix complexity**: small for the projection itself — read every component and return "mixed" as its own outcome rather than folding it into the leading component's sign, then refuse rather than prove when the outcome is mixed. Design-required for what "mixed" should then mean, per the open point above; refusing is the safe answer until that is settled.
+- **Priority**: blocks shipping. It is a silent wrong answer on the one check the declaration exists to get right.
+- **Read with BUG-069**, which is the same declaration going unchecked entirely when the value comes from an expression instead of a literal. Between them a `period nonnegative` declaration is enforced correctly in only one position — a literal default whose components all share one sign.
+- **Status**: Active — soundness hole.
+
 ### BUG-067: Every exponent-notation numeric literal silently evaluates to `0`
 
 - **Discovered**: 2026-07-27, reviewing the phase-5 divisor and overflow recommendation. **Confirmed at HEAD through `precept_compile`** — the six cells below were run, not reasoned about.
@@ -447,7 +549,7 @@ surfaced for proper fixing.
 - **Also collapses a scope boundary**: a `decimal nonzero <- M1 / M2` over two `money` fields gives a covered-lane divisor whose arithmetic happened entirely on an uncovered lane, so restricting a rule to the primitive numeric lanes does not restrict what can reach it.
 - **Measured across every modifier, 2026-07-26 — the bug is wider than "computed fields" in one direction and narrower in another. Full evidence at [`docs/working-reset/phase-3/computed-field-modifier-enforcement.md`](../working-reset/phase-3/computed-field-modifier-enforcement.md); all of it re-verified via `precept_compile` at HEAD.** Four corrections and additions to the text above:
   - **Narrower than "in general".** The claim that *"any proof consuming any modifier on any `<-` field rests on nothing"* is not right for `min` and `max`. Those two do produce an establishing obligation on a computed field — `IntervalContainment` — and they genuinely prove or genuinely refuse. `field C as decimal min 4 max 9 <- Rate * Factor` over operands bounded `[2 .. 3]` returns `computedInterval "[4 .. 9]"`, **Proved**; the same declaration over unbounded operands returns `"[−∞ .. +∞]"`, **Unresolved**, and the file is refused with `PRE0078`. The unenforced set is `nonzero`, `positive`, `nonnegative`, `maxplaces`, `minlength`, `maxlength`, `mincount` — not all of them.
-  - **Wider than computed fields, for the sign modifiers.** `nonzero`, `positive` and `nonnegative` are unchecked against *any* expression, including a write to an ordinary stored field. `field TNonzero as decimal nonzero optional` plus `set TNonzero = A - B` where `A - B` is `-1.0` compiles with **zero diagnostics and an empty `proofObligations` array**, as do the `nonnegative` and `positive` versions in the same file. So the framing "a modifier on a computed field" understates it: for the sign modifiers the establishment gap follows the *expression*, not the `<-`. The `min` version of the identical file is correctly refused. **Read this against BUG-050, which is its other half and is not a duplicate.** BUG-050 is the *consumption* side — a declared fact stays usable as a premise after a write that falsifies it, because the discharge never consults `ReassignedBefore`. This row is the *establishment* side — the write generates no obligation to satisfy the declaration in the first place. Both are live together: `field T as decimal nonzero` with `set T = A - B` and then `set R = 100.0 / T` compiles with zero diagnostics and the divisor `Proved` by `DeclarationAttribute` (re-verified independently at HEAD 2026-07-26), and `A - B` is zero whenever the two editable operands are equal. Fixing either one alone leaves the file accepted.
+  - **Wider than computed fields, for the sign modifiers.** `nonzero`, `positive` and `nonnegative` are unchecked against *any* expression, including a write to an ordinary stored field. `field TNonzero as decimal nonzero optional` plus `set TNonzero = A - B` where `A - B` is `-1.0` compiles with **zero diagnostics and an empty `proofObligations` array**, as do the `nonnegative` and `positive` versions in the same file. So the framing "a modifier on a computed field" understates it: for the sign modifiers the establishment gap follows the *expression*, not the `<-`. The `min` version of the identical file is correctly refused. **Read this against BUG-050, which is its other half and is not a duplicate.** BUG-050 is the *consumption* side — a declared fact stays usable as a premise after a write that falsifies it, because the discharge never consults `ReassignedBefore`. This row is the *establishment* side — the write generates no obligation to satisfy the declaration in the first place. Both are live together: `field T as decimal nonzero` with `set T = A - B` and then `set R = 100.0 / T` compiles with zero diagnostics and the divisor `Proved` by `DeclarationAttribute` (re-verified independently at HEAD 2026-07-26), and `A - B` is zero whenever the two editable operands are equal. Fixing either one alone leaves the file accepted. **The `period` lane of this same bullet is filed separately as BUG-069** (2026-08-11), because this entry never uses the word `period` and so is not findable from that behaviour, because the reach there is total — with BUG-068 there is no position in which a `period nonnegative` declaration is enforced correctly, while on this lane `min 0` still works — and because the establishment obligation this entry's fix would add is evaluated on `period` by the broken sign projection BUG-068 reports. Neither row is a duplicate of the other; they are the same gap measured on two lanes with different consequences.
   - **The sharpest single case: `min 0` and `nonnegative` mean the same thing and behave differently.** In one file, `field ViaMinZero as decimal min 0 <- Rate * Factor` raises an obligation and refuses the definition, while `field ViaNonneg as decimal nonnegative <- Rate * Factor` on the next line raises nothing. The cause is `ProofEngine.Intervals.cs:405`, where the declared-bound switch has cases for `ModifierKind.Min` and `ModifierKind.Max` and returns `null` for everything else. Which spelling the author picks decides whether the compiler looks.
   - **Two more consumers, and one modifier that no proof consumes at all.** Beyond the divisor: `nonnegative` on a computed `number` discharges `Argument must be non-negative` for `sqrt` by `DeclarationAttribute` (`field C as number nonnegative <- Rate - Factor` with `1.5 - 4.0`, then `set R = sqrt(C)` — clean), and `positive` on a computed decimal discharges the divisor proof the same way. `mincount` on a computed collection discharges `List must be non-empty`. `maxplaces` is the opposite case: it produces no obligation anywhere and is consumed by nothing — `grep -rni "maxplaces" src/Precept/Pipeline/Proof*` returns no output, so it is invisible to the proof engine. It is enforced only against literal values by the type checker (`PRE0067`), which means `set Target = A * B` yielding `3.9525` into a `maxplaces 2` field passes silently, and `field D as decimal maxplaces 2 <- 3.9525` passes too. Rounding does not help: `<- round(A * B, 2)` and `<- round(A * B, 6)` both compile clean with empty obligation arrays, and `round` erases interval bounds — `A * B` over operands bounded `[0 .. 10]` proves at `[0 .. 100]` while `round(A * B, 2)` on the same operands reports `[−∞ .. +∞]` and is refused.
 - **Scope / class**: SOUNDNESS, over-accept, on the headline fault.
@@ -483,6 +585,8 @@ surfaced for proper fixing.
 - **Reach**: `MoneyDividePeriod` and `QuantityDividePeriod`.
 - **Scope / class**: SOUNDNESS, over-accept, on the headline fault. Distinct from BUG-045 — that is finite-representation underflow through arithmetic; this fires on a bare field reference.
 - **Fix complexity**: the compound-basis half is a bounded fix against settled canon (make the check see value-compound and basis-open periods, not just declared-`in` ones). ~~and the `positive` half is a one-line applicability correction~~ — withdrawn 2026-07-26, see above; `positive` stays. Only the non-zero predicate needs a ruling.
+- **Re-checked 2026-08-11 against the period-ordering rulings, and nothing in this entry changes.** The re-check was outstanding because the owner's walk ruling of 2026-07-26 — that periods sharing a declared basis do order — overrode the locked no-ordering decision this entry once leaned on. Two further rulings landed 2026-07-29 (build both the scalar and collection halves of the ordering mechanism; waive the comparator-survey research gate) and the design was locked 2026-08-11. **Result**: the only sub-point the ordering rulings ever reached was `positive`-on-`period`, and that was already withdrawn on 2026-07-26 — the strikethrough above is that withdrawal. The rest of this entry is about the divisor path and the sign projection, neither of which the ordering operator touches; the locked design explicitly keeps period comparisons out of the relational-fact path, so it adds no new consumer here. **The repro was re-run at HEAD `39f11e90` and is unchanged**: `success: true`, zero diagnostics, `Divisor must be non-zero` **Proved** by `DeclarationAttribute`, and `Default value of 'Gap' must satisfy 'nonzero'` **Proved** by `Literal`. The entry stands as written.
+- **Two neighbours filed 2026-08-11 that share this entry's mechanical cause and are not duplicates of it**: **BUG-068**, a mixed-sign literal default proved to satisfy `nonnegative` on a field with no division anywhere; and **BUG-069**, a sign modifier on a `period` raising no obligation at all when the value comes from an expression. Both sit outside the divisor path this entry is scoped to. BUG-068 and this entry should be closed by the same repair to `ProjectPeriodSign`.
 - **Status**: Active — soundness hole.
 
 ### BUG-046: A divisor whose declared interval excludes zero is not proved non-zero — the file is rejected saying it "can be zero" (false rejection)

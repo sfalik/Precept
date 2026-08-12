@@ -5,7 +5,9 @@ committed; the tree is left dirty.** No sub-agents were spawned. `docs/philosoph
 Nothing under `docs/archive/`, `src/` or `tools/` was edited.
 [`period-ordering-design.md`](period-ordering-design.md) keeps its `Externally-Grounded` status and its
 recommendation untouched — it was already modified and uncommitted in the tree when this pass started,
-by the pass that wrote it, and this pass did not add to that diff.
+by the pass that wrote it, and this pass did not add to that diff. **That was its status on the day of
+this run and is left as the record of it. The owner locked the design on 2026-08-11**; if you are reading
+this for the design's current status, read the design's own front matter instead of this line.
 
 **What this pass is.** The owner ruled on 2026-07-26 that periods pinned to the same single unit order,
 against locked Decision 14 in `temporal-type-system.md`. The ruling had never reached the documents, and
@@ -189,8 +191,13 @@ one table cell or one sentence, and the bare line numbers below are in `temporal
   correction the plan already notes: it said `temporal-type-system.md` was untouched by any slice, and
   the document was touched twice for other rows.
 - **BUG-047** is named by the register row as needing a re-check against the ruling. Not done here — it
-  is a bug-tracking judgement, not a document reconciliation.
-- **Nothing here closes the design.** Three code blockers stand between this and a locked mechanism: the
+  is a bug-tracking judgement, not a document reconciliation. **Done 2026-08-11**: nothing in the entry
+  changes, its repro re-runs unchanged at HEAD, and the result is written into the entry itself.
+- **Nothing here closes the design.** Three code items stand between this and a built mechanism: the
   binding path where a declared qualifier does not constrain the value, the refusal diagnostics that
   must replace `PRE0018`'s incoherent message, and the type gate on the proof engine's relational-fact
-  path. They are enumerated in the design and in § 7.4 of the adversarial review.
+  path. They are enumerated in the design and in § 7.4 of the adversarial review. **Note added
+  2026-08-11**: this paragraph called them blockers on a *locked* design, and that framing was wrong. The
+  owner locked the design on 2026-08-11 with all three still unbuilt, because each is an implementation
+  obligation carrying an acceptance criterion rather than an unanswered question. They block the
+  *mechanism*, not the lock — and § Ship now item 1 still has to land before the operators ship.

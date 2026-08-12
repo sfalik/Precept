@@ -1,5 +1,7 @@
 ---
-status: Externally-Grounded — 2026-07-28; owner rulings recorded 2026-07-29. **Not locked** — the lock is the owner's to set and no agent may set it. Four of the five open questions are now closed, two by the rulings in § Owner rulings, one by the owner amending the alignment directive in canon, and one because it turned out to be a defect rather than a question. § Open questions carries the disposition of each. The design's own first-draft recommendation was refuted by its red-team pass; § The short version carries the corrected one.
+status: Locked 2026-08-11 — **the owner set it, and these are his words.** He was told the design had been assessed lockable and deliberately left unlocked, and that two defects behind it were unfiled. His reply, complete and verbatim — *"yes lock the design and log the bugs."* No agent set this status. It is recorded with the quotation so a reader can check it against what he actually said rather than take an agent's label for authority. Before that it read `Externally-Grounded — 2026-07-28`, with owner rulings recorded 2026-07-29.
+lock-scope: The lock covers **the eight decisions in § Decisions and nothing else.** They are enumerated at § Is this lockable § What the lock settles. **It does not say the code is done, because none of it is built.** Three code items and the six § Ship now repairs stay outstanding — they are implementation obligations carrying acceptance criteria, not unanswered questions, and § Is this lockable § What the lock does not settle lists them. § Ship now item 1, the binding path where a declared qualifier does not constrain the value, must land before the operators ship or the prevention claim is false on arrival; the lock does not discharge that sequencing obligation. **Two of the eight are short on the precedent leg and say so rather than inventing one** — Decision 6 has no precedent and records that there is none, and Decision 8 cites the project's own rationale rule rather than an instance of a decision being repaired this way. Both are disclosed in § Is this lockable and neither was papered over to get the lock.
+open-questions: Four of the five open questions are now closed, two by the rulings in § Owner rulings, one by the owner amending the alignment directive in canon, and one because it turned out to be a defect rather than a question. § Open questions carries the disposition of each. The design's own first-draft recommendation was refuted by its red-team pass; § The short version carries the corrected one.
 phase-target: Document reconciliation is phase 2 (readiness-plan row `N82`) and is **done**, 2026-07-29 — see [`period-ordering-reconciliation.md`](period-ordering-reconciliation.md). The repairs in § Ship now are unassigned bug-fix work that needs no phase gate. The ordering operator's mechanism now has a phase — `compiler-readiness-plan.md` § 1 and § 4 record it as folded into phase 5.
 comparable-systems-research-status: partial, and **the gate is waived for this decision** — see § Owner rulings, ruling 2. NodaTime 3.3.3 surveyed to Stage-1 depth by reflection against the shipped assembly and its XML documentation, plus an original measurement of `Period.CreateComparer` over 170,000 pairs and the adversarial review's independent re-run over 407,972. Rust and PostgreSQL cited from primary documentation, accessed 2026-07-28. java.time and Joda-Time are asserted from general knowledge and are **not** verified in this pass. Python `dateutil`, Rust `chrono`, Go and ECMAScript Temporal are unsurveyed. `research/INDEX.md:48` registers that gap and calls a broader survey a prerequisite for any irreversible temporal-surface decision; the owner waived it here on the ground that those systems are not comparators for this decision, because Precept ships NodaTime's `Period` rather than choosing between temporal models. The gap itself stays open in `research/INDEX.md`.
 sources-consulted:
@@ -76,9 +78,9 @@ Two documents in this project both have a locked decision numbered 14 about `per
 
 ## Owner rulings
 
-Two rulings, given 2026-07-29, recorded in the owner's words with the reasoning he gave. A ruling whose reason is written down wrongly gets re-litigated, so the reasoning below is his and is marked where it differs from what an agent recommended.
+Three rulings — two given 2026-07-29 and the lock given 2026-08-11 — recorded in the owner's words with the reasoning he gave. A ruling whose reason is written down wrongly gets re-litigated, so the reasoning below is his and is marked where it differs from what an agent recommended.
 
-**Neither ruling locks this document.** The status field is unchanged and the lock is the owner's to set. § Open questions now records the disposition of all five questions, and § Is this lockable states what a lock would be locking.
+**The first two rulings did not lock this document; the third does.** § Open questions records the disposition of all five questions, and § Is this lockable states what the lock covers and what it leaves outstanding.
 
 ### Ruling 1 — build both halves
 
@@ -99,6 +101,16 @@ He waived it. His words: **"waive it, we're built on noda."**
 **His argument is not the review's, and the difference matters.** The adversarial review's § 7.3 recommended waiving on the ground that the direct measurement is stronger evidence for this specific rule than a comparator survey would be. That is a fine argument about evidential weight, and it is not the one that carries. The gate exists because *comparators* have not been surveyed — and for this decision they are not comparators. Precept does not choose between temporal models. It ships NodaTime's `Period` as the runtime representation of `period`, with the dependency pinned at `src/Precept/Precept.csproj:15`. What Joda-Time, java.time, Python `dateutil`, Rust `chrono`, Go or ECMAScript Temporal does with its own period type has no bearing on whether Precept can order the value it actually holds. The evidence that decides this rule is what NodaTime's `Period` does — and that is the one thing this pass surveyed to depth, by reflection against the shipped 3.3.3 assembly, plus the original measurement and the adversarial review's independent nine-calendar re-run.
 
 **What the waiver does not do.** It is a waiver for this decision, on this type, on that reason. It does not close the gap recorded at `research/INDEX.md:48`, and it does not carry to a future temporal decision where Precept would be picking a model rather than exposing NodaTime's — there the comparators would be comparators, and the gate would apply on its own terms.
+
+### Ruling 3 — the design is locked, 2026-08-11
+
+He was told two things: that § Is this lockable had assessed the design lockable and that the lock had deliberately been left unset because it is his to set, and that the two defects § Open questions item 3 describes were still not filed anywhere. His reply, verbatim and complete: **"yes lock the design and log the bugs."**
+
+**What that locks.** The eight decisions in § Decisions, and only those. They are listed at § Is this lockable § What the lock settles.
+
+**What it does not lock, and this matters more than the lock does.** None of the mechanism is built. The three code items and the six § Ship now repairs are outstanding, and § Is this lockable § What the lock does not settle lists them. The sequencing obligation stands with them: § Ship now item 1 — the binding path where a declared qualifier does not constrain the value — lands before the operators, because Decision 1's correctness argument reads a declared qualifier and assumes it holds. A reader who takes this lock as saying the code is finished has read it wrong.
+
+**The bugs.** Both filed the same day in [`docs/Working/bugs.md`](../../Working/bugs.md), and both reproduced afresh against HEAD at filing time rather than carried across from this document. **`BUG-068`** is the false proof — a mixed-sign `period` literal default reported **Proved** against `nonnegative`. **`BUG-069`** is the missing obligation — a sign modifier on a `period` raising nothing at all when the value comes from an expression, which is the more serious of the two because refusing mixed-sign literals would close the first and leave this one untouched. § Open questions item 3 carries the detail, including one thing the earlier text there got wrong.
 
 ### Where that leaves the five open questions
 
@@ -169,7 +181,7 @@ Two further first-draft claims fell with it, and are struck: that the worked exa
 
 ## What the adversarial review found
 
-`period-ordering-adversarial-review-2026-07-28.md`, in this folder, is an independent adversarial read of this document written on the owner's request, with the stated posture that the design was stepping into a hazard NodaTime avoided on purpose. It did not trust this document's self-reported red-team pass: it re-ran the central compile claims against the live compiler and re-ran the core measurement with fresh code. Every compile claim in § Ship now and in § The claim that was wrong reproduced at HEAD. The measurement reproduced too, and then broke in one place. The review's own recommendation — build the operator, both halves — is the reviewer's opinion and not a lock, and this document's status is unchanged: **Externally-Grounded, not locked.**
+`period-ordering-adversarial-review-2026-07-28.md`, in this folder, is an independent adversarial read of this document written on the owner's request, with the stated posture that the design was stepping into a hazard NodaTime avoided on purpose. It did not trust this document's self-reported red-team pass: it re-ran the central compile claims against the live compiler and re-ran the core measurement with fresh code. Every compile claim in § Ship now and in § The claim that was wrong reproduced at HEAD. The measurement reproduced too, and then broke in one place. The review's own recommendation — build the operator, both halves — is the reviewer's opinion and never was a lock. **The lock came later and from the owner**, on 2026-08-11, and it is recorded in § Owner rulings, ruling 3, with his words. The review's agreement with the outcome is not what makes it settled.
 
 **Applied to this document in this pass.**
 
@@ -250,7 +262,7 @@ The value is computed correctly and thrown away at one place: `ProofEngine.Quali
 
 **6 — `PRE0018`'s message on a period comparison.** *"Expected a period value here, but got 'period'"* is what an author gets today for the exact thing under discussion. It is internally incoherent and never mentions ordering. Whatever the ordering answer is, this must say what is wrong and what to write instead.
 
-**And one that needs a ruling but not this design.** `field J as period nonnegative default '1 months + -30 days'` compiles today with the obligation reported **Proved**. That value moves forward from 2021-01-01 and backward from 2021-02-01 — Decision 14's own argument arriving in the sign question. Refusing mixed-sign literals does not close it, because `period − period` produces them (`'1 month' - '30 days'` is `P1M-30D`) and `field D as period nonnegative <- A - B` raises **no obligation at all**. § Open questions item 3.
+**And one that needs a ruling but not this design.** `field J as period nonnegative default '1 months + -30 days'` compiles today with the obligation reported **Proved**. That value moves forward from 2021-01-01 and backward from 2021-02-01 — Decision 14's own argument arriving in the sign question. Refusing mixed-sign literals does not close it, because `period − period` produces them (`'1 month' - '30 days'` is `P1M-30D`) and `field D as period nonnegative <- A - B` raises **no obligation at all**. § Open questions item 3. **Both are now filed** — `BUG-068` and `BUG-069` in `docs/Working/bugs.md`, 2026-08-11.
 
 ---
 
@@ -726,7 +738,7 @@ Per the routing table in `CLAUDE.md § Documentation Sync`.
 
 ## Open questions
 
-Five were asked. **Four are closed and one was never a question.** The design is still not locked — a lock is the owner's act and § Is this lockable states what it would cover — but nothing on this list is now waiting on an answer.
+Five were asked. **Four are closed and one was never a question.** Nothing on this list is waiting on an answer, and the owner locked the design on 2026-08-11 (§ Owner rulings, ruling 3) — a lock covering the eight decisions and none of the unbuilt code, as § Is this lockable sets out.
 
 | # | Question | Disposition |
 |---|---|---|
@@ -776,7 +788,9 @@ rule ExpirationDate <= CommencementDate + ShortTermCeiling when LeaseClassificat
 
 **The second defect behind it.** `field D as period nonnegative <- A - B`, with `A` and `B` both `period in 'days'`, compiles with **zero proof obligations** — verified at HEAD 2026-07-29. So refusing mixed-sign literals would not close the hole; `period − period` reaches the same place with nothing raised at all, and this one is not a misclassification but a missing obligation.
 
-**Where defects are tracked, and what is and is not filed.** `docs/Working/bugs.md`. The root cause is filed there as part of **BUG-047** (`bugs.md:457`, *"its non-zero check reads only the leading component"*), whose mechanical-cause bullet at `:481` names `ProjectPeriodSign` and the leading-component read exactly. But BUG-047's scope is the period *divisor* path, and the two cases above are different positions: a declaration-attribute discharge of a `nonnegative` modifier, and a computed field raising no obligation. **Neither is filed in its own right**, and no other `bugs.md` entry covers them — a grep of that file for `ProjectPeriodSign` and for mixed signs returns only BUG-047's line `:481`. The readiness plan's *"the `nonnegative` unsoundness"* row (`compiler-readiness-plan.md:140`, and the fourth "Known risks" entry it points at) is **a different defect** — `field Bal as decimal nonnegative max 100` reporting its interval as `[−∞ .. 100]` — and does not cover these. Filing them, or widening BUG-047 to cover the two positions, is bug-tracking work this design does not do.
+**Where defects are tracked. Both are now filed — 2026-08-11, on the owner's word.** `docs/Working/bugs.md`. The false proof is **`BUG-068`** and the missing obligation is **`BUG-069`**. Each was reproduced afresh against HEAD with `precept_compile` at filing time rather than carried across from this document, and each entry says how it differs from the neighbouring entries so nobody closes it as a duplicate.
+
+The paragraph that stood here said neither was filed and that no other entry covered them. The first half is now out of date and the second half was **not quite right**, and the correction is worth keeping. The root cause of the false proof is indeed already written down inside **BUG-047** (`bugs.md:457`, *"its non-zero check reads only the leading component"*, with the mechanical-cause bullet at `:481` naming `ProjectPeriodSign` exactly), but BUG-047's scope is the period *divisor* path and neither case above is a division. What the earlier grep missed is **BUG-048**: its second bullet already records that `nonzero`, `positive` and `nonnegative` raise no establishing obligation against *any* expression, measured on the `decimal` lane. That is the same gap `BUG-069` reports on the `period` lane, and `BUG-069` says so in its own text rather than claiming novelty it does not have. The grep missed it because BUG-048 never uses the word *period*, which is the ordinary way a search for a mechanism misses an entry filed under a different type. The readiness plan's *"the `nonnegative` unsoundness"* row (`compiler-readiness-plan.md` § 3, and the fourth "Known risks" entry it points at) remains **a different defect** — `field Bal as decimal nonnegative max 100` reporting its interval as `[−∞ .. 100]` — and covers neither.
 
 **What inside it genuinely needs a decision, and it is not this design's.** What non-zero-ness and non-negativity *mean* for a period whose components disagree in sign. Closing that needs either a refusal on `period − period` and unary negation, or a sign domain over period components — which is the interval work deferred at `temporal-type-system.md:1713`. BUG-047 records the same open point in its own terms (*"what non-zero predicate a `period` divisor must satisfy"*). That decision belongs with the interval domain, not here.
 
@@ -798,7 +812,7 @@ No sample declares a collection of periods, money, quantity or price, so the col
 
 ## Is this lockable
 
-**This section is an assessment, not a status change.** The status field still reads `Externally-Grounded — not locked`, and no agent may change it. What follows is the working, so the owner can check it rather than take it.
+**This section was written as an assessment, before the lock, and it is kept as it was written.** It is the working the owner was given, so he could check the reasoning rather than take a verdict. **He read it and locked the design on 2026-08-11** — *"yes lock the design and log the bugs"* — and § Owner rulings, ruling 3, records that. The section is not the authority for the lock; his sentence is. Read on to see what he was agreeing to.
 
 ### The six blockers the adversarial review listed
 
@@ -823,7 +837,9 @@ Treating an unbuilt acceptance criterion as a lock blocker would invert the life
 
 **The one caveat that belongs with that.** The review wrote blocker 1 as "must land first", and it means it. A build that shipped the operators before the binding path is fixed would make the prevention claim false on arrival, which the Philosophy Alignment table's Principle 1 row says in its own words. That is a sequencing obligation on whoever plans the work, and it is recorded in § Dependencies. Locking does not discharge it.
 
-### What locking this design would settle
+### What the lock settles
+
+Written before the lock as *what locking would settle*; the owner set the lock on 2026-08-11, so every item below is now settled rather than proposed.
 
 - **Decision 1** — two periods order when both resolve, on the temporal-unit axis, to a basis naming exactly one component and the same component on both sides. Everything else refused at compile time. Irreversible after ship.
 - **Decision 2** — `TypeTrait.Orderable` is removed and replaced by a condition on the type entry, across `period`, `money`, `quantity`, `price`, `choice` and every other entry. Public catalog surface; hard to reverse.
@@ -834,18 +850,23 @@ Treating an unbuilt acceptance criterion as a lock blocker would invert the life
 - **Decision 7** — ordering ships before the period interval domain, and period comparisons contribute no proof facts.
 - **Decision 8** — Decision 14 is rewritten rather than deleted. **Already executed**, 2026-07-29, ahead of the lock.
 
-All eight carry the four legs `CLAUDE.md § Per-Decision Rationale` requires — rationale, alternatives rejected with reasons, precedent, tradeoff accepted — plus a counter-evidence leg, a reversibility mark and a blast radius. Two precedent legs answer in the negative and say so: Decision 6 records that there is none, because the type gate fixes a defect this pass found rather than following anything; and Decision 8's precedent is the project's own rationale rule rather than an instance of a decision being repaired this way. Both are answers to the leg, not omissions of it. Decision 1's counter-evidence leg names the condition under which the decision is wrong (that the owner values `period in 'weeks'` against `period in 'days'` more than `.min` determinism), prices it, and hands it to falsifier 3. That is a named live tension inside a locked decision, which is what the four-leg standard asks for rather than something it forbids.
+All eight carry the four legs `CLAUDE.md § Per-Decision Rationale` requires — rationale, alternatives rejected with reasons, precedent, tradeoff accepted — plus a counter-evidence leg, a reversibility mark and a blast radius. **Two are short on precedent, and the lock records that rather than hiding it.** Decision 6 has no precedent at all and says so, because the type gate fixes a defect this pass found rather than following anything anyone has done before; what grounds it instead is the defect itself, evidenced at `ProofEngine.Composition.cs:224-:241` and `TypedExpressionMagnitude.cs:142-:155` in its Sources leg. Decision 8's precedent is the project's own rationale rule — a rule about how decisions must be written, not an instance of a decision being repaired this way — so that leg is answered by a standard rather than by evidence of the practice. Neither gap was filled with an invented precedent to get the lock past the four-leg bar, and a reader who wants to re-open either has the honest reason to hand. Decision 1's counter-evidence leg names the condition under which the decision is wrong (that the owner values `period in 'weeks'` against `period in 'days'` more than `.min` determinism), prices it, and hands it to falsifier 3. That is a named live tension inside a locked decision, which is what the four-leg standard asks for rather than something it forbids.
 
-### What locking would not settle
+### What the lock does not settle
 
+**Read this list before acting on the lock.** Nothing here is built, and the lock says nothing about whether it is.
+
+- **The three code items.** § Ship now item 1 — the binding path where a declared qualifier does not constrain the value — plus the refusal diagnostics that replace `PRE0018`, and the type gate on the relational-fact path. Each is an implementation obligation with an acceptance criterion, which is why none of them held the lock up; none is done, which is why the lock does not make the mechanism real. Item 1 lands first or Decision 1's correctness argument is false on arrival.
 - **The § Ship now repairs.** Six defects, four of them not about periods. A lock does not fix them, and item 1 must be fixed before the operators ship.
-- **§ Open questions item 3.** The mixed-sign defect and the question of what non-zero-ness means for a period whose components disagree. Independent of ordering; belongs with the deferred interval work.
+- **§ Open questions item 3.** The question of what non-zero-ness and non-negativity mean for a period whose components disagree in sign. Independent of ordering; belongs with the deferred interval work. The two defects underneath it are filed as `BUG-068` and `BUG-069` and are not waiting on that question — they are wrong under every reading of it.
 - **The weeks-versus-days boundary.** Refused for reach rather than correctness, with falsifier 3 naming what would reopen it.
 - **Where the work is scheduled.** `compiler-readiness-plan.md` § 1 and § 4 record the mechanism as folded into phase 5. Phase 5's own stated scope is settling the obligation families and the discharge procedure, and the build happens at phase 11 — so "folded into phase 5" needs reading as where the obligation and discharge shape are settled, not where the code lands. Whoever plans the phases owns that, not this design.
 
-### Assessment
+### Assessment, and the lock that followed it
 
-**Lockable.** Every question this design put to the owner is answered, three of the review's six blockers are closed, and the other three are implementation obligations the design already carries as acceptance criteria with a stated order. The remaining risk is in the building, not in the deciding — and the design names the sequencing constraint that keeps the building honest.
+**The assessment was: lockable.** Every question this design put to the owner is answered, three of the review's six blockers are closed, and the other three are implementation obligations the design already carries as acceptance criteria with a stated order. The remaining risk is in the building, not in the deciding — and the design names the sequencing constraint that keeps the building honest.
+
+**The owner locked it on 2026-08-11** — *"yes lock the design and log the bugs"* — and the front matter and § Owner rulings, ruling 3, carry that. The assessment above is an agent's argument and was never authority for a lock; his sentence is. What the lock reaches and what it leaves alone are the two lists above, and the shorter of them is the one that matters for anyone about to build: the three code items are not done.
 
 ---
 
@@ -855,4 +876,4 @@ The rule and its decision procedure for every declaration form and every operand
 
 And the plain answer to the question the owner asked: NodaTime's reason is real, it is about the width of the type, and it does not reach a value known to be counted in one unit. For two scalar fields the comparison an author wants already works today under a different spelling, so there the operator buys legibility rather than capability, and that half should be decided on that basis. For a collection of pinned periods there is no other route at all — `.min`/`.max` legality is a trait of the element type and no accessor can supply it from outside — so that half is a capability question, and it is the one that decides whether the operator is worth building.
 
-**And it has been decided.** 2026-07-29 — *"build both."* The research gate was waived the same day, on the ground that the unsurveyed systems are not comparators for a decision where Precept ships NodaTime's own `Period`. § Owner rulings carries both, and § Is this lockable says what a lock would cover and what would still be outstanding after it.
+**And it has been decided.** 2026-07-29 — *"build both."* The research gate was waived the same day, on the ground that the unsurveyed systems are not comparators for a decision where Precept ships NodaTime's own `Period`. **The design was then locked on 2026-08-11** — *"yes lock the design and log the bugs."* § Owner rulings carries all three in his words, and § Is this lockable says what the lock reaches and what is still outstanding after it: the eight decisions are settled, and none of the code is written.
