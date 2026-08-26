@@ -29,7 +29,8 @@
 > compiler — an internal build milestone marking when the prove-or-reject engine runs end to end. It is not
 > a release, and nobody outside the project receives it. So "post-MVP" and "after the MVP" place work later
 > in the build order; they never describe a gap the product is meant to carry, and nothing in these docs
-> should be read as saying a deferred item is missing from something a user gets.
+> should be read as saying a deferred item is missing from something a user gets. This definition was put
+> to the owner on 2026-08-26 and he confirmed it.
 
 ---
 

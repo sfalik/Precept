@@ -174,7 +174,6 @@ Descriptors are the "no string aliasing" principle applied at the runtime API bo
 An index of what is undecided about the descriptor types. Each entry says what somebody has to decide and points at where the case for it is written; that discussion stays where it is.
 
 - **What replaces `ConstraintDescriptor.ReferencedFields`.** It is a provisional flat list of field names, and a typed target hierarchy is meant to take its place. Nothing says what that hierarchy is, because it waits on the constraint evaluation attribution model — which is itself undecided: `evaluator.md` § 7.2 Inspection Operations asks which type carries what inspection reports in place of a constraint verdict. See § Descriptor Shapes.
-- **Which storage shape `FieldDescriptor.AccessModes` takes** — a dictionary keyed by state, or an indexed representation. The choice affects lookup cost, descriptor size, and how the builder emits it. The property is not on the `FieldDescriptor` shape printed in § Descriptor Shapes, and both the builder and the evaluator need it there. The question is written in `precept-builder.md` § Pass 1 — Descriptor Pass and `evaluator.md` § 7.5 Access Mode Enforcement; it is indexed here because the type it changes is this document's.
 
 ### Notes
 

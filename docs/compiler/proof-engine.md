@@ -320,8 +320,6 @@ public enum ProofStrategy
 > **Invariant:** The proof engine MUST NOT use `with { ... }` on `obligation.Site` or create new `TypedExpression` instances — it must preserve the original object reference. The `ProofObligation` itself can use `with { ... }` (it's a separate record), but the `Site` field must point to the original `SemanticIndex` expression.
 >
 > **Why:** reference identity is the only thing that tells two identical-but-distinct expressions apart. The same text written into two transition rows produces two `TypedExpression` values that compare equal structurally, so a consumer matching on structure attributes an obligation to whichever of them it meets first. Copying the `Site` with `with { }` discards the distinction.
->
-> **What is not settled is whether any consumer needs the distinction.** Diagnostic emission matches on the span, and so does the language server when it looks for the obligation behind a squiggle. Until something has to separate two structurally identical sites, the invariant costs nothing and buys nothing, and the argument above is a reason to keep it rather than a demonstration that anything would break without it. The specification of the certificate checker is where this closes: a checker that replays a discharge has to find the expression the discharge was about, and how it identifies that expression decides whether `Site` must be a reference or may be a span.
 
 #### ConstraintInfluenceEntry
 

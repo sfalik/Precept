@@ -427,6 +427,14 @@ the only hunk in the file.
 
 ## Traces to nothing he wrote or ruled
 
+> **Dispositioned 2026-08-26 — both items are closed.** Item 1's paragraph **came out of `proof-engine.md`**
+> on his *"lets go clean"*; the invariant and the "Why" paragraph above it stay, and phase 5's certificate
+> checker meets the question on its own. Item 2's three sentences **came out of canon** along with every
+> other site of the "and nothing wider" narrowing — he did not want the underlying question settled in
+> passing. What a direct field edit evaluates is still open and still belongs to phase 5. The two findings
+> below are left as they were written and describe the file before that surgery. His words and his reasons:
+> [`../trace-walk-rulings.md`](../trace-walk-rulings.md).
+
 Two items. The first is small and nothing rests on it. The second is a sentence that took a side in a
 question still going to the owner, in three places, unmarked.
 
@@ -474,7 +482,8 @@ resolving a contradiction.
 ### 2. Three new sentences in `proof-engine.md` adopt a scope for ingress validation that canon marks as disputed
 
 **Where**: `proof-engine.md:133`, `:2170` and `:2597`. Canon is not edited from here, so the three sentences
-are still in the file exactly as described.
+were still in the file exactly as described when this was written. They came out on 2026-08-26 — see the
+note at the head of this section.
 
 `proof-engine.md:133`, `:2170` and `:2597` now each describe ingress validation as holding a value to *"the
 constraints declared on the slot it enters"*, and `:2597` adds *"and nothing beyond them"*. None of these

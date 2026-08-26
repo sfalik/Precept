@@ -499,6 +499,12 @@ a statement that nothing inside the engine will notice.
 
 ## Traces to nothing he wrote or ruled
 
+> **Dispositioned 2026-08-26 — the item is closed.** The narrowing **came out of canon**, in both of these
+> documents and at every other site. He did not want the underlying question settled in passing; what a
+> direct field edit evaluates is still open and still belongs to phase 5. The finding below is left as it
+> was written and describes the files before that surgery. His words and his reasons:
+> [`../trace-walk-rulings.md`](../trace-walk-rulings.md).
+
 **One change, made in two of the three documents. It is already labelled inside canon as disputed, and it
 is on the plan's § 4 list as a question waiting on you — but it is a sentence that contradicts your own
 want document sitting in two canonical documents, so it belongs on this list rather than being counted as an

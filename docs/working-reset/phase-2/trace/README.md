@@ -44,12 +44,21 @@ held.** The other ~241 have not been re-derived by anybody but the writer.
 That is the honest state of it. A reader who wants to rely on a particular entry should open its citation;
 the entries give file and line so that this is a minute's work rather than an afternoon's.
 
-## What he actually has to read: the category-4 short lists
+## The category-4 short lists, and what he decided about them
 
 Eleven items across the seven documents. **Five of the eleven are the same question** — the "and nothing
-wider" narrowing of what an ingress check evaluates — appearing in five different documents, and that
-question is already on the plan's § 4 list waiting for him. So there are seven distinct things here, not
-eleven.
+wider" narrowing of what an ingress check evaluates — appearing in five different documents. So there are
+seven distinct things here, not eleven.
+
+**All of them were put to him and dispositioned on 2026-08-26.** His rulings, with his words and his
+reasons, are in [`../trace-walk-rulings.md`](../trace-walk-rulings.md); each of the seven documents now
+carries the outcome at the head of its own short list. In summary: the "and nothing wider" narrowing came
+out of canon at every site, and what a direct field edit evaluates stays open for phase 5; he confirmed he
+approved the philosophy rewrite, which closes three of the four items in `philosophy-and-architecture.md`
+and leaves one correction to the rewrite record; the open-question indexes stay, less one entry in
+`descriptor-types.md` that pointed at a question written in other documents; the paragraph in
+`proof-engine.md` questioning the reference-identity invariant came out; and the definition of "the MVP"
+was confirmed by him and is now recorded in `soundness-and-coverage.md` as confirmed.
 
 | Where | Item |
 |---|---|
@@ -85,6 +94,8 @@ from it. The full record of his answer is in
 - It does not say whether a change is **correct** — only whether it traces to something he wrote or ruled.
   Several correctly warranted changes describe a compiler that does not exist yet; that is the intended
   posture under walk item 23 and is not treated as a defect.
-- **It edits no canonical file.** Where a trace says a canon sentence is wrong, the sentence is still there.
+- **It edits no canonical file.** Where a trace says a canon sentence is wrong, the trace leaves the sentence
+  in place. Some of those sentences have since been removed, by his rulings of 2026-08-26 rather than by the
+  trace; the head of each short list says which.
 - It covers only the 23 files listed above. Working papers, plans and registers were read as evidence but
   are not themselves traced.

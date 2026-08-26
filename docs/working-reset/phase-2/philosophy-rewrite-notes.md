@@ -21,8 +21,11 @@ verifying a definition's proof before governing under it.
   ("data entities outnumber workflow entities"), and "this is not a secondary capability" are gone,
   along with the Terraform / SQL / DDD precedent list. States-are-optional is now said once flatly
   in each place: one clause in the opening, one plain line in the principles. The market-size claim
-  was unsupportable and unnecessary — if stateless precepts are first-class, that holds whether or
-  not they are the majority.
+  came out with the rest of the doubled argument, as part of the rewrite the owner approved — not
+  because it lacks evidence. `research/philosophy/entity-first-positioning-evidence.md` § 1.2 is
+  headed with that claim and carries a five-domain table of ratios behind it, and
+  `philosophy.md` links to that file. It was cut because it was not needed: if stateless precepts
+  are first-class, that holds whether or not they are the majority.
 - **"The word itself."** Its one working phrase — "declared once, holding always" — moved up to the
   second paragraph; the rest repeated the hierarchy section. The document no longer ends on its own
   etymology.

@@ -322,6 +322,13 @@ rests entirely on the engine being right — which is why the fail-open holes ar
 
 ## Traces to nothing he wrote or ruled
 
+> **Dispositioned 2026-08-26 — both of the two changes quoted below are closed.** The note defining "the
+> MVP" was put to him directly and **he confirmed it**: *"yes"*. `soundness-and-coverage.md` now records
+> that, dated, in the note itself. "What the chain rules out" **needs no action** — it is an inference he
+> never wrote, but it is drawn from rules the document already states, and it marks the unresolved part as
+> unresolved and points at the parked question. His words and his reasons:
+> [`../trace-walk-rulings.md`](../trace-walk-rulings.md).
+
 **Nothing in these two files falls entirely into this category.** Every deletion of the fault-checking
 model traces to want:165 or want:171; every reclassification of a bound traces to want:22; the checker's
 return to scope traces to want:201–206; the author-visible verdicts trace to his 2026-07-26 ruling.

@@ -250,6 +250,13 @@ warrants. The table itself is Category 4.
 
 ## Traces to nothing he wrote or ruled
 
+> **Dispositioned 2026-08-26 — the item is closed.** The open-question indexes **stay** — *"agree"*. One
+> entry comes out, the sub-item this section already singles out: the `FieldDescriptor.AccessModes` entry
+> has been deleted from `descriptor-types.md`, because an index that points at questions written in other
+> documents becomes a second place to maintain. The finding below is left as it was written and describes
+> the file before that deletion. His words and his reasons:
+> [`../trace-walk-rulings.md`](../trace-walk-rulings.md).
+
 One item. It is an editorial decision made across all three documents in `3fb04266`, and it changes no
 claim: nothing was resolved, narrowed, moved or contradicted, and the working paper for the pass
 (`runtime-open-questions.md`) states that plainly.
@@ -309,7 +316,8 @@ consequence of that section existing.
 `FieldDescriptor` shape does not carry the property. The entry is at `descriptor-types.md:177`; the question
 itself is written in `precept-builder.md` § Pass 1 and `evaluator.md` § 7.5, about a type this document
 owns. `runtime-open-questions.md:117–120` names it as a
-judgement call and says: "If that reads as over-reach it is one line to remove." It is still there at HEAD.
+judgement call and says: "If that reads as over-reach it is one line to remove." It was still there at HEAD
+when this was written; it was removed on 2026-08-26.
 
 ### The `Fault`-producer entries, which do trace
 

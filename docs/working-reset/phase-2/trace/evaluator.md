@@ -259,6 +259,13 @@ same disclosure. Recording the gap rather than claiming the type is gone is the 
 
 ## Traces to nothing he wrote or ruled
 
+> **Dispositioned 2026-08-26 — both items are closed.** Item 1's sentences **came out of canon** at every
+> site, together with the index entry at `:2015` that stated the narrowing and marked it disputed in the
+> same breath; what a direct field edit evaluates is still open and still belongs to phase 5. Item 2, the
+> index of open questions, **stays** — *"agree"*. The findings below are left as they were written and
+> describe the file before that surgery. His words and his reasons:
+> [`../trace-walk-rulings.md`](../trace-walk-rulings.md).
+
 ### 1. The sentence narrowing what an update's ingress check evaluates — `:738`, `:1381`, `:1383`, `:2015`
 
 **Before** (nothing — this text is new; the document said only "2. Apply patch to working copy" and § 7.6

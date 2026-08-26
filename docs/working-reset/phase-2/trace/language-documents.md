@@ -421,6 +421,12 @@ overflow guards"*.
 
 ## Traces to nothing he wrote or ruled
 
+> **Dispositioned 2026-08-26 — the item is closed.** The narrowing **came out of canon**, here and at every
+> other site. He did not want the underlying question settled in passing, so the specification now says
+> nothing about what a direct field edit evaluates, in either direction, and phase 5 settles it. The finding
+> below is left as it was written and describes the file before that surgery. His words and his reasons:
+> [`../trace-walk-rulings.md`](../trace-walk-rulings.md).
+
 One item. The tree already flags it as disputed in canon's own voice, so he is not being shown it for the
 first time here. A second item stood in this list until 2026-08-26 and has been withdrawn; it is written up
 in full in the section after this one.

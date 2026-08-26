@@ -560,6 +560,17 @@ said the opposite of what the owner wrote, and it also contradicted `:842` in th
 
 ## Traces to nothing he wrote or ruled
 
+> **Dispositioned 2026-08-26 — all four items are closed.** Item 1: he confirmed that he approved the
+> rewrite of `docs/philosophy.md` — the whole-document rewrite, not only the eight corrections prepared for
+> approval — so the status line's claim is true and the editorial decisions carry his approval. Item 2's two
+> sentences **came out of canon** along with every other site of the "and nothing wider" narrowing; what a
+> direct field edit evaluates is still open and still belongs to phase 5. Item 3, the AI-agent paragraph, is
+> part of that approved rewrite and stays. Item 4: the deletion stands on the same approval, and the
+> **stated reason has been corrected** in [`../philosophy-rewrite-notes.md`](../philosophy-rewrite-notes.md)
+> — the paragraph came out with the rest of the doubled stateless argument, not because the claim lacks
+> evidence. The findings below are left as they were written. His words and his reasons:
+> [`../trace-walk-rulings.md`](../trace-walk-rulings.md).
+
 Four items. The first two are the ones worth his time.
 
 ### 1. The philosophy rewrite's editorial decisions, and the approval claim on top of them
