@@ -2594,7 +2594,7 @@ The `ProofLedger` does NOT cross the compile-runtime boundary.
 
 The proof engine never evaluates a rule against concrete values. Neither does anything else: no phase of an operation re-checks a rule against the configuration the operation commits (language spec §0.7; `../runtime/evaluator.md` § Ingress Validation). The division of work is:
 - **Proof engine:** "Can any reachable operation violate this rule, given the structure and the premises the author declared?"
-- **Evaluator:** "Does this incoming value satisfy the constraints declared on the slot it enters, and does this guard hold?" — the two checks the proofs rest on, and nothing beyond them.
+- **Evaluator:** "Does this incoming value satisfy the constraints declared on the slot it enters, and does this guard hold?" — the two checks the proofs rest on.
 
 ### No General Dataflow Analysis
 

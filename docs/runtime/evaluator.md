@@ -735,10 +735,8 @@ UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
     }
     
     // 2. Ingress governance (§3A.4 phase 1): each incoming value is held to the
-    //    constraints declared on the field it is entering — and nothing wider —
-    //    before it is applied and before anything derives from it (spec §0.7).
-    //    "Nothing wider" is disputed and is not settled canon — see the note in
-    //    spec §0.7, Governance. Do not build against this scope.
+    //    constraints declared on the field it is entering, before it is applied
+    //    and before anything derives from it (spec §0.7).
     //    Collect-all: every failing value is reported, not just the first.
     var violations = ValidateIngress(patch, precept.Fields, version.CurrentState);
     if (violations.Count > 0)
@@ -1352,7 +1350,7 @@ The evaluator never re-derives this; it reads the pre-resolved descriptor.
 
 This is the only place the evaluator evaluates a declared constraint against data. It runs at §3A.4 phase 1, on values arriving from outside, before the working copy derives anything from them. It is collect-all.
 
-The `Always`, `FromState` and `ToState` buckets of the `ConstraintPlanIndex` are **not** walked here. Those are global rules and state ensures over field values; the compiler proved every handler preserves them and every initial event establishes them (spec §0.7), so the evaluator does not re-check them. Those buckets remain in the built model because the constraint catalogs are built from them (`Precept.Constraints`, `Version.ApplicableConstraints`).
+The pseudocode below is the event path: `ValidateIngress` takes an `EventDescriptor` and checks the values an event supplies. On that path the `Always`, `FromState` and `ToState` buckets of the `ConstraintPlanIndex` are **not** walked. Those are global rules and state ensures over field values; the compiler proved every handler preserves them and every initial event establishes them (spec §0.7), so the evaluator does not re-check them there. Those buckets remain in the built model because the constraint catalogs are built from them (`Precept.Constraints`, `Version.ApplicableConstraints`). What a direct field edit through `Update` evaluates is a separate question, and this document does not settle it.
 
 ```csharp
 IReadOnlyList<ConstraintViolation> ValidateIngress(
@@ -1378,9 +1376,7 @@ IReadOnlyList<ConstraintViolation> ValidateIngress(
 }
 ```
 
-`Update` runs the same check over the patched field values, against the constraints declared on each field it writes — and nothing wider (spec §0.7, *Governance*).
-
-> **"Nothing wider" is disputed and is not settled canon.** See the note in spec §0.7, *Governance*. Do not build against this scope, and do not cite it as evidence.
+`Update` runs the same check over the patched field values, against the constraints declared on each field it writes (spec §0.7, *Governance*). Whether an edit evaluates anything beyond those is the open question noted at the start of this section.
 
 ```csharp
 void EvaluateConstraint(
@@ -2012,7 +2008,6 @@ An index of what this document leaves undecided. Each entry says what somebody h
 - **Which type carries what inspection reports in place of a constraint verdict.** Execution has no constraint-evaluation phase, so inspection has none to preview, and `TransitionInspection.Constraints`, `UpdateInspection.Constraints` and `EventInspection.EventEnsures` currently have nothing to fill them. What inspection is meant to report instead is proof provenance — no check needed here, and here are the premises it was proven from — and no document says which type carries that. `BuildConstraintResults` stays unspecified until it is decided. See § 7.2 Inspection Operations.
 - **When a state carries more than one state action, whether all of them fire and in what order.** Owned by `precept-language-spec.md` § 3A.4; the flow diagram and lifecycle here depict a single action chain per position and do not answer it. See § 6 Execution Flow Diagram and § 6 Working Copy Management.
 - **Whether entry actions fire at construction and on a self-transition.** Same origin and same two sections as the entry above.
-- **Whether an `Update` holds each incoming value to the constraints declared on the field it enters and nothing wider.** The "nothing wider" scope is disputed and is not settled canon; the dispute is recorded in `precept-language-spec.md` § 0.7, *Governance*. See § 7.6 Ingress Validation.
 - **Four opcode semantics that nothing pins down**: how `LOAD_ARG` treats an absent or null input, whether `BRANCH_FALSE` treats numeric zero as false or only `false` itself, whether `RETURN` may legally fall through to further opcodes, and whether the evaluation stack is pooled rather than `stackalloc`-only. They have to be settled before builder-emitted plans and any later compiled path can be relied on to execute identically. See § 7.3 Opcode Execution Engine.
 - **The internal field layout of `PreceptValue`** — which tag type, where the union payload sits, and which value types share which union region. The 32-byte size and the tagged-value-struct shape are locked; the layout inside them is not. See § 5 Inputs and Outputs.
 - **What a trace record looks like, how a trace context is attached to an evaluation call, and how the language server and MCP server read the trace output.** See § 11 Decision 8.
@@ -2128,13 +2123,13 @@ The same inputs always produce the same outputs. This enables confident testing 
 
 ### Ingress Validation Matrix
 
-This matrix summarizes which constraints and access-mode checks each operation evaluates. No operation evaluates a constraint against the finished working copy: `always`, `from <state>`, `in <state>` and `to <state>` are proven at compile time and never walked at execution time (spec §0.7).
+This matrix summarizes which constraints and access-mode checks each operation evaluates. No operation evaluates a constraint against the finished working copy: `always`, `from <state>`, `in <state>` and `to <state>` are proven at compile time, so nothing re-checks them once the mutations are complete (spec §0.7).
 
 | Operation | Access-mode checks | Row dispatch | Constraints evaluated |
 |---|---|---|---|
 | `Fire` | no | yes | the constraints declared on each supplied argument, plus `on <event>` |
 | `InspectFire` | no | yes (all rows) | same as `Fire` |
-| `Update` | yes | no | the constraints declared on each patched field |
+| `Update` | yes | no | the constraints declared on each patched field; whether an edit evaluates anything further is not settled — see § 7.6 |
 | `InspectUpdate` | yes (reported) | no | same as `Update`, plus event-prospect over hypothetical state |
 | `Create` with initial event | no | yes (initial event) | same as `Fire` for the initial event |
 | `Create` without initial event | no | no | none — there is no external input to check |
@@ -2145,7 +2140,7 @@ This matrix summarizes which constraints and access-mode checks each operation e
 **Key rules:**
 - Restore bypasses both access-mode checks and ingress validation — trusted hydration (spec §0.7; Decision 5)
 - Inspection and commit paths execute the same prebuilt plans — disposition alone differs
-- The `always` / `from` / `in` / `to` buckets are still built and still index the constraint catalogs; they are simply not evaluated against entity data at runtime
+- The `always` / `from` / `in` / `to` buckets are still built and still index the constraint catalogs; no operation walks them over the finished working copy
 
 ---
 

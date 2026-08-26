@@ -399,9 +399,7 @@ Version next = outcome switch
 
 Update runs the field-write pipeline: access mode check → type validation → ingress validation of each patched value (collect-all) → patch application to working copy → computed field recomputation → commit. Returns one `UpdateOutcome` variant.
 
-Ingress validation happens **before** the value is applied, and it holds the incoming value to the constraints declared on the field it enters — nothing wider (spec §0.7, *Governance*). It is the same operation-blind check every externally-supplied value gets. There is no second pass over the finished working copy: an editable field is an ordinary write site, and the compiler discharged its obligations at compile time like any other. A patched value that fails its check is refused before any mutation runs, so nothing is rolled back.
-
-> **"Nothing wider" is disputed and is not settled canon.** See the note in spec §0.7, *Governance*. Do not build against this scope, and do not cite it as evidence.
+Ingress validation happens **before** the value is applied, and it holds the incoming value to the constraints declared on the field it enters (spec §0.7, *Governance*). It is the same operation-blind check every externally-supplied value gets. There is no second pass over the finished working copy: an editable field is an ordinary write site, and the compiler discharged its obligations at compile time like any other. A patched value that fails its check is refused before any mutation runs, so nothing is rolled back.
 
 **Why Update, not Edit:** Renamed from `Edit` to avoid confusion with `edit` declarations in the DSL (per-state field access blocks). `Update` describes what the caller does to field values; `edit` describes what the precept author declares.
 

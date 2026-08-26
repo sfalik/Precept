@@ -271,23 +271,7 @@ The compiler delivers both by proof over the reachable configurations, from four
 
 **Overflow is where this does not hold today, and saying so is the point of this paragraph.** The arithmetic overflow model — integer, temporal, and number-lane infinity — is in scope and not yet implemented. By an explicit ruling its build is sequenced after the MVP, the first working compiler, which is an internal milestone and not something anybody receives, so this is an ordering decision about when the work happens and not a gap the product is meant to carry (`docs/compiler/soundness-and-coverage.md` defines the milestone at its head and records the sequencing in §3.1 and §6). Until it is built the compiler does not prove the absence of overflow, and the runtime carries no guard against it, so a definition that compiles clean can still overflow when an expression is evaluated. The paragraph above states the target the language is being built toward and that target is not being weakened to match; this note records the one place the target is not yet met, so no reader takes the list above as a description of current behaviour.
 
-**Governance — enforced at runtime on external input.** Every value entering the entity from outside the definition — event arguments, construction inputs, direct field edits — is held to the constraints declared on the slot it enters, at the moment it enters, before any computation derives from it. This enforcement is operation-blind: it upholds the field's declared contract whether or not any fault-prone operation references the field. It is also *only* the field's own declared contract — ingress makes the incoming value legal for the slot it enters, and nothing wider. An invalid configuration never persists because every handler was proven at compile time to preserve every rule and ingress makes the premises those proofs rest on true of the values that arrive — this is prevention, not detection. (Principles 1, 6.)
-
-> **This scope is disputed and is not settled canon.** The words "and nothing wider" narrow ingress to the
-> constraints declared on the slot a value enters. `docs/Working/what-i-want-2026-07-16.md:143` says the opposite for an
-> editable-field write — that the applicable rules are evaluated there, and that this is "exactly the premise that closes
-> the editable write sites in the compiler's proof". The narrowing was written on 2026-07-27 on a reading of the owner's
-> walk item 16, and that item's recorded answer preserves want:143 rather than replacing it. No other document supports
-> the narrowing independently: every canonical sentence that agrees with it was written in the same pass. **Do not build
-> against this scope, and do not cite it as evidence.** The question — what discharges a relational rule's preservation
-> obligation when a field it mentions is edited — is open and goes to the owner. See
-> `docs/working-reset/phase-5/editable-write-cascade.md` and `editable-write-design-space.md`.
->
-> The same narrowing is stated at §3A.4 and in five runtime and architecture documents:
-> `runtime/runtime-api.md` § Update, `runtime/evaluator.md` § Update ingress (twice),
-> `runtime/result-types.md` § `UpdateOutcome`, and `compiler-and-runtime-design.md` §1.1 *Governance*.
-> Each carries a pointer back to this note. Every one of them was written in the pass that wrote this sentence,
-> so none of them is independent support for it.
+**Governance — enforced at runtime on external input.** Every value entering the entity from outside the definition — event arguments, construction inputs, direct field edits — is held to the constraints declared on the slot it enters, at the moment it enters, before any computation derives from it. This enforcement is operation-blind: it upholds the field's declared contract whether or not any fault-prone operation references the field. An invalid configuration never persists because every handler was proven at compile time to preserve every rule and ingress makes the premises those proofs rest on true of the values that arrive — this is prevention, not detection. (Principles 1, 6.)
 
 **Composition.** For a value supplied at runtime, the compiler's proof that the operation cannot fault rests on a premise the author declared — a modifier on the field or the argument, the handler's guard, or a rule that already held; governance makes that premise true of the value at ingress. The proof is therefore complete at compile time and the fault never occurs — proven by the compiler, its precondition discharged by governance, nothing left to a runtime check.
 
@@ -1989,12 +1973,7 @@ This attribution model is a language-level requirement because it flows from how
 
 All mutations execute on a working copy. If the operation runs to completion, the working copy is promoted to become the entity's committed state. If the operation refuses part-way — an authored `reject` row matched, an incoming value failed its ingress check, a patch failed its access-mode check — the working copy is discarded whole and the entity's state is unchanged. Promotion is not conditional on a constraint check: every handler was proven at compile time to preserve every rule, so a working copy the operation completed is valid by construction. An invalid configuration never exists, even transiently, and there is no window in which a partially-committed state with violated rules can be observed.
 
-Externally-sourced values are validated against their declared constraints at **ingress** — as they enter, before the working copy derives any dependent value (governance, §0.7). That check upholds the declared contract of the slot the value enters and nothing wider; there is no second pass over the finished working copy. Restored state is not ingress at all: it is trusted as valid at persistence time, and no later operation re-governs it (§0.7).
-
-> **The words "and nothing wider" above are disputed and are not settled canon.** The full note is in §0.7,
-> *Governance*, which is the section every other document cites for the guarantee contract. **Do not build against this
-> scope, and do not cite it as evidence.**
-
+Externally-sourced values are validated against their declared constraints at **ingress** — as they enter, before the working copy derives any dependent value (governance, §0.7). That check upholds the declared contract of the slot the value enters; there is no second pass over the finished working copy. Restored state is not ingress at all: it is trusted as valid at persistence time, and no later operation re-governs it (§0.7).
 
 This guarantee applies to all mutation surfaces: event-driven transitions, stateless event hooks, direct field updates, and state entry/exit actions. The working copy semantics are uniform — every path through the engine that can modify entity data uses the same all-or-nothing promotion/discard model.
 

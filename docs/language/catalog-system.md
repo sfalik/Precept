@@ -100,7 +100,7 @@ The catalog system is intended to become the machine-readable definition of the 
 
 Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, outcome forms, diagnostics, faults, and visual classification — is defined as structured metadata in a static, compiler-enforced catalog. Fifteen catalogs cover the language (twelve language-definition + two failure-mode + one tooling-adjacent). The goal is that their union becomes the language specification in machine-readable form.
 
-**This section is the vision, not the current state.** As of 2026-07-25 the catalogs do not yet hold everything the specification requires — `precept-language-spec.md:2010` says so in the spec's own voice about the write list, the `CertificateSteps` catalog named at `:225` does not exist, and `ProofRequirementKind` carries no establishment or preservation member. Until that closes, the canonical documents are what completeness is measured against. See `CLAUDE.md` § Catalog System.
+**This section is the vision, not the current state.** As of 2026-07-25 the catalogs do not yet hold everything the specification requires — `precept-language-spec.md:1999` says so in the spec's own voice about the write list, the `CertificateSteps` catalog named at `:225` does not exist, and `ProofRequirementKind` carries no establishment or preservation member. Until that closes, the canonical documents are what completeness is measured against. See `CLAUDE.md` § Catalog System.
 
 Every consumer reads from these catalogs:
 
