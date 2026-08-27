@@ -792,6 +792,11 @@ belong in front of whoever owns the plan.
 
 ## Where the certificate checker's compiler stage goes — genuinely without a home
 
+> **Outcome, 2026-08-26 — it has a home now.** The first of the two options below was taken: the compiler
+> documents gained an open-questions index at `docs/compiler/README.md` § Open questions, and this question
+> is a row in it. The finding as written below describes the state at the time of the read; the outcome
+> paragraph at the end of the section says what was built. The question itself is still unanswered.
+
 The requirement is written three times (`soundness-and-coverage.md:158` and `:55–58`, `proof-engine.md:2536`).
 `docs/compiler/README.md:17` says "The compiler is a linear six-stage pipeline" and lists six stages, none of
 them a checker. No stage document exists.
@@ -830,6 +835,17 @@ lives.
 Neither option above is taken here. Creating the table is a change to canon and widening a phase is a change
 to the plan, and both are calls for whoever owns those documents.
 
+**Outcome, 2026-08-26 — the first option was taken and the work is done.** `docs/compiler/README.md` gained a
+§ Open questions section: a preamble stating that the discussion of each question stays in the section that
+raised it and that the index only makes questions findable, then a table of eleven rows ordered by the
+document that owns each question, each row naming a decision and pointing at where it is argued. This
+question is one of those rows, and the row says plainly that no stage document owns it because the stage does
+not exist yet, and that `soundness-and-coverage.md` § 5b is where the requirement is stated rather than where
+the placement is argued. The cost recorded above — that the table would either start with a row pointing
+nowhere or need the discussion written first — is met the first way, and the row says so rather than hiding
+it. What is settled is where the question lives; the question itself is untouched, and it still belongs to no
+phase. The plan's § 5 row is closed to match.
+
 ## Time-referencing rules — the owner is unclear rather than plainly absent
 
 Set out in Part 2. The owner deliberately left the question open at `what-i-want-2026-07-16.md:219`;
@@ -857,7 +873,7 @@ is one question for phase 3 or two questions split across phases 3 and 5.
 | 6. Schema evolution on restore | Phase 2 (open) |
 | 7. `on <Event> ensure` at ingress | Phase 3 |
 | `ensure` absent from the want document | Phase 3 |
-| Certificate checker's compiler stage | **None** — and no table in `docs/compiler/` holds it either. Two candidate homes recorded in Part 4; neither chosen |
+| Certificate checker's compiler stage | **No phase** — but `docs/compiler/README.md` § Open questions holds it, built 2026-08-26 as the first of the two candidate homes recorded in Part 4 |
 | What carries the certificate out | Parked in `runtime/README.md` § Open questions; argued in `precept-builder.md` § 9. No phase, and it does not need one |
 | Premise list against the constraint index | Parked in `runtime/README.md` § Open questions; argued in `precept-builder.md` § 12 |
 | What inspection reports instead | Parked in `runtime/README.md` § Open questions; argued in `evaluator.md` § 7.2 |
