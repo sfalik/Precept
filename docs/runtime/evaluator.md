@@ -143,7 +143,7 @@ Inspection and commit paths execute the **same prebuilt plans** — the only dif
 | **Access mode enforcement** | For Update: check `FieldDescriptor.AccessModes[currentState]` before accepting patch |
 | **Computed field recomputation** | After mutations and before commit: walk `SlotLayout.ComputedSlots` and re-evaluate |
 | **Structured outcome production** | Produce `EventOutcome`, `UpdateOutcome` discriminated unions — never throw for in-domain failures |
-| **Inspection production** | Produce `EventInspection`, `UpdateInspection` with full row-by-row and constraint-by-constraint detail |
+| **Inspection production** | Produce `EventInspection`, `UpdateInspection` with full row-by-row detail, and the ingress check results on an update patch. What they report where execution has no constraint verdict to preview is undecided — see § Open Questions |
 
 ### Out of Scope
 
@@ -1262,10 +1262,10 @@ With naive per-mutation CoW: 3 allocations, 2 immediately discarded. At scale (2
 | Array Type | Who Rents | Who Returns | When |
 |---|---|---|---|
 | Committed version backing | Nobody (donated from previous `Fire`) | Nobody (GC'd with `Version`) | N/A |
-| Working collection array | Evaluator (on first mutation) | Evaluator (constraint failure) OR donated (commit success) | End of row |
+| Working collection array | Evaluator (on first mutation) | Evaluator (if the row is abandoned — see below) OR donated (commit success) | End of row |
 | Resized array | Evaluator (capacity exceeded) | Old: returned immediately. New: same lifecycle as working. | Resize point |
 
-**Rollback on constraint failure:**
+**Rollback on an abandoned row:**
 
 ```csharp
 for (int i = 0; i < workingCopy.Length; i++)
@@ -1277,6 +1277,14 @@ for (int i = 0; i < workingCopy.Length; i++)
     }
 }
 ```
+
+**What abandons a row is undecided.** The lifetime table and this block were written against a constraint
+failure occurring after mutations had begun. No such failure exists: the constraints declared on incoming
+values are checked at ingress, before any value is applied and before anything derives from it, and nothing
+is evaluated against the finished working copy (§ Ingress Validation Matrix). The mechanism may still be
+needed — an engine fault caught part-way through a row, or inspection releasing the copy it executed on —
+but which of those it serves, and whether any of them can occur mid-row, is not settled anywhere. Until it
+is, this is the return path for a row that does not reach commit, with no case named that reaches it.
 
 **Tradeoffs accepted:**
 
@@ -1930,10 +1938,10 @@ This makes evaluation predictable-time, cache-friendly, and trivially traceable.
 
 Most systems have separate "preview" and "execute" paths. Precept's inspection API runs the **same plans** as the commit path — only disposition differs:
 
-| Mode | Guard | Actions | Constraints | Disposition |
-|---|---|---|---|---|
-| Commit | Evaluate | Execute | Evaluate | Fail/succeed |
-| Inspect | Evaluate | Execute (on copy) | Evaluate | Report all |
+| Mode | Guard | Actions | Disposition |
+|---|---|---|---|
+| Commit | Evaluate | Execute | Fail/succeed |
+| Inspect | Evaluate | Execute (on copy) | Report all |
 
 This guarantees that inspection cannot disagree with commit. A row that inspection marks `Certain` will be the winning row when committed.
 
@@ -2011,6 +2019,7 @@ An index of what this document leaves undecided. Each entry says what somebody h
 - **Four opcode semantics that nothing pins down**: how `LOAD_ARG` treats an absent or null input, whether `BRANCH_FALSE` treats numeric zero as false or only `false` itself, whether `RETURN` may legally fall through to further opcodes, and whether the evaluation stack is pooled rather than `stackalloc`-only. They have to be settled before builder-emitted plans and any later compiled path can be relied on to execute identically. See § 7.3 Opcode Execution Engine.
 - **The internal field layout of `PreceptValue`** — which tag type, where the union payload sits, and which value types share which union region. The 32-byte size and the tagged-value-struct shape are locked; the layout inside them is not. See § 5 Inputs and Outputs.
 - **What a trace record looks like, how a trace context is attached to an evaluation call, and how the language server and MCP server read the trace output.** See § 11 Decision 8.
+- **What abandons a row part-way through, if anything does.** The `ArrayPool` return path for a working collection array was written against a post-mutation constraint failure, which no longer exists. Whether an engine fault caught mid-row or inspection releasing its copy replaces it, or whether nothing reaches the path at all, is undecided. See § D. Copy-on-Write Protocol for Multi-Mutation Events.
 - **Whether the working copy's slot array is stack-allocated for small precepts or always heap-allocated.** See § Implementation Status below.
 - **Which ownership model `Version.Slots` uses** — the working array donated raw, or wrapped in an immutable type. The choice decides how far zero-copy promotion reaches and what a snapshot guarantees. See § Implementation Status below.
 - **Which storage shape `FieldDescriptor.AccessModes` takes** — a dictionary keyed by state, or an indexed representation. The same question is written in `precept-builder.md` § Pass 1 — Descriptor Pass. See § 7.5 Access Mode Enforcement and § Implementation Status below.

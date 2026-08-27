@@ -860,7 +860,9 @@ The structural guarantee means that a valid executable model communicates entire
 - Boundary validation: `InvalidArgs`, `InvalidInput`, `RestoreInvalidInput`
 - Access enforcement: `AccessDenied`
 
-There is no `*ConstraintsFailed` outcome in any of these families, and there cannot be one: a definition only compiles if every handler was proven to preserve every rule, so no operation can reach the point of committing a configuration that breaks one. An outcome for that case would name something the compiler already made impossible.
+No outcome in these families reports a constraint failure found after a mutation, and there cannot be one: a definition only compiles if every handler was proven to preserve every rule, so no operation can reach the point of committing a configuration that breaks one. An outcome for that case would name something the compiler already made impossible.
+
+One variant does carry the name, and it is not that case. `UpdateOutcome.ConstraintsFailed` is an ingress failure: it reports the values an update patch was trying to write that the fields those values were entering do not admit, refused before the patch is applied and before anything derives from it. It is declared and described in `result-types.md` § UpdateOutcome.
 
 **Faults** — produced only when the engine breaks one of its own invariants. Every `FaultCode` has a compiler-owned diagnostic counterpart (the prevention rule that should have blocked the site). But many diagnostics have no fault counterpart, and many runtime outcomes are intentionally modeled as normal results, not faults.
 
