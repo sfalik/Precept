@@ -269,6 +269,46 @@ A fourth absence is carried from the plan rather than found by grep: the plan's 
 records that the induction's base case is *assumed* for restored and host-injected data and that this
 assumption is written down nowhere a reader of the guarantee would find it. That is an addition row.
 
+## 4b. The canon-against-canon search
+
+**Added 2026-08-27.** Everything above starts from a claim in the want document, which is what this
+phase was scoped to until the owner widened it. The wider scope needs a search that starts nowhere near
+the want document: two canonical documents disagreeing with each other is a defect on its own account,
+because if canon has no single position then "canon agrees with the want document" is not a claim that
+can be checked at all.
+
+**It cannot be written as a grep list.** There is no claim list to start from, and a reader is not a
+procedure — one careful reader found twelve of these and would not find the same twelve twice. What
+replaces both is a set of **mechanical checks**, each one taking a kind of fact that canon states more
+than once and comparing the statements. A check reads the whole canonical set, so no document is
+favoured and no reader's attention decides the coverage.
+
+**Check 1 — types declared in more than one document.** Built and run 2026-08-27.
+[`checks/declared-types.py`](checks/declared-types.py), run from the repository root. It walks every
+fenced code block in the canonical set, extracts each type declaration and its member names, and prints
+every type name whose member sets are not identical across the documents declaring it. The run is
+written up in
+[`canon-against-canon-check-1-declared-types.md`](canon-against-canon-check-1-declared-types.md): 235
+type names declared, 87 in more than one document, 20 with differing members, of which twelve are
+genuine and the rest are marked abbreviations. **What the check cannot do is separate those two**, so its
+output is a candidate list that has to be read. It flags a declaration carrying an elision marker; nothing
+else is decided for you.
+
+**Checks not yet built**, each one a shape already represented among the cold read's findings, which is
+why each is worth a check rather than a reader:
+
+- **A count stated about a set, against the set.** `diagnostic-system.md` declares 147 enum members,
+  states 164 three times, and calls the set closed four times. A check extracts every "N <things>" claim
+  near an enumeration and counts the enumeration.
+- **An identifier attributed by one document to another document's stage.** `diagnostic-system.md:321`
+  declares `StructuralSinkState` under the Graph header; `graph-analyzer.md` has never heard of it. A
+  check greps each attributed identifier in the document that would own it.
+- **An ordering or numbering stated more than once.** `precept-builder.md` numbers its own passes one way
+  in a list and the other way in a diagram, a dependency table and two section headings.
+
+**Re-running.** Each check is a script and reproduces its own output. A finding it produces goes into the
+register's § 12 like any other, and carries no want line, which is the whole point of the shape.
+
 ## 5. Fold in the two committed inputs
 
 Neither of these is produced by the greps above, and both must be merged before the register is
