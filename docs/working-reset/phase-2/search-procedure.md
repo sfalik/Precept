@@ -294,17 +294,27 @@ genuine and the rest are marked abbreviations. **What the check cannot do is sep
 output is a candidate list that has to be read. It flags a declaration carrying an elision marker; nothing
 else is decided for you.
 
-**Checks not yet built**, each one a shape already represented among the cold read's findings, which is
-why each is worth a check rather than a reader:
+**Checks 2, 3 and 4** were built the same day and are written up in
+[`canon-against-canon-checks-2-4.md`](canon-against-canon-checks-2-4.md):
 
-- **A count stated about a set, against the set.** `diagnostic-system.md` declares 147 enum members,
-  states 164 three times, and calls the set closed four times. A check extracts every "N <things>" claim
-  near an enumeration and counts the enumeration.
-- **An identifier attributed by one document to another document's stage.** `diagnostic-system.md:321`
-  declares `StructuralSinkState` under the Graph header; `graph-analyzer.md` has never heard of it. A
-  check greps each attributed identifier in the document that would own it.
-- **An ordering or numbering stated more than once.** `precept-builder.md` numbers its own passes one way
-  in a list and the other way in a diagram, a dependency table and two section headings.
+- **Check 2 — counts, against the set and against each other.**
+  [`checks/stated-counts.py`](checks/stated-counts.py). De-camel-cases each declared enum name into the
+  phrase prose uses for it and compares every number canon states for that phrase against the member
+  count, then reports countable nouns given more than one number. Three new findings; reproduced the
+  147-against-164 and the eight-against-nine variant counts.
+- **Check 3 — identifiers used as though declared, that nothing declares.**
+  [`checks/undeclared-identifiers.py`](checks/undeclared-identifiers.py). Produces *completeness gaps*
+  rather than disagreements, and the write-up says so; kept for whoever writes the corrected statement of
+  the runtime. Read `csharp` fences only — its first run read `.precept` examples as C# and returned an
+  author's field names.
+- **Check 4 — a diagnostic code against the stage document that would emit it.**
+  [`checks/code-stage-attribution.py`](checks/code-stage-attribution.py). Prints per-stage coverage,
+  because a stage naming every code it emits and missing one is a finding while a stage naming almost none
+  never enumerated them. One finding, already known, and nothing new.
+
+**Still not built.** An ordering or numbering stated more than once — `precept-builder.md` numbers its own
+passes one way in a list and the other way in a diagram, a dependency table and two section headings.
+That one is still a reader's finding.
 
 **Re-running.** Each check is a script and reproduces its own output. A finding it produces goes into the
 register's § 12 like any other, and carries no want line, which is the whole point of the shape.
