@@ -106,6 +106,15 @@ sealed record ArgDescriptor(
     int SourceLine);
 ```
 
+**The `FieldDescriptor` printed above is missing `AccessModes`, and it should not be.** Two other canonical
+documents read a per-state access-mode lookup off this type: `precept-builder.md` § 7 Pass 1 — Descriptor
+Pass says the property is needed and that the builder emits it, and `evaluator.md` § 7.5 Access Mode
+Enforcement checks it before accepting a patch on an Update. So the shape above omits a property the builder
+has to produce and the evaluator has to read. That is a defect in this document, not something anybody has
+to decide. What is still open is which storage shape the property takes — a dictionary keyed by state, or an
+indexed representation — and that question is written in those two documents and indexed in
+`runtime/README.md` § Open questions.
+
 `ConstraintDescriptor` exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy will replace it when the constraint evaluation attribution model is implemented.
 
 ### API Surfaces Using Descriptors
