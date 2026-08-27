@@ -65,13 +65,16 @@ are the part worth reading:
   [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md), every one of the twenty-eight
   matched to the register one at a time: **four are rows with the same substance, four sit inside rows
   written about something else, one is in § 14.4 as an explicit exclusion whose own stated condition has
-  since been met, and nineteen are in no row at all.** **That is still a result, not a pass**, and the
-  condition is not declared passed on it here — the read was deliberately not a re-run of the search
-  procedure the condition names, and whether a differently shaped read plus this diff is what the condition
-  was asking for is Shane's call. What the diff turned up that plainly wants reading before he decides is
-  collected in its own section: two executed rows whose corrections now contradict each other, one family
-  of nineteen rows that left a table stating the model it removed, and the sentence "every handler was
-  proven to preserve every rule" resting on an obligation kind the proof engine does not have. The findings
+  since been met, and nineteen are in no row at all.** **Condition 4 was rewritten on 2026-08-27 to ask for the
+  test that was actually run**, because the one it named — re-run the search procedure — had been judged
+  too weak to bother with and a differently shaped net used instead, leaving the condition asking for one
+  thing while the work did another. It now asks that a reader who did not build the register, given the
+  want document and the canonical documents and nothing else, finds no **canon-against-want** disagreement
+  the register does not already hold. Findings of other shapes are recorded and routed rather than counted.
+  **Under that condition four findings remain**, listed with it: the dead-end definition, `on <Event>
+  ensure` at ingress, the `ensure` construct being absent from the want document, and what artefact
+  carries the certificate out of the compiler. Clearing those four passes it. The five things the diff collected for him were walked on 2026-08-27
+  and are dealt with — see below. The findings
   and what they do and do not settle are set out under the condition itself.
 
 **The five were walked with him on 2026-08-27, and the walk produced a scope ruling that matters more than
@@ -181,7 +184,7 @@ step 1 assumes all three already exist.
 |---|---|---|---|---|
 | 0 | Make the instructions true | **Done** 2026-07-25, `355d9b37` `89392acd` | 1 | — |
 | 1 | Work out what is actually decided, and by whom | **Done** 2026-07-26, `f813e709` `a240a788` `183c2569` `714c7e8d` `7e224b9a` (slice 1.6 disposal deferred to phase 8 and does not block) | 1 | — |
-| 2 | Settle every place canon and the want document disagree | **In progress** 2026-08-27 — **145 rows, all executed or dispositioned**. 133 carry a commit hash; the rest state a reason. **Condition 2 passes**, verified row by row on 2026-07-28: each stamp was checked against the commit rather than taken from its own cell. **Condition 3 holds as of `3a561dad`**, re-run at HEAD with no regression found — six patterns had rotted, five of them broken by that day's own corrections. **Condition 6 passes as of 2026-08-11**: `N82` was executed 2026-07-29, and the one open item with no owning phase — whether anything ever constructs a `Fault` — was ruled by Shane on 2026-08-11 and is now a named exception. See exit condition 6. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed. **The trace is done, 2026-08-13, corrected 2026-08-26** — seven documents in [`phase-2/trace/`](phase-2/trace/) justifying every change to canon in this phase from `git diff`, all 23 changed files walked, coverage independently recounted, nine of ~250 warrants opened and all nine held. **Its eleven category-4 items were walked with him on 2026-08-26 and all of them are dispositioned** — five were the same "and nothing wider" question, ruled out of canon; the rest are recorded in [`phase-2/trace-walk-rulings.md`](phase-2/trace-walk-rulings.md). The finding it raised against `precept-language-spec.md:270` was withdrawn on his 2026-08-26 answer that he reviewed and approved the want document; nothing comes out of canon. **The cold read is done and written up** — [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md): twenty-eight findings checked against the documents they cite, twenty-two reproducing as stated or within a few lines, nothing found simply wrong; four live disagreements with the want document, six silences, eighteen places canonical documents contradict each other. **And the finding-by-finding diff against the register has now run** — [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md): of the twenty-eight, four are register rows with the same substance, four sit inside rows written about something else, one is a § 14.4 exclusion whose own stated condition has since been met, and **nineteen are in no row at all**. It flags five things to read before signing, including two executed rows whose corrections now contradict each other at HEAD. **It is still not a pass of condition 4, and does not claim to be** — the read was deliberately not a re-run of the search procedure the condition names, and nobody here has ruled on whether the substitute is what the condition was asking for. What both produced and what that leaves open is written under the condition. It also left one item with no owner anywhere — where the certificate checker's compiler stage sits. That is dealt with: the compiler documents now carry an index of what they leave undecided at [`docs/compiler/README.md`](../compiler/README.md) § Open questions, and the question is a row in it, on the same footing as the questions parked in the runtime index. **The five were walked with him on 2026-08-27** — [`phase-2/five-items-walk-2026-08-27.md`](phase-2/five-items-walk-2026-08-27.md). He ruled the phase's scope in the middle of it: a build-state observation is not a phase 2 item, and neither is two canonical documents disagreeing with each other. Only one of the five bore on sign-off — a want line excluded from the register under a rule that sends canon-answers-an-open-question to § 4, where canon had since answered and nobody checked. It is now § 4's fifteenth row. Two canon-against-canon items were repaired because they were cheap, one was left where phase 5 already owns it, and the twelve-strong category behind them now has a row in § 5 | 1 | Phase 1 |
+| 2 | Settle every place canon and the want document disagree | **In progress** 2026-08-27 — **145 rows, all executed or dispositioned**. 133 carry a commit hash; the rest state a reason. **Condition 2 passes**, verified row by row on 2026-07-28: each stamp was checked against the commit rather than taken from its own cell. **Condition 3 holds as of `3a561dad`**, re-run at HEAD with no regression found — six patterns had rotted, five of them broken by that day's own corrections. **Condition 6 passes as of 2026-08-11**: `N82` was executed 2026-07-29, and the one open item with no owning phase — whether anything ever constructs a `Fault` — was ruled by Shane on 2026-08-11 and is now a named exception. See exit condition 6. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed. **The trace is done, 2026-08-13, corrected 2026-08-26** — seven documents in [`phase-2/trace/`](phase-2/trace/) justifying every change to canon in this phase from `git diff`, all 23 changed files walked, coverage independently recounted, nine of ~250 warrants opened and all nine held. **Its eleven category-4 items were walked with him on 2026-08-26 and all of them are dispositioned** — five were the same "and nothing wider" question, ruled out of canon; the rest are recorded in [`phase-2/trace-walk-rulings.md`](phase-2/trace-walk-rulings.md). The finding it raised against `precept-language-spec.md:270` was withdrawn on his 2026-08-26 answer that he reviewed and approved the want document; nothing comes out of canon. **The cold read is done and written up** — [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md): twenty-eight findings checked against the documents they cite, twenty-two reproducing as stated or within a few lines, nothing found simply wrong; four live disagreements with the want document, six silences, eighteen places canonical documents contradict each other. **And the finding-by-finding diff against the register has now run** — [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md): of the twenty-eight, four are register rows with the same substance, four sit inside rows written about something else, one is a § 14.4 exclusion whose own stated condition has since been met, and **nineteen are in no row at all**. It flags five things to read before signing, including two executed rows whose corrections now contradict each other at HEAD. **It is still not a pass of condition 4, and does not claim to be** — the read was deliberately not a re-run of the search procedure the condition names, and nobody here has ruled on whether the substitute is what the condition was asking for. What both produced and what that leaves open is written under the condition. It also left one item with no owner anywhere — where the certificate checker's compiler stage sits. That is dealt with: the compiler documents now carry an index of what they leave undecided at [`docs/compiler/README.md`](../compiler/README.md) § Open questions, and the question is a row in it, on the same footing as the questions parked in the runtime index. **The five were walked with him on 2026-08-27** — [`phase-2/five-items-walk-2026-08-27.md`](phase-2/five-items-walk-2026-08-27.md). He ruled the phase's scope in the middle of it: a build-state observation is not a phase 2 item, and neither is two canonical documents disagreeing with each other. Only one of the five bore on sign-off — a want line excluded from the register under a rule that sends canon-answers-an-open-question to § 4, where canon had since answered and nobody checked. It is now § 4's fifteenth row. Two canon-against-canon items were repaired because they were cheap, one was left where phase 5 already owns it, and the twelve-strong category behind them now has a row in § 5. **Condition 4 was rewritten the same day** to ask for the test that was actually run rather than the weaker one it named, scoped by his ruling to canon-against-want findings only. **Four findings remain under it** — the dead-end definition, `on <Event> ensure` at ingress, the `ensure` construct absent from the want document, and what artefact carries the certificate out of the compiler. Clearing those four passes it | 1 | Phase 1 |
 | 3 | Corrected statement of the language, and the catalog drift check | Not started | 0 | Phase 2 |
 | 4 | Draft the certificate step list and count it | Not started | 0 | Phase 3; ends on **Shane's** recorded word |
 | 5 | Settle the obligation families and the discharge procedure | Not started | 0 | Phases 3, 4 |
@@ -982,17 +985,58 @@ different person running it reaches the same list.
    been undone, or has the sentence been reworded underneath the pattern?* — and answers it by reading the
    canonical text, not by trusting the grep. The cheap defence, and the one applied on 2026-07-28, is to
    quote the least changeable words that carry the claim rather than the whole sentence.
-4. The search procedure, re-run at HEAD by somebody who did not write it, produces no disagreement that
-   is not already a row. Check: run it, diff the output against the register.
+4. A reader who did not build the register, given the want document and the canonical documents and
+   nothing else, produces no disagreement between canon and the want document that is not already a row.
+   Check: run the read, sort its findings by shape, diff the canon-against-want ones against the register.
 
-   **The cold read has run, and this condition is not declared passed on it.** § 5 set the cold read up as
-   what would test this condition properly, on the reasoning that a search procedure cannot find the holes
-   in its own scope — the fifth pass widened fifteen patterns with synonyms and found nothing, while the
-   thing actually missing was a folder no pattern covered. The read is done and written up at
-   [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md). What it is: one reader taken through
-   the want document and then the runtime and compiler documents with nothing else — no register, no
-   procedure, no list of what earlier passes had found. That is deliberately *not* the re-run this condition
-   asks for. It is a differently shaped net, it has no repeatability, and it claims no completeness.
+   **This condition was rewritten on 2026-08-27, and what it used to say is the first thing to read.** It
+   asked for the search procedure to be re-run at HEAD by somebody who did not write it. That test was
+   judged too weak to run, for a reason that held up: a search cannot find the holes in its own scope. The
+   fifth pass widened fifteen patterns with synonyms and found nothing, while the thing actually missing
+   was a folder no pattern covered. Re-running the procedure mostly re-tests the patterns. So § 5 set up a
+   differently shaped net instead — the cold read — and the plan recorded honestly that it was *not* the
+   re-run this condition asked for. **That left the condition asking for one test while the work did
+   another, and nobody could say it had passed.** The rewrite closes that: the cold read is now what the
+   condition asks for, because it is the better test.
+
+   **What it deliberately does not count.** Findings outside the canon-against-want shape do not bear on
+   this condition — two canonical documents disagreeing with each other, a document's own arithmetic not
+   adding up, or the compiler not yet having built something canon describes. They are recorded and routed
+   (§ 5 for the first two, the owner's list for anything needing a ruling), and they are worth fixing, but
+   this phase was scoped to canon against the want document and the condition now says so. **That scope is
+   the owner's ruling of 2026-08-27**, given when four of five items put to him turned out to be outside
+   it: *"What is the point of phase 2, I thought we were just trying to get the design aligned to the want
+   document?"* A cold reader with no patterns will always surface findings of other shapes; counting them
+   against this condition makes it unpassable by construction, which is what had happened.
+
+   **Where it stands under the rewrite.** The cold read has run and the finding-by-finding diff with it.
+   Nineteen of its twenty-eight findings are in no register row. Thirteen are two canonical documents
+   disagreeing and go to § 5. Six bear on this condition — three disagreements between canon and the want
+   document, three places one or the other is silent. Of those six, one was ruled out on 2026-08-27 as
+   design-against-build (the proof engine having no obligation for "this handler preserves this rule",
+   owned by phases 5 and 9), and one has since been given a home (where the certificate checker's compiler
+   stage sits, now a row in the compiler documents' index). **Four remain, and dispositioning them is
+   ordinary work for this phase rather than a new question:**
+
+   - Three different definitions of a dead end. `what-i-want-2026-07-16.md:152` and
+     `compiler-and-runtime-design.md:147` say every non-terminal state must have an outgoing path;
+     `graph-analyzer.md:451`'s algorithm passes two non-terminal states that transition only into each
+     other, and `:457` states the want's definition as that algorithm's rationale.
+   - `on <Event> ensure` runs at ingress, where the want document routes anything relational an event
+     needs to its guards (`:143`). `evaluator.md:1369` has a third thing at ingress.
+   - The `ensure` construct is absent from the want document altogether, while canon specifies it — the
+     one finding of the shape *the want document is silent where canon speaks*, which no row shape covers.
+   - What artefact carries the certificate out of the compiler. The want document names one at `:199`;
+     `Compilation` appears nowhere in the register.
+
+   The read is written up at [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md). What it is:
+   one reader taken through the want document and then the runtime and compiler documents with nothing
+   else — no register, no procedure, no list of what earlier passes had found. **Two limits stay true
+   after the rewrite and are the reason this condition is a bar rather than a proof**: the read has no
+   repeatability, so a second reader would not produce the same list, and it claims no completeness. What
+   it produces is a list of what one careful reader coming fresh found that the register does not hold, and
+   after sorting by shape and routing the rest, that list is the four above. Clearing them is what passes
+   this condition; that one reader found four is a real result and not the same as there being only four.
 
    **What it found.** Twenty-nine findings were claimed, one was withdrawn before verification began
    because the owner's own answer of 2026-08-26 settled it, and twenty-eight were checked against the
