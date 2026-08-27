@@ -69,25 +69,29 @@ are the part worth reading:
   test that was actually run**, because the one it named — re-run the search procedure — had been judged
   too weak to bother with and a differently shaped net used instead, leaving the condition asking for one
   thing while the work did another. It now asks that a reader who did not build the register, given the
-  want document and the canonical documents and nothing else, finds no **canon-against-want** disagreement
-  the register does not already hold. Findings of other shapes are recorded and routed rather than counted.
-  **Under that condition four findings remain**, listed with it: the dead-end definition, `on <Event>
-  ensure` at ingress, the `ensure` construct being absent from the want document, and what artefact
-  carries the certificate out of the compiler. Clearing those four passes it. The five things the diff collected for him were walked on 2026-08-27
+  want document and the canonical documents and nothing else, finds nothing the register does not already
+  hold — **in two shapes: canon against the want document, and two canonical documents against each
+  other**. The second was briefly excluded and put back on his correction the same day. **Sixteen findings
+  remain under it**, listed with it: four where canon and the want document disagree or one of them is
+  silent, and twelve where two canonical documents disagree — six in the runtime documents, six in the
+  compiler ones, none in the language documents, which is why no later phase would have reached them. The five things the diff collected for him were walked on 2026-08-27
   and are dealt with — see below. The findings
   and what they do and do not settle are set out under the condition itself.
 
 **The five were walked with him on 2026-08-27, and the walk produced a scope ruling that matters more than
 any of them.** Partway through he stopped it — *"this is getting ridiculous going around in circles. What
 is the point of phase 2, I thought we were just trying to get the design aligned to the want document?"* —
-and he is right against this phase's own goal. Two of the five were two canonical documents disagreeing
-with each other; one was the compiler not yet having built something canon describes. Neither shape is a
-disagreement between canon and the want document, so neither is a gate on this phase. **One of the five
-was**: a want line excluded from the register under a rule that says canon answering an open question goes
-to § 4, where canon had since answered it and nobody had checked. That is now the fifteenth row in § 4.
-The two canon-against-canon items were repaired anyway because they were cheap, the third was left where
-it already has an owner, and the twelve-strong category they came from now has a row in § 5. Recorded with
-his words in [`phase-2/five-items-walk-2026-08-27.md`](phase-2/five-items-walk-2026-08-27.md).
+and he is right about the item he said it of — the compiler not yet having built something canon
+describes says nothing about whether two documents agree, and is not this phase's business. **The
+assistant then extended that to two canonical documents disagreeing with each other, which he had not
+said, and he corrected it the same day**: if two canonical documents disagree, canon has no single
+position, so "canon agrees with the want document" is not a well-formed claim. That correction is what
+moved this phase to the wide scope now written into exit condition 4. Of the five items, one was a want
+line excluded from the register under a rule sending canon-answers-an-open-question to § 4, where canon
+had since answered and nobody checked — now § 4's fifteenth row; two were canon-against-canon and were
+repaired; one was the induction gap, left where phases 5 and 9 own it; and one is canon-against-canon
+still standing, now a register obligation rather than a note. Recorded with his words in
+[`phase-2/five-items-walk-2026-08-27.md`](phase-2/five-items-walk-2026-08-27.md).
 
 **Where the fourteen went.** This section and § 5 both said fourteen rows were unstamped, and the stamping
 pass stamped thirty-four. Those are not in conflict: its § 2 is "the fourteen rows that named a pass" and
@@ -184,7 +188,7 @@ step 1 assumes all three already exist.
 |---|---|---|---|---|
 | 0 | Make the instructions true | **Done** 2026-07-25, `355d9b37` `89392acd` | 1 | — |
 | 1 | Work out what is actually decided, and by whom | **Done** 2026-07-26, `f813e709` `a240a788` `183c2569` `714c7e8d` `7e224b9a` (slice 1.6 disposal deferred to phase 8 and does not block) | 1 | — |
-| 2 | Settle every place canon and the want document disagree | **In progress** 2026-08-27 — **145 rows, all executed or dispositioned**. 133 carry a commit hash; the rest state a reason. **Condition 2 passes**, verified row by row on 2026-07-28: each stamp was checked against the commit rather than taken from its own cell. **Condition 3 holds as of `3a561dad`**, re-run at HEAD with no regression found — six patterns had rotted, five of them broken by that day's own corrections. **Condition 6 passes as of 2026-08-11**: `N82` was executed 2026-07-29, and the one open item with no owning phase — whether anything ever constructs a `Fault` — was ruled by Shane on 2026-08-11 and is now a named exception. See exit condition 6. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed. **The trace is done, 2026-08-13, corrected 2026-08-26** — seven documents in [`phase-2/trace/`](phase-2/trace/) justifying every change to canon in this phase from `git diff`, all 23 changed files walked, coverage independently recounted, nine of ~250 warrants opened and all nine held. **Its eleven category-4 items were walked with him on 2026-08-26 and all of them are dispositioned** — five were the same "and nothing wider" question, ruled out of canon; the rest are recorded in [`phase-2/trace-walk-rulings.md`](phase-2/trace-walk-rulings.md). The finding it raised against `precept-language-spec.md:270` was withdrawn on his 2026-08-26 answer that he reviewed and approved the want document; nothing comes out of canon. **The cold read is done and written up** — [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md): twenty-eight findings checked against the documents they cite, twenty-two reproducing as stated or within a few lines, nothing found simply wrong; four live disagreements with the want document, six silences, eighteen places canonical documents contradict each other. **And the finding-by-finding diff against the register has now run** — [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md): of the twenty-eight, four are register rows with the same substance, four sit inside rows written about something else, one is a § 14.4 exclusion whose own stated condition has since been met, and **nineteen are in no row at all**. It flags five things to read before signing, including two executed rows whose corrections now contradict each other at HEAD. **It is still not a pass of condition 4, and does not claim to be** — the read was deliberately not a re-run of the search procedure the condition names, and nobody here has ruled on whether the substitute is what the condition was asking for. What both produced and what that leaves open is written under the condition. It also left one item with no owner anywhere — where the certificate checker's compiler stage sits. That is dealt with: the compiler documents now carry an index of what they leave undecided at [`docs/compiler/README.md`](../compiler/README.md) § Open questions, and the question is a row in it, on the same footing as the questions parked in the runtime index. **The five were walked with him on 2026-08-27** — [`phase-2/five-items-walk-2026-08-27.md`](phase-2/five-items-walk-2026-08-27.md). He ruled the phase's scope in the middle of it: a build-state observation is not a phase 2 item, and neither is two canonical documents disagreeing with each other. Only one of the five bore on sign-off — a want line excluded from the register under a rule that sends canon-answers-an-open-question to § 4, where canon had since answered and nobody checked. It is now § 4's fifteenth row. Two canon-against-canon items were repaired because they were cheap, one was left where phase 5 already owns it, and the twelve-strong category behind them now has a row in § 5. **Condition 4 was rewritten the same day** to ask for the test that was actually run rather than the weaker one it named, scoped by his ruling to canon-against-want findings only. **Four findings remain under it** — the dead-end definition, `on <Event> ensure` at ingress, the `ensure` construct absent from the want document, and what artefact carries the certificate out of the compiler. Clearing those four passes it | 1 | Phase 1 |
+| 2 | Settle every place canon and the want document disagree | **In progress** 2026-08-27 — **145 rows, all executed or dispositioned**. 133 carry a commit hash; the rest state a reason. **Condition 2 passes**, verified row by row on 2026-07-28: each stamp was checked against the commit rather than taken from its own cell. **Condition 3 holds as of `3a561dad`**, re-run at HEAD with no regression found — six patterns had rotted, five of them broken by that day's own corrections. **Condition 6 passes as of 2026-08-11**: `N82` was executed 2026-07-29, and the one open item with no owning phase — whether anything ever constructs a `Fault` — was ruled by Shane on 2026-08-11 and is now a named exception. See exit condition 6. Conditions 1, 4 and 5 recorded as passing by the fifth pass and the confirmation run — not independently recounted since. Philosophy **locked** 2026-07-27, so the four philosophy rows are closed. **The trace is done, 2026-08-13, corrected 2026-08-26** — seven documents in [`phase-2/trace/`](phase-2/trace/) justifying every change to canon in this phase from `git diff`, all 23 changed files walked, coverage independently recounted, nine of ~250 warrants opened and all nine held. **Its eleven category-4 items were walked with him on 2026-08-26 and all of them are dispositioned** — five were the same "and nothing wider" question, ruled out of canon; the rest are recorded in [`phase-2/trace-walk-rulings.md`](phase-2/trace-walk-rulings.md). The finding it raised against `precept-language-spec.md:270` was withdrawn on his 2026-08-26 answer that he reviewed and approved the want document; nothing comes out of canon. **The cold read is done and written up** — [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md): twenty-eight findings checked against the documents they cite, twenty-two reproducing as stated or within a few lines, nothing found simply wrong; four live disagreements with the want document, six silences, eighteen places canonical documents contradict each other. **And the finding-by-finding diff against the register has now run** — [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md): of the twenty-eight, four are register rows with the same substance, four sit inside rows written about something else, one is a § 14.4 exclusion whose own stated condition has since been met, and **nineteen are in no row at all**. It flags five things to read before signing, including two executed rows whose corrections now contradict each other at HEAD. **It is still not a pass of condition 4, and does not claim to be** — the read was deliberately not a re-run of the search procedure the condition names, and nobody here has ruled on whether the substitute is what the condition was asking for. What both produced and what that leaves open is written under the condition. It also left one item with no owner anywhere — where the certificate checker's compiler stage sits. That is dealt with: the compiler documents now carry an index of what they leave undecided at [`docs/compiler/README.md`](../compiler/README.md) § Open questions, and the question is a row in it, on the same footing as the questions parked in the runtime index. **The five were walked with him on 2026-08-27** — [`phase-2/five-items-walk-2026-08-27.md`](phase-2/five-items-walk-2026-08-27.md). He ruled in the middle of it that a build-state observation is not a phase 2 item; the assistant extended that to canon-against-canon, which he had not said, and he corrected it the same day — if two canonical documents disagree, canon has no single position and the alignment claim is not well-formed. Only one of the five bore on sign-off as first scoped — a want line excluded from the register under a rule that sends canon-answers-an-open-question to § 4, where canon had since answered and nobody checked. It is now § 4's fifteenth row. Two canon-against-canon items were repaired because they were cheap, one was left where phase 5 already owns it, and the twelve-strong category behind them now has a row in § 5. **Condition 4 was rewritten the same day** to ask for the test that was actually run rather than the weaker one it named, and scoped **wide** on his correction: canon against the want document, and two canonical documents against each other. **Sixteen findings remain under it** — four of the first shape and twelve of the second, six of those in the runtime documents and six in the compiler ones. The register needs a row shape it has never had and the search procedure needs a pass that reads canon against itself | 1 | Phase 1 |
 | 3 | Corrected statement of the language, and the catalog drift check | Not started | 0 | Phase 2 |
 | 4 | Draft the certificate step list and count it | Not started | 0 | Phase 3; ends on **Shane's** recorded word |
 | 5 | Settle the obligation families and the discharge procedure | Not started | 0 | Phases 3, 4 |
@@ -365,7 +369,7 @@ the row says so. A row leaves this list when it is done or when it becomes a pha
 | **~~A cold read of the runtime and compiler documents, diffed against the register~~ Done 2026-08-26 — the read ran, and the finding-by-finding diff has now run too** | One reader, the want document and canon, no register and no search procedure, listing every disagreement, then diffed against the register. Condition 4 asks for the search procedure to be re-run, and a procedure cannot find its own scope holes: the fifth pass widened fifteen patterns with synonyms and found nothing, while the thing actually missing was an unsearched folder. Scoped to the runtime and compiler documents because phase 3 rereads every language document and so provides a second net there, and none anywhere else. **The write-up landed 2026-08-26: [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md).** Twenty-nine findings were claimed, one was withdrawn before verification began, and twenty-eight were checked against the documents they cite — twenty-two reproduce as stated or with a line number moved by a few lines, five reproduce in a changed form with the change stated at each one, and one is confirmed closed. Nothing was found simply wrong. **What has not been done is the second half of this row and of condition 4.** The read deliberately did not consult the register, and verification consulted it only where assigning an owner required it, so the write-up names four register rows in passing and nowhere establishes, finding by finding, which of its findings are already rows and which are new. **That diff has now run**, at [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md). Every one of the twenty-eight live findings is matched to the register one at a time: **four are rows with the same substance and the row's recorded state matches what the document says at HEAD; four sit inside rows written about something else; one is recorded in § 14.4 as considered and explicitly excluded, and the exclusion's own stated condition — that canon says nothing about the question — has since stopped holding; and nineteen are in no row at all.** The nineteen are accounted for by four properties of the register's shape rather than by any pass missing something: it has no row shape for the want document being silent where canon speaks (one finding) or for two canonical documents disagreeing with no want line behind it (twelve), patterns cannot see an arithmetic defect such as a document declaring 147 diagnostic codes and stating 164 (four), and § 1.0's family test cannot join a noun in a table header to a verb in the body rows (one). **Five things the diff turned up plainly want reading before sign-off** and are collected in its own section — chiefly that `S7` and `N15`, both executed, now contradict each other at HEAD (`result-types.md:139`/`:148`/`:152` against `compiler-and-runtime-design.md:863`), that the nineteen-row § 1 family left `evaluator.md:1933–1936` showing the constraint pass it removed, and that the sentence `S2` and `S9` wrote — "every handler was proven to preserve every rule" — rests on an obligation kind `proof-engine.md:489` does not list. The diff resolves none of them and does not rule on the condition. What both the read and the diff mean for the condition is written under the condition itself | Nothing. Read the five items the diff collects before signing |
 | **~~Where the certificate checker's compiler stage sits has no home — decide where the question lives~~ Done 2026-08-26 — the compiler documents now have an index and the question is a row in it** | Canon states three times that the checker runs at two call sites (`soundness-and-coverage.md:159` and `:55–58`, `proof-engine.md:2534`). Where the compiler-side stage sits is still written nowhere: `docs/compiler/README.md` calls the pipeline six stages and lists six, none of them a checker, and no stage document exists for it. **The cold read checked every phase entry rather than assuming**, and found no phase whose scope reaches it: phase 5 produces the checker's *specification*, and its three named questions are about what the checker walks and what it asks the catalog — none about where it is invoked; phase 11 produces "the certificate checker and the runtime's load-time call to it", naming one call site and not the other, and builds only what phase 10 has a red test for. The read recorded two ways to give the question a home and chose neither — a compiler-side equivalent of the runtime documents' open-questions index, or widening phase 5's stated scope by this one question. **The first was taken.** `docs/compiler/README.md` § Open questions now indexes what the compiler documents leave undecided, on the same terms as `docs/runtime/README.md` § Open questions — eleven rows, each naming a decision and pointing at where it is argued — and this question is one of them, with the row saying plainly that no stage document owns it because the stage does not exist yet. **What is closed is where the question lives, not the question.** It still belongs to no phase; it now sits in canon, which does not go quiet when a phase closes, the same footing the three runtime-parked questions have. Set out in [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md) Part 4, which records the option taken | Nothing |
 | **~~Two questions left open inside canon need owners that meet condition 6's bar~~ Done — the second of the two closed 2026-08-11** | The reference-identity invariant on `ProofObligation.Site` got its reason back on 2026-07-28 and is owned by **phase 5**, whose stated output includes the specification of the certificate checker. Whether anything ever constructs a `Fault` has **no owning phase** — checked against every phase entry, not assumed — and Shane ruled on 2026-08-11 that it is deferred until the runtime is being built, which makes it a named exception rather than an unowned deferral. Both are written up under exit condition 6, and the exception is written down in § No phase closes with an open deferral that has no owner | — |
-| **Work the cold read's canon-against-canon findings** | The finding-by-finding diff found nineteen of the cold read's twenty-eight findings in no register row, and twelve of those are two canonical documents disagreeing with each other with no want line behind them — a shape phase 2 never had a row for, and never claimed to. They are written up in [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md) and matched against the register in [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md). Two were fixed on 2026-08-27 — the outcome one document declared and another declared impossible, and the inspection summary table still showing the constraint pass the rest of its own document says was removed, which turned up three further survivors in `evaluator.md` when the same sweep was run by hand. **The heaviest one still standing is who owns schema evolution on restore**: `compiler-and-runtime-design.md:718` calls definition migration out of scope for v1 and says host applications must manage it externally, while `runtime-api.md:277`, `:906` and `evaluator.md:1757` all say it is the post-MVP job of the restore path itself. That is an ownership question about a capability, not a wording slip. Where working one of these turns out to need a ruling rather than a repair, it goes to § 4 | Nobody has taken the list. Nothing blocks it |
+| **~~Work the cold read's canon-against-canon findings~~ Not § 5 work — moved into phase 2 on 2026-08-27** | Added here that morning on the reading that two canonical documents disagreeing was outside the phase. The owner corrected that the same day: if two canonical documents disagree, canon has no single position, so the alignment this phase establishes cannot be stated at all. The twelve are now register obligations under exit condition 4, listed there, and this row stays struck through so the reasoning is not lost. **The heaviest is who owns schema evolution on restore** — `compiler-and-runtime-design.md:718` calls definition migration out of scope for v1 and says host applications must manage it externally, while `runtime-api.md:277`, `:906` and `evaluator.md:1757` all say it is the post-MVP job of the restore path itself. An ownership question about a capability, not a wording slip | Moved to phase 2 |
 
 **Both of the things this paragraph used to say were uncommitted have landed** — the fault-backstop
 correction in `c9193ec8`, and [`phase-2/period-ordering-design.md`](phase-2/period-ordering-design.md).
@@ -999,24 +1003,41 @@ different person running it reaches the same list.
    another, and nobody could say it had passed.** The rewrite closes that: the cold read is now what the
    condition asks for, because it is the better test.
 
-   **What it deliberately does not count.** Findings outside the canon-against-want shape do not bear on
-   this condition — two canonical documents disagreeing with each other, a document's own arithmetic not
-   adding up, or the compiler not yet having built something canon describes. They are recorded and routed
-   (§ 5 for the first two, the owner's list for anything needing a ruling), and they are worth fixing, but
-   this phase was scoped to canon against the want document and the condition now says so. **That scope is
-   the owner's ruling of 2026-08-27**, given when four of five items put to him turned out to be outside
-   it: *"What is the point of phase 2, I thought we were just trying to get the design aligned to the want
-   document?"* A cold reader with no patterns will always surface findings of other shapes; counting them
-   against this condition makes it unpassable by construction, which is what had happened.
+   **What counts, and the correction behind it.** Two shapes count: canon disagreeing with the want
+   document, and **two canonical documents disagreeing with each other**. The second was written out of
+   this condition on 2026-08-27 and put back the same day, on the owner's challenge — *"when did I rule
+   that two documents disagreeing with each other is not a problem? as I understand it, the goal is ensure
+   consistency between the want doc and the canonical docs"*. **His reason is the one that settles it: if
+   two canonical documents disagree, canon has no single position, so "canon agrees with the want
+   document" is not a well-formed claim at all.** Consistency inside canon is a precondition for stating
+   the alignment this phase exists to establish, not a separate tidy-up alongside it. Excluding those
+   findings would not have made this condition cheaper; it would have made it hollow.
 
-   **Where it stands under the rewrite.** The cold read has run and the finding-by-finding diff with it.
-   Nineteen of its twenty-eight findings are in no register row. Thirteen are two canonical documents
-   disagreeing and go to § 5. Six bear on this condition — three disagreements between canon and the want
-   document, three places one or the other is silent. Of those six, one was ruled out on 2026-08-27 as
-   design-against-build (the proof engine having no obligation for "this handler preserves this rule",
-   owned by phases 5 and 9), and one has since been given a home (where the certificate checker's compiler
-   stage sits, now a row in the compiler documents' index). **Four remain, and dispositioning them is
-   ordinary work for this phase rather than a new question:**
+   **The exclusion had been attributed to him and he had not said it.** What he said, about a different
+   item, was that the compiler not yet having built something canon describes is not this phase's business
+   — *"obviously it can't yet, we haven't built it yet"*. **That half stands**: a build-state observation
+   says nothing about whether two documents agree, and it does not count here. It was extended to
+   canon-against-canon by the assistant and written into this plan in four places as his ruling. It was
+   not his, and the extension is withdrawn.
+
+   **Why now rather than later, which is the question that decided it.** No later phase reaches these.
+   Phase 3 resolves contradictions among the **language** documents as a by-product of restating the
+   language completely — and none of the findings live there. They are in the runtime and compiler
+   documents. Phase 10 turns numbered claims into failing tests and the numbered claims come from phase 3,
+   so a disagreement between two runtime documents never becomes one; phase 12 re-runs that same trace. No
+   phase of this plan builds the runtime. Left out here, they would sit until somebody built against
+   documents that contradict each other.
+
+   **Where it stands.** The cold read has run and the finding-by-finding diff with it. Nineteen of its
+   twenty-eight findings are in no register row. Under the scope above, **sixteen of the nineteen bear on
+   this condition** and need a row and a disposition. Two of the three that do not: one was ruled out on
+   2026-08-27 as design-against-build (the proof engine having no obligation for "this handler preserves
+   this rule", owned by phases 5 and 9), and one has since been given a home (where the certificate
+   checker's compiler stage sits, now a row in the compiler documents' index). The third was fixed on
+   2026-08-27 (`evaluator.md`'s inspection table still showing the constraint pass the same document
+   denies six times).
+
+   **The four where canon and the want document disagree, or one of them is silent:**
 
    - Three different definitions of a dead end. `what-i-want-2026-07-16.md:152` and
      `compiler-and-runtime-design.md:147` say every non-terminal state must have an outgoing path;
@@ -1028,6 +1049,37 @@ different person running it reaches the same list.
      one finding of the shape *the want document is silent where canon speaks*, which no row shape covers.
    - What artefact carries the certificate out of the compiler. The want document names one at `:199`;
      `Compilation` appears nowhere in the register.
+
+   **The twelve where two canonical documents disagree with each other.** Six sit in the runtime
+   documents and six in the compiler ones; none is in the language documents, which is why phase 3 would
+   never have reached them. All twelve reproduce, and each is set out with its citations in
+   [`phase-2/cold-read-register-diff.md`](phase-2/cold-read-register-diff.md) Part 3:
+
+   - `UpdateOutcome`'s variant names do not overlap between two accounts of it.
+   - `Restore` either recomputes computed fields or leaves them stale, depending on the document.
+   - `precept-builder.md` numbers its own passes two ways — the list transposes the constraint plan and
+     execution plan passes against the diagram, the dependency table and the section headings.
+   - `FieldDescriptor` has two shapes, seven members against eight, and `AccessModes` — which the
+     evaluator reads — is in neither.
+   - `Compilation` has two memberships, and the document that declares four members then says three.
+   - `diagnostic-system.md` declares 147 codes, states 164 in three places, and calls the set closed in
+     four.
+   - Four codes are discussed by name and are in no list: PRE0113, PRE0114, PRE0115, PRE0116.
+   - `DiagnosticCategory` is owned in six places in the same document that rejects it at `:772`.
+   - The Roslyn rule range is given as PRECEPT0001–0031 in one place and 0001–0024 in another.
+   - The diagnostic count differs between documents — 132 against 164.
+   - `StructuralSinkState` is assigned a code under the Graph header by the diagnostic document and is
+     unknown to `graph-analyzer.md`.
+   - `graph-analyzer.md`'s forwarding-fact table calls itself the current contract and omits
+     `UnreachableRowFact`, which `proof-engine.md` says is in the same hierarchy.
+
+   **What this costs, stated plainly.** The register has no row shape for this. Its rows run *canon says
+   X, the want document says not-X*, plus additions for *the want document requires what canon does not
+   say*. Eleven existing rows carry an intra-canon marker, but every one arrived from the 2026-07-14 input
+   list or as a by-product of chasing a want disagreement — nothing ever went looking for these on their
+   own account, which is why a category that looks covered is only covered where it happened to collide
+   with something else. Wide means a row shape that names two canonical sites and no want line, and it
+   means the search procedure gains a pass that reads canon against itself.
 
    The read is written up at [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md). What it is:
    one reader taken through the want document and then the runtime and compiler documents with nothing

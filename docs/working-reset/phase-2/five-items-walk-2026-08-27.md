@@ -18,13 +18,22 @@ and the want document say different things, resolve each in writing with a reaso
 that:
 
 - **A build-state observation is not a phase 2 item.** That the compiler has not yet built something canon
-  describes is design-versus-build. It says nothing about whether canon and the want document agree.
-- **Two canonical documents disagreeing with each other is not a phase 2 item either.** It is worth
-  fixing, and the register has no row shape for it, but it is not a gate on this phase.
-- **What phase 2 is answerable for** is whether the register fairly records the disagreements between
-  canon and the want document. Of the five items, exactly one bore on that.
+  describes is design-versus-build. It says nothing about whether canon and the want document agree. **This
+  half is his and it stands.**
+- **Two canonical documents disagreeing with each other was then read as outside the phase too.** That was
+  the assistant's extension, not his, and **he corrected it the same day**: *"when did I rule that two
+  documents disagreeing with each other is not a problem? as I understand it, the goal is ensure
+  consistency between the want doc and the canonical docs"*. His reason settles it — if two canonical
+  documents disagree, canon has no single position, so "canon agrees with the want document" is not a
+  well-formed claim. Consistency inside canon is a precondition for the alignment this phase establishes.
+- **What decided the timing**: no later phase reaches these. Phase 3 resolves contradictions among the
+  language documents by restating the language, and none of the findings live there — they are in the
+  runtime and compiler documents. Phase 10's tests come from phase 3's numbered claims and phase 12
+  re-runs that trace. No phase builds the runtime. Asked *"if we don't do wide now, when would we do
+  it?"*, the answer was never, and he ruled: **"then wide now."**
 
-The five items were reclassified on this ruling before the rest of the walk continued.
+The five items were reclassified twice — once on the first reading, and again when the extension was
+withdrawn. The classifications below are the corrected ones.
 
 ## Item by item
 
@@ -43,7 +52,7 @@ after a mutation, and a following paragraph names the ingress variant and points
 reason was left exactly as it was, because it is the same claim item 3 is about and re-justifying it here
 would have settled that question in passing.
 
-*Classification under the ruling above: canon against canon. Not a phase 2 gate.*
+*Classification: canon against canon — in scope under the corrected reading, and fixed.*
 
 ### 2. The inspection table still showing the pass the document says was removed — FIXED
 
@@ -67,7 +76,7 @@ turned up three more survivors in the same document:
 - `:125`, "enforce access modes and constraints" for Update — loose rather than wrong. Left alone, on his
   instruction.
 
-*Classification: canon against canon. Not a phase 2 gate.*
+*Classification: canon against canon — in scope under the corrected reading.*
 
 ### 3. Two executed rows resting on an obligation the compiler cannot state — OUT OF SCOPE
 
@@ -83,7 +92,7 @@ induction argument a deliverable; phase 9 records that `ProofRequirementKind` ca
 canon edit was made. The cross-reference from the obligation list to the section stating the gap was
 offered and not taken.
 
-### 4. Two documents assigning schema migration to different owners — RECORDED, NOT FIXED
+### 4. Two documents assigning schema migration to different owners — NOW A REGISTER OBLIGATION
 
 `compiler-and-runtime-design.md:718` calls definition migration out of scope for v1 and says host
 applications must manage it externally. `runtime-api.md:277`, `:906` and `evaluator.md:1757` say it is the
@@ -91,10 +100,13 @@ post-MVP job of the restore path itself. Neither register row nearby quoted the 
 work — one quoted a clause about the sweep, the other a clause about constraint evaluation, and the
 sentence between them matched neither pattern.
 
-**His instruction: record it as a canon-against-canon note.** Done, as a row in the plan's § 5, covering
-the whole category of twelve rather than this one alone, with this named as the heaviest still standing.
+**His instruction at the time: record it as a canon-against-canon note.** That was done as a § 5 row
+covering the whole category of twelve. **It did not survive the day.** Once the extension excluding
+canon-against-canon was withdrawn, the twelve became register obligations under exit condition 4 and the
+§ 5 row was struck through. This one is named there as the heaviest of them: it is an ownership question
+about a capability, not a wording slip.
 
-*Classification: canon against canon. Not a phase 2 gate.*
+*Classification: canon against canon — in scope under the corrected reading.*
 
 ### 5. A want line excluded on a condition that had since been met — ADDED TO § 4
 
@@ -112,10 +124,17 @@ stands until he rules. The other line excluded by the same rule — the promise 
 checked and holds: the only canon mention is the name binder listing cross-precept resolution as out of
 scope, which agrees with the want document rather than answering it.
 
-*Classification: canon against the want document. The one item of the five that bore on sign-off.*
+*Classification: canon against the want document. The only one of the five that bore on sign-off as the phase was first scoped; under the corrected scope items 1, 2 and 4 bear on it too.*
 
 ## What this leaves
 
-Phase 2's sign-off question is whether the register fairly records the disagreements between canon and the
-want document. One of the five bore on it, and it is now on the list of things waiting on him rather than
-buried in an exclusion. The rest were either out of scope or repaired.
+Phase 2's sign-off question is whether the register fairly records the disagreements it is answerable for
+— and by the end of the day that was two shapes, not one: canon against the want document, and two
+canonical documents against each other. Exit condition 4 was rewritten to say so, and sixteen findings
+remain under it. The register needs a row shape it has never had, and the search procedure needs a pass
+that reads canon against itself.
+
+**The lesson worth keeping from the day** is not any of the five items. It is that the assistant turned a
+complaint about one item into a scope ruling covering a whole category, wrote it into the plan in four
+places as the owner's, and it took his direct challenge to get it out. A ruling is what he said, about
+the thing he said it of.
