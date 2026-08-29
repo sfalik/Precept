@@ -72,9 +72,11 @@ are the part worth reading:
   want document and the canonical documents and nothing else, finds nothing the register does not already
   hold — **in two shapes: canon against the want document, and two canonical documents against each
   other**. The second was briefly excluded and put back on his correction the same day. **Sixteen findings
-  remain under it**, listed with it: four where canon and the want document disagree or one of them is
-  silent, and twelve where two canonical documents disagree — six in the runtime documents, six in the
-  compiler ones, none in the language documents, which is why no later phase would have reached them. The five things the diff collected for him were walked on 2026-08-27
+  remained when it was rewritten** — four where canon and the want document disagree or one of them is
+  silent, twelve where two canonical documents disagree, none of the twelve in the language documents,
+  which is why no later phase would have reached them. **Four mechanical checks built the same day added
+  fourteen more**, now rows `N105`–`N119` in the register's new § 12.1, of which eleven resolve by naming
+  which document owns a type and four are substantive. The five things the diff collected for him were walked on 2026-08-27
   and are dealt with — see below. The findings
   and what they do and do not settle are set out under the condition itself.
 
@@ -1073,13 +1075,39 @@ different person running it reaches the same list.
    - `graph-analyzer.md`'s forwarding-fact table calls itself the current contract and omits
      `UnreachableRowFact`, which `proof-engine.md` says is in the same hierarchy.
 
-   **What this costs, stated plainly.** The register has no row shape for this. Its rows run *canon says
-   X, the want document says not-X*, plus additions for *the want document requires what canon does not
-   say*. Eleven existing rows carry an intra-canon marker, but every one arrived from the 2026-07-14 input
-   list or as a by-product of chasing a want disagreement — nothing ever went looking for these on their
-   own account, which is why a category that looks covered is only covered where it happened to collide
-   with something else. Wide means a row shape that names two canonical sites and no want line, and it
-   means the search procedure gains a pass that reads canon against itself.
+   **The search for these is now built, and it found more. 2026-08-27.** The twelve above came from one
+   cold reader who was not looking for them systematically. Four **mechanical checks** now read canon
+   against itself — declared types compared member by member, stated counts against the sets they count,
+   identifiers used as though declared, and each diagnostic code against the stage document that would
+   emit it. They are in [`phase-2/checks/`](phase-2/checks/) and written up in
+   [`phase-2/canon-against-canon-check-1-declared-types.md`](phase-2/canon-against-canon-check-1-declared-types.md)
+   and [`phase-2/canon-against-canon-checks-2-4.md`](phase-2/canon-against-canon-checks-2-4.md).
+   **Nineteen genuine findings; five were already known, which is the evidence the checks work, and
+   fourteen are new.** They are register rows `N105`–`N119` in a new § 12.1.
+
+   **Most of them are one rule rather than fifteen decisions.** Canon already has a convention for a type
+   stated in two places — one document is the canonical source and others reference it rather than restate
+   it, which `primitive-types.md:740` and `collection-types.md:1549` say of themselves and which
+   `precept-builder.md:318`, `evaluator.md:715` and `diagnostic-system.md:569` each apply to a specific
+   type. Eleven of the fifteen resolve by naming the owning document. **Four are substantive**:
+   `ProofRequirement`'s base record differs between the catalog and the proof engine, and the catalog
+   contradicts its own diagram; `ConstraintDescriptor`'s two declarations share two members of seven;
+   `ConstraintInfluenceMap` is indexed in opposite directions; and `ConstraintKind` declares five members
+   where the specification names four kinds in a different taxonomy.
+
+   **What is still open under this condition**: the four canon-against-want findings above, and the twelve
+   cold-read canon-against-canon findings above, of which only `FieldDescriptor` has a row so far —
+   `N112`. The fifteen new rows cover what the checks found, not what the cold reader found. **And one
+   check shape is still unbuilt**: an ordering or numbering stated more than once, which is why
+   `precept-builder.md` numbering its own passes two ways is still a reader's finding.
+
+   **What this costs, stated plainly — and it was first written down wrong.** This paragraph said the
+   register had no row shape for canon against canon. **It has one**: the `INTRA-CANON` marker is defined
+   in the register's *How to read a row*, and § 12 is *Canon contradicting canon*. What it never had is a
+   **search**. Eleven rows carry the marker and every one arrived from the 2026-07-14 input list or as a
+   by-product of chasing a want disagreement, so a category that looks covered was only ever covered where
+   it happened to collide with something else. So the cost is not a new row shape; it is the search pass,
+   and the finding that a marker existing is not the same as anybody having looked.
 
    The read is written up at [`phase-2/cold-read-findings.md`](phase-2/cold-read-findings.md). What it is:
    one reader taken through the want document and then the runtime and compiler documents with nothing
