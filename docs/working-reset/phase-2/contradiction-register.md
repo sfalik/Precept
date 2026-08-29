@@ -671,8 +671,16 @@ Recount rather than trusting these:
 
 ```bash
 grep -oE '^\| (S[0-9]+|P[0-9]+|R[0-9]+[ab]?|C[0-9]+|SC-1|N[0-9]+) \|' contradiction-register.md \
-  | tr -d '| ' | sort -u | wc -l          # 128 identifiers as built; 146 after the fourth pass; 150 after the fifth
+  | tr -d '| ' | sort -u | wc -l          # 128 as built; 146 fourth pass; 150 fifth; 165 after § 12.1
 ```
+
+**Updated 2026-08-27: 165 identifiers.** Fifteen rows, N105–N119, were added to § 12.1 by the four
+mechanical canon-against-canon checks after the owner widened this phase's scope. All fifteen are
+`INTRA-CANON`, none is executed, and each carries the check that detects it in place of a grep — the
+check is the pattern. Eleven resolve by naming which document owns the type; four are substantive
+decisions and say so. The figures below are as the register was first built; the deltas are recorded
+in the rows they belong to rather than by rewriting the table, which is how every earlier pass
+recorded its own.
 
 **128 identifiers, 123 rows.** Five identifiers are deliberately not rows and are excluded from every
 count below: **P5** and **P6** are recorded in § 5 as *considered and excluded by owner ruling*, and
@@ -689,10 +697,11 @@ intra-canon list reads completely. Each of the five says so in its own resolutio
 | Cross-reference entries carrying no resolution of their own (N76, N77, N78) | 3, **not counted as rows** |
 | Rows marked `OWNER APPROVAL REQUIRED` (`docs/philosophy.md`) | 4 (P1, P2, P3, P4) — plus P5, P6 recorded as excluded, not rows |
 | Rows marked `ADDITION` (canon must gain text) | 9 (N52, N53, N54, N55, N59, N68, N69, N70, N71) |
-| Rows marked `INTRA-CANON` | 11 (N18, C3, C7, N46, N47, N48, N56, N57, N58, N74, N75) |
+| Rows marked `INTRA-CANON` | 11 as built (N18, C3, C7, N46, N47, N48, N56, N57, N58, N74, N75); **26 after 2026-08-27**, with N105–N119 added by the mechanical checks in § 12.1 |
 | Rows marked **WIDE** (pattern must run against the wider file set) | 16 |
 | Rows that are confirm-only, no edit | 6 (R8, N44, N47, N49, N64, N67) |
-| Rows routed to "Waiting on Shane" rather than resolved here | 4 (N79, N80, N81, N82) |
+| Rows routed to "Waiting on Shane" rather than resolved here | 4 (N79, N80, N81, N82), plus N96 added later |
+| Rows whose resolution is a substantive decision, added 2026-08-27 | 4 (N105, N106, N107, N117) — the rest of § 12.1 resolves by naming which document owns the type, or is a forced correction |
 | Rows with a resolution and a reason, both non-empty | 123 — condition 1 met |
 | Rows naming the commit that executed them | 0 — **true only of the register as first written.** A different slice executes; that slice fills the column, and by 2026-07-27 roughly ninety rows carry a hash. Recount rather than reading this line. |
 
