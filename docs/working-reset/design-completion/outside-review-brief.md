@@ -39,7 +39,14 @@ For every finding give a severity (critical, major, minor), the evidence as `fil
 
 - Be adversarial. Your job is to find what is wrong, missing, or unworkable, not to summarise or endorse.
 - Do not edit, create, move or delete any file except your report.
-- Write your report to `docs/working-reset/design-completion/outside-review-report.md`.
+- Write your report to `docs/working-reset/design-completion/outside-review-report.md`. If you are told you are the second reviewer, use `docs/working-reset/design-completion/outside-review-report-2.md` instead, and say in the report which model you are.
+
+## When the report is finished
+
+1. Run `git status`. The report must be the only new or changed file. If anything else has changed, stop and say so; do not commit.
+2. Stage only the report, by its path: `git add docs/working-reset/design-completion/outside-review-report.md` (or the `-2` name). Never use `git add .` or `git add -A`.
+3. Commit with the message `the outside review of the design-completion plan, by <your model name>`.
+4. Push: `git push`. If the push is rejected because the branch moved, run `git pull --rebase` and push again. If it still fails, stop and report the error; do not force-push.
 
 ## Writing rules for the report
 
@@ -49,3 +56,7 @@ The repository's own writing rules apply; your tool will not load them, so here 
 - Do not use these words: source of truth (as a noun phrase), load-bearing, lens, surface (on its own), signal (meaning evidence), orthogonal, spine, harness, the ask, arm (of a switch or procedure).
 - Use "denominator" only in its arithmetic sense.
 - What a proof produces to demonstrate a violation is a "counterexample", never a "witness", even where a document says witness.
+
+## Coverage
+
+End the report with a section listing every file named above that you read in full, every one you read only in part, and every one you could not open or did not read. Do not leave a file out of this list silently.
