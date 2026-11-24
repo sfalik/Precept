@@ -1,78 +1,123 @@
 # The design completion plan, summarised
 
-A reading aid for `design-completion-plan-v3.md` ("plan"); where they differ, the plan stands. It finishes the design, writes no product code (plan:43-44), and replaces the thirteen-phase readiness plan.
+A reading aid for `design-completion-plan.md` in this folder, as rewritten on 2026-11-23 against
+`5c4269bc`. Where the two differ, the plan stands. The plan finishes the design. It writes no product
+code and no acceptance criteria, and it replaces the thirteen-phase readiness plan.
+
+## What changed
+
+The outside reviews found that the earlier plan could finish with a fact missing, could halt work that
+was going well, and built fifteen scripts before any design paragraph. This version is 599 lines, down
+from 1,302. The design's scope is unchanged; plan machinery was cut.
 
 ## What finished means
 
-Seven counts, each printed by a script, must all reach zero (plan:61-71):
-
-1. Eighteen contents items are written in their owning canonical documents, every argument behind them having survived attack.
-2. Fifteen hard problems are closed by a design, or by a refusal on an allowed reason that survived attack.
-3. Every disagreement of canon with the want document or itself is closed by an edit (58 at the start).
-4. Every ruling of his, including answers given during the work, is stated in canon, carried by a named rule, or retired on his own later words.
-5. Each fact has one full statement; other documents point to it.
-6. No finding, parked item or open question remains.
-7. Everything passed to the build is a permitted kind. The one item left open is who constructs a `Fault`, on his words.
+Eight conditions and your signature. Every content item is written with its arguments attacked. Every
+hard problem is closed by a design or an allowed refusal. Every disagreement in canon is closed. Every
+ruling of yours about what Precept does is stated in canon. Each fact has exactly one full statement,
+checked both ways: from every original requirement to its statement, and back. Nothing is left open
+except who constructs a `Fault`, on your words. The finish procedure must itself pass a test: six worked
+cases, each with one fact deliberately removed, and it must refuse to finish each time. The finish then
+hands over an exact revision and the list of claims; acceptance criteria are written afterwards.
 
 ## The steps
 
-- **0.** Commit the inputs, build fifteen scripts, and test eleven assumptions about unattended running. Capped at ten runs and 4,000 script lines.
-- **1.** What an operation is, and the closed list of everything that writes a field.
-- **2.** What every operator means on every type, rounding and overflow included.
-- **3.** One table turning every constraint spelling into the statement that must hold, and where.
-- **4.** What must be proved at creation and at every write, and what a proof may assume. An early checkpoint tests whether this can be written at all.
-- **5.** The facts each type contributes and how each action changes them.
-- **6.** The closed set of proof steps, which is also the certificate's vocabulary.
-- **7.** The procedures that find proofs, with cost bounds.
-- **8.** The three verdicts, the counterexample, and the suggested missing premise.
-- **9.** Dead rows, reachability and dead ends: each state shown reachable or the definition rejected.
-- **10.** The certificate and checker.
-- **11.** The induction argument itself. Then his proof-model sign-off.
-- **12.** Catalog entries, diagnostics, runtime and tooling.
-- **13.** Acceptance criteria.
-- **14.** Alongside 1 to 12: mechanical fixes, merging duplicates, sorting deferrals, finishing documents. Paused whenever it changes over twice the lines the proof-model work does.
-- **15.** Worked examples carried by hand through every document; his finish sign-off.
+Fifteen, one at a time, by one writer. You start each with one line. No schedule.
 
-## How it runs and what he does
+- **0.** Your yes recorded, one small start-and-status check, and two walks on paper: a whole step from
+  one start line, and the schedule with your edit answer still outstanding. Every other check is built
+  when the work first needs it, and tested on cases that must pass and cases that must be refused.
+- **1.** What an operation is. The first text is the path of an ordinary row, from guard selection
+  through its writes to recomputation. It is a draft nothing may rely on until it has been attacked.
+- **2 and 3.** What every operator means on every type; the table of what counts as a rule.
+- **4.** What must be proved at creation, at restore and at every write; what a proof may assume; what is
+  checked on the way in; preview.
+- **5 to 8.** Facts per type, proof steps, the procedures that find proofs, verdicts and explanations.
+- **9 and 10.** Reachability and exits; the certificate and its checker.
+- **11.** The induction argument. Then your proof-model sign-off.
+- **12 and 13.** Catalog entries, diagnostics, runtime, tooling, and every section of the two proof
+  documents that no content item owns; then tidying everything else.
+- **14.** The finish checks, the hand walk, your finish sign-off.
 
-Scripts choose each run (plan:1133-1134). Fable 5.2 writes; Opus 5.5 attacks (plan:1110-1118). Every argument gets twelve rounds of fresh attackers, each required to give a concrete counterexample; a failure gets a second author for six rounds, then goes to him (plan:684-709).
+## What is kept
 
-He types `Run the design-completion plan` once per step; nothing is scheduled (plan:1143-1148). He hears only by notice: questions ready, failed arguments, a stop rule, a failed run, a usage limit, a step finished (plan:1051-1058).
+The twelve attack rounds, unchanged: two fresh attackers a round, each with a concrete attempted
+counterexample; repairs confirmed by someone else; a second author on a different model if an argument
+fails. A round counts only against the text it attacked; if the meaning has changed since, it is run
+again. Your three sign-offs. The order of authority: your words, the want document, then canon.
 
-## Everything asked of him
+## What is fixed in the design target
 
-Certain: fourteen decisions or reads plus sixteen start lines (plan:1070-1081). The fourteen: this summary and his yes; yes or no on the exact permission rules for unattended runs; one line on correcting a memory file that teaches a reversed ruling; seven question sheets; two conversations; the proof-model sign-off; the finish sign-off.
+Errors found in the technical inputs are listed in `inputs/technical-errata.md`. The plan now requires: a
+real run into every state and a real way out for every entity in it, not just an arrow on a graph;
+preview evaluated under the conditions the proof assumed; a rule for data restored under a changed
+definition, before the proof-model sign-off; every field an action writes counted; every declared check
+on incoming values enforced even if no proof used it; and no assumption that two non-zero `decimal`
+values multiply to a non-zero result.
 
-May be added: up to eight more sheets (cap fifteen); up to three philosophy-edit approvals; up to eleven sheets of failed arguments; stop-rule notices; restarts after failures or limits, which the plan does not bound (plan:1085-1096).
+## When the work stops, and who clears it
 
-## The questions
+No rule counts lines or totals. Before first use each rule is run on two ordinary cases, where it must
+stay quiet, and on one real failure, where it must fire.
 
-Certain, in the first batch:
+| Rule | Threshold | Cleared by |
+|---|---|---|
+| A piece relies on a claim with an open finding | Any | The finding closed and its repair confirmed by someone else. Unrelated work continues |
+| A piece cites text still marked as a draft | Any | The cited text passing its twelve rounds |
+| An argument is refuted by a different counterexample each time | Three repairs in a row | Not a halt: it goes to the second author early |
+| The same requirement fails again | Successive repairs refuted with no change of design | The repair holding, or your choice |
+| An argument has not passed | Twelve rounds, then up to six more with a second author on a different model | After eighteen it reaches you with its counterexample. You choose more rounds, a different argument, or a language change. Weakening the guarantee is not offered |
+| One counterexample breaks several arguments | Any | The repair holding, or your choice on one sheet |
+| A use of your words is unchecked or too wide | Any | An independent reader confirming a corrected use |
+| A run produces nothing checkable | A literal failure or an empty output | Your next start line, which allows one retry |
+| Step 0 is not working | Three runs | Your words |
+| A session you have open, when runs cannot be unattended | Five runs | Your restart line |
 
-1. When a field a rule mentions is edited directly, is the rule proved from the field's bounds, checked at the write, or is `editable` refused?
-2. Is `integer` fixed-width with overflow proofs, or arbitrary precision?
-3. Must every `decimal` operation be proved within a fixed range, or has `decimal` no overflow? The first rejects his `Deposit` until bounded.
-4. May a state declare several state actions?
-5. Do entry actions run when an entity is created in that state?
-6. Do they run on a transition from a state back to itself?
-7. May a rule mention the current time? A "no" needs a philosophy edit.
+## What reaches you
 
-Only if two blind checkers find nothing settles them: whether a certificate names what establishes each fact; what an event `ensure` is; the decimal rounding model; whether two looping states with no exit are a dead end; whether `from any` means one row per state; whether per-operation approximation may replace the exact and approximate type split; a non-linear rule that bounds would prove but his approved text rejects; the reachability standard, if unmeetable.
+- Three sign-offs: this plan, the proof model, the finish.
+- Six questions, written out in `owner-questions.md`: three about state entry actions, whether
+  `integer` has an upper limit, whether a rule may mention the current time, and what a direct edit
+  checks. The `integer` sheet also asks you to confirm that `decimal` has no upper limit, which your bank
+  example appears to require and which changes the type callers receive; your "no decision yet" was
+  recorded about numbers as a whole. The last sheet is mostly a confirmation of your own text. That file
+  also lists the questions found already answered, and four decided as engineering without words of
+  yours: whether a stored proof names what establishes each fact, where a divisor's non-zeroness must
+  come from, how many digits a `decimal` division keeps, and the shape of results a caller receives.
+- Fifteen start lines, one per step, plus one for each restart.
+- One yes or no on the exact permission list for unattended runs, asked before the first such run.
+- At most one approval of a philosophy edit, and only if your clock answer needs it.
+- Six further questions, each only if it arises: the design would have to refuse `Deposit` as you wrote
+  it; the design changes the number of digits a `decimal` division keeps from canon's 28; a
+  realistic workflow cannot be proved reachable without restricting authors; a new author-written bound
+  on dates is proposed; who supplies a migration when old data is restored; a refusal on "earns its
+  place".
+- One-line notices when you approve the proof model: every state must be able to reach a `terminal`
+  state; whether a proof record names what establishes each fact; who constructs a `Fault` stays
+  deferred; `decimal` gets no upper limit, which changes the type callers receive, unless you answered
+  otherwise on the `integer` sheet.
+- Sheets for arguments that still fail, sheets for a shared false premise, and notices after a failed
+  run, including the one after three failed runs of step 0, which only your words clear. None of these
+  three is bounded.
+- Three more things that need your say, none of them bounded: any change to which model does which job;
+  drawing on extra paid usage; and any edit to the plan after you adopt it.
+- The shape of results a caller receives is not sent to you as a question. Canon already fixes what such
+  a result must carry, so the shape is chosen in step 12 and shown at your finish sign-off.
 
-Two conversations, canon quoted and no shape proposed: bounds on temporal point types, and how a quantifier binds over collections.
+## Weak points
 
-## Main safeguards
-
-Earlier fixes failed because agents enforced them, so each safeguard is a script that stops work (plan:1206-1209). Design agents get no compiler; citing code, tests, samples or catalogs is rejected. Questions need two blind checkers. His answers are recorded word for word; every use of a ruling is checked for width; "locked" and similar labels need his row. Refusals never cite the first build. Stop rules clear only on his words or an independent repair.
-
-## Untested or guessed
-
-The plan's own list (plan:1181-1200, :1265-1288):
-
-- Whether the proof model can be written at all is open (want document).
-- Unattended running is assumed until step 0's tests pass; fallbacks cost him, such as a restart every five runs.
-- The size is unknown until step 1, and each argument needs at least 48 agent runs before repairs.
-- Paper checks can share a blind spot, and some checks rest on agents reading; only the eventual certificate checker is code.
-- Nothing proves an `answers.md` row is his, beyond the list each notice shows him.
-- Whether an agent truly ran on its pinned model may not be observable.
-- The input studies were not all read end to end.
+- **The proof model may not close.** Your own document calls feasibility the open question. An early
+  small test is meant to show that soon, not prevent it.
+- **Everything is checked on paper by agents**, who can share a blind spot.
+- **Your time is not capped.** An argument that still fails after eighteen rounds reaches you with its
+  counterexample, with no limit on how many. The sign-off reads have no page limit.
+- **Later steps wait for your answers.** Step 4 cannot finish without the edit answer, and seven steps
+  rely on it.
+- **This summary has not yet been compared with the plan by an agent that did not write it.** The plan
+  requires that comparison, item by item, before you read this page.
+- **Worst case for starts.** If runs can neither be unattended nor resume, eight arguments alone take
+  about twenty sessions.
+- **The final both-way read is large**, and of unknown size.
+- **The two confirmation checks differ on one point**: whether "every state can reach an end state" is
+  settled by canon or is yours. The plan treats it as settled and tells you at the sign-off.
+- **The list of disagreements in canon is incomplete.** Each step reads its documents in full.
