@@ -372,7 +372,7 @@ public sealed record EventInspection(
     string EventName,                                          // Self-describing — no name-patching needed by consumers
     Prospect OverallProspect,                                  // Certain | Possible | Impossible
     ImmutableArray<ArgDescriptor> DeclaredArgs,               // Arg contract from EventDescriptor.ArgDescriptors
-    ImmutableArray<ArgError> ArgErrors,                        // Non-empty when provided args are structurally invalid
+    ImmutableArray<ArgError> ArgErrors,                        // Non-empty when the supplied args fail the phase-1 ingress check
     ImmutableArray<FieldSnapshot> CurrentFields,              // Pre-mutation field state — captured once before row loop
     ImmutableArray<TransitionInspection> Transitions,         // Per-row inspection detail
     ImmutableArray<ConstraintResult> EventEnsures             // Event-level constraint results
@@ -442,7 +442,7 @@ public static class Evaluator
 
 ### Execution Flow Diagram
 
-The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); each maps onto — and is ordered by — a phase of the § 3A.4 *Operation execution order* (`precept-language-spec.md`, § 3A.4). Phase names from § 3A.4 are cited in parentheses.
+The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); each maps onto — and is ordered by — a phase of the § 3A.4 *Operation execution order* (`precept-language-spec.md`, § 3A.4). Phase names from § 3A.4 are cited in parentheses. One step is placed later than its phase: the copy of the slots (2b) is the starting working copy of phase 0, and the evaluator may take it once a mutation row has won, because nothing before that point writes (guard evaluation writes nothing, § 3A.4 phase 2), so no one can tell the difference. Every outcome that ends the operation before commit — `InvalidArgs`, `UndefinedEvent`, `Unmatched`, `Rejected` — is decided at the phase the specification gives it (phase 1 or 2), never at commit.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -472,11 +472,12 @@ The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); 
 │  │  against slots + args. If false → try the next row. Guard evaluation     │  │
 │  │  writes nothing. The first row whose guard passes wins, and the          │  │
 │  │  remaining rows are not evaluated. A winning reject row stops here and   │  │
-│  │  returns Rejected(reason); steps 2b–2g run only for a mutation row.      │  │
+│  │  returns Rejected(reason). If no row's guard passes → return Unmatched() │  │
+│  │  (phase 2). Steps 2b–2g run only for a winning mutation row.             │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  2b. Snapshot Working Copy                                              │  │
-│  │  Clone slots array for mutation isolation                               │  │
+│  │  2b. Snapshot Working Copy (§3A.4 — The starting working copy)          │  │
+│  │  Clone slots array for mutation isolation (taken late; see above)       │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  2c. Exit Actions (§3A.4 — Exit actions)                                │  │
@@ -510,8 +511,7 @@ The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); 
                                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  Step 3: Commit (§3A.4 — Commit)                                              │
-│  No guard passed → return Unmatched()                                         │
-│  Otherwise → promote the winning row's working copy unconditionally and       │
+│  Promote the winning row's working copy unconditionally and                   │
 │  return Transitioned or Applied                                               │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -520,17 +520,17 @@ The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); 
 
 ### Working Copy Management
 
-The evaluator never mutates the input `Version`. The Fire lifecycle for one event, in § 3A.4 order (`precept-language-spec.md`, § 3A.4, *Operation execution order*):
+The evaluator never mutates the input `Version`. The phases a `Fire` runs, their order, and which of them are skipped for which row are stated once, in `precept-language-spec.md` § 3A.4, *Operation execution order* (phases 0 to 8). This list only says what the working copy does at each of them:
 
-1. **Rent:** Rent a `PreceptValue[]` working copy from `ArrayPool<PreceptValue>.Shared`
-2. **Populate:** Copy `Version.Slots` into the rented array (field slots)
-3. **Load args:** The `FiredArgs` value carries the `PreceptValue[]` arg slot array materialized by `IArgBuilder` at the Fire boundary (ingress governance already validated these — §3A.4 phase 1). Event args are already `PreceptValue` — no per-opcode conversion needed. `LOAD_ARG` reads from this array by pre-resolved slot index.
-4. **Exit actions (§3A.4 — Exit actions):** State actions declared on the state being left (`from <State> -> …`) applied to the working copy.
-5. **State change (§3A.4 — The state change):** The working copy's state becomes the row's target state. No field is written.
-6. **Mutate (§3A.4 — Mutation):** Execute the row's action chain against the working copy, in written order.
-7. **Entering the target state (§3A.4 — Entering the target state):** The `omit` reset (composition rule 5), then the state actions declared on the state being entered (`to <State> -> …`).
-8. **Recompute (§3A.4 — Computed-field recomputation):** Walk `SlotLayout.ComputedSlots`, in dependency order, so a computed field that reads another is derived after it; re-evaluate each computed field.
-9. **Commit (§3A.4 — Commit):** Donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone). Promotion is unconditional once the row's action chain has run: the compiler proved the handler preserves every rule (spec §0.7), so there is no verdict to wait for. The array goes back to `ArrayPool<PreceptValue>.Shared` only when the operation never reached this step — the arguments failed their ingress check at step 3, or the winning row was a `reject` row.
+1. **Rent and populate (phase 0):** Rent a `PreceptValue[]` working copy from `ArrayPool<PreceptValue>.Shared` and copy `Version.Slots` into it. The copy may be taken as late as the first write (2b in the diagram above), because nothing before it writes.
+2. **Ingress (phase 1):** The `FiredArgs` value carries the `PreceptValue[]` arg slot array materialized by `IArgBuilder` at the Fire boundary, and phase 1 checks it against the event's declared argument constraints and `on <Event> ensure` declarations. Event args are already `PreceptValue` — no per-opcode conversion needed. `LOAD_ARG` reads from this array by pre-resolved slot index.
+3. **Dispatch (phase 2):** Evaluate the candidate rows' guards in declaration order; the first whose guard is true wins, and no later row is evaluated. A winning `reject` row's reason string is evaluated and the operation ends `Rejected`; no candidate row ends it `UndefinedEvent`; no true guard ends it `Unmatched`.
+4. **Exit actions (phase 3):** State actions declared on the state being left (`from <State> -> …`) applied to the working copy.
+5. **State change (phase 4):** The working copy's state becomes the row's target state. No field is written.
+6. **Mutate (phase 5):** Execute the row's action chain against the working copy, in written order.
+7. **Entering the target state (phase 6):** The `omit` reset (composition rule 5), then the state actions declared on the state being entered (`to <State> -> …`).
+8. **Recompute (phase 7):** Walk `SlotLayout.ComputedSlots`, in dependency order, so a computed field that reads another is derived after it; re-evaluate each computed field.
+9. **Commit (phase 8):** Donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone). Promotion is unconditional once the operation reaches this step: the compiler proved the handler preserves every rule (spec §0.7), so there is no verdict to wait for. Every operation that ends before this step — the arguments failed ingress at step 2, or dispatch at step 3 ended it `UndefinedEvent`, `Unmatched` or `Rejected` — returns the array to `ArrayPool<PreceptValue>.Shared` instead.
 
 **Reading a computed field anywhere in an operation.** The specification defines a read of a computed field, anywhere in an operation, as the value of its expression over the working copy at that moment (`precept-language-spec.md` § 3A.4, *What a computed field returns when it is read during an operation*). That covers every position, not only steps 4–7: a `default` expression read while `Create` builds the hollow version, an argument constraint or `on <Event> ensure` at ingress, a row's guard and a reject reason at dispatch, and the state actions and row actions. Step 8 fixes the values the committed version carries; it is not the only moment a computed slot may be read as current. The evaluator therefore must not answer a read of a computed slot with the value left there by the previous operation, nor, while the hollow version is being built, with whatever the slot happens to hold before anything has derived it: such a read derives the field from the slots materialized so far (the specification refuses at compile time any such read whose dependencies have no value yet — § 3A.4 phase 0). Whether it evaluates the field's `ComputedPlan` at the read, or re-derives the affected computed slots after each write to something they depend on, is an implementation choice that has not been made.
 
@@ -584,9 +584,15 @@ EventOutcome Create(FiredArgs? args)
     var hollowSlots = new PreceptValue[precept.SlotLayout.FieldCount];
     // A computed slot is not materialized here; a default, guard or ensure that
     // reads one before step 8 derives it at the read ("Reading a computed field
-    // anywhere in an operation", § Working Copy Management).
+    // anywhere in an operation", § Working Copy Management). A default may read
+    // the fields declared before it (spec §3A.4 phase 0), so each is evaluated
+    // over the slots materialized so far. A required field with no default gets
+    // no value here; the construction row assigns it.
     for (int i = 0; i < hollowSlots.Length; i++)
-        hollowSlots[i] = EvaluateDefault(precept.Fields[i]);
+    {
+        if (precept.Fields[i].ComputedPlan != null) continue;
+        hollowSlots[i] = EvaluateDefault(precept.Fields[i], hollowSlots);
+    }
     
     var hollow = new Version(precept, precept.InitialState, hollowSlots);
 
@@ -612,10 +618,15 @@ EventOutcome Create(FiredArgs? args)
 ```csharp
 EventOutcome Create()
 {
-    // 1. Build version with defaults + initial state
+    // 1. Build version with defaults + initial state, in declaration order; each
+    //    default may read the fields declared before it (spec §3A.4 phase 0).
+    //    Computed slots are derived at step 3.
     var slots = new PreceptValue[precept.SlotLayout.FieldCount];
     for (int i = 0; i < slots.Length; i++)
-        slots[i] = EvaluateDefault(precept.Fields[i]);
+    {
+        if (precept.Fields[i].ComputedPlan != null) continue;
+        slots[i] = EvaluateDefault(precept.Fields[i], slots);
+    }
     
     // 2. Entry actions of the initial state (§3A.4 phase 6): construction enters the
     //    initial state, so they run against the defaults, in declaration order.
@@ -628,8 +639,10 @@ EventOutcome Create()
     
     // 4. Commit. No constraint evaluation: the compiler proved that what this
     //    commits — the default configuration with the initial state's entry
-    //    actions applied — satisfies every rule (spec §0.7, base case; C100/C101
-    //    check the defaults), so there is nothing to re-check here.
+    //    actions applied — satisfies every rule (spec §0.7, base case). What the
+    //    base case checks, including the exception for a default that construction
+    //    provably overwrites, is stated in spec §0.6 item 11; the diagnostics are
+    //    DefaultViolatesRule and UnsatisfiableInitialState. Nothing is re-checked here.
     return new EventOutcome.Created(new Version(precept, precept.InitialState, slots));
 }
 ```
@@ -643,10 +656,15 @@ For stateless precepts, `Create` omits the initial-state assignment and all stat
 ```csharp
 EventOutcome Create()  // stateless precept — no initial event
 {
-    // 1. Build version with defaults (no initial state — State = null)
+    // 1. Build version with defaults (no initial state — State = null), in
+    //    declaration order; each default may read the fields declared before it
+    //    (spec §3A.4 phase 0). Computed slots are derived at step 2.
     var slots = new PreceptValue[precept.SlotLayout.FieldCount];
     for (int i = 0; i < slots.Length; i++)
-        slots[i] = EvaluateDefault(precept.Fields[i]);
+    {
+        if (precept.Fields[i].ComputedPlan != null) continue;
+        slots[i] = EvaluateDefault(precept.Fields[i], slots);
+    }
 
     // 2. Recompute computed fields
     foreach (var slot in precept.SlotLayout.ComputedSlots)
@@ -684,6 +702,9 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
     //    below over the construction rows (see Create above).
 
     // 1. Look up dispatch index
+    //    The list for (state, event) already holds every candidate row in declaration
+    //    order: the state's own rows, comma-list rows naming it, and `from any` rows
+    //    (precept-builder.md § TransitionDispatchIndex; spec §3A.4 phase 2).
     if (!precept.DispatchIndex.Rows.TryGetValue((version.CurrentState, @event), out var rows))
         return new UndefinedEvent();
     
@@ -758,6 +779,12 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         if (@event.IsInitial)
             return new EventOutcome.Created(new Version(precept, version.CurrentState, workingCopy), firedArgs);
 
+        // An event row of a stateless precept has no `transition` or `no transition`
+        // outcome (spec §2.2, *Stateless event hook*); a success is Applied (spec
+        // §3A.4, *The operations*).
+        if (precept.InitialState == null)
+            return new EventOutcome.Applied(new Version(precept, null, workingCopy), firedArgs, mutations);
+
         return row.Outcome switch
         {
             TransitionOutcome.Transition   => new EventOutcome.Transitioned(new Version(precept, newState, workingCopy), firedArgs, mutations),
@@ -810,8 +837,11 @@ UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
     if (patch != null)
     {
         for (int i = 0; i < patch.Length; i++)
-            if (!patch[i].IsAbsent)
-                workingCopy[i] = patch[i];  // patch is slot-indexed; IsAbsent means this slot is not being updated
+            if (patch.Names(i))
+                workingCopy[i] = patch[i];  // patch is slot-indexed, with a presence mask saying which slots it names.
+                                            // A named slot may hold the not-set value, which makes an optional field
+                                            // not set; an unnamed slot is not being updated. The two must not share an
+                                            // encoding (spec § 3A.4, What a patch value may be).
     }
     
     // 4. Recompute computed fields
@@ -826,7 +856,7 @@ UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
 
 #### FromJson (Hydration — Not an Evaluator Operation)
 
-`FromJson` is handled at the `Precept` API boundary. It parses the persistence envelope, validates the `$precept` name, resolves the `$state`, and populates the slot array from the `fields` object, then recomputes computed fields and constructs `Version`. No constraint validation occurs. Access modes are bypassed. No row is dispatched and no action runs; the only expressions evaluated are the computed fields' (`precept-language-spec.md` § 3A.4: recomputation runs in every operation, `Restore` included).
+`FromJson` is handled at the `Precept` API boundary. It parses the persistence envelope, validates the `$precept` name, resolves the `$state`, and populates the slot array from the `fields` object, then recomputes computed fields and constructs `Version`. Which slots it writes is stated in `precept-language-spec.md` § 3A.4, phase 0 and phase 1: a value given for a field the persisted state omits is accepted and not written, and that field's slot is given its reset value, which the definition fixes and the executable model carries as a value, so putting it there evaluates nothing. No constraint validation occurs. Access modes are bypassed. No row is dispatched and no action runs; the only expressions evaluated are the computed fields' (`precept-language-spec.md` § 3A.4: recomputation runs in every operation, `Restore` included).
 
 See `runtime-api.md` § Restoration for the full behavioral specification.
 
@@ -867,6 +897,9 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
         return new EventInspection(eventName, Prospect.Impossible, declaredArgs, argErrors, [], [], []);
 
     // ── Dispatch lookup ──────────────────────────────────────────
+    //    The list for (state, event) already holds every candidate row in declaration
+    //    order: the state's own rows, comma-list rows naming it, and `from any` rows
+    //    (precept-builder.md § TransitionDispatchIndex; spec §3A.4 phase 2).
     if (!precept.DispatchIndex.Rows.TryGetValue((version.CurrentState, @event), out var rows))
         return new EventInspection(eventName, Prospect.Impossible, declaredArgs, [], [], [], []);
     
@@ -898,7 +931,8 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
         // ── Guard evaluation ─────────────────────────────────────
         // Inspect path uses EvaluateGuardProspect (Kleene ternary), not EvaluateGuard (bool).
         // Missing required args → Unknown → propagates via Kleene truth table to Possible.
-        // An optional arg the caller left out is not missing: it loads as not set
+        // An optional or defaulted arg the caller left out is not missing: it loads
+        // at its default where it has one, and otherwise as not set
         // (spec §3A.4 phase 1, §3A.6 "When inputs are missing").
         // Full args → standard binary evaluation (Certain or Impossible).
         Prospect guardProspect;
@@ -1003,7 +1037,7 @@ The case that forces it: a row simulates its actions when its guard is merely `P
 
 The commit path calls `EvaluateGuard(plan, slots, args)` → `bool`. The inspect path calls `EvaluateGuardProspect(plan, slots, args?, earlierPossible)` → `Prospect`, which implements Kleene three-value logic:
 
-- Any `LOAD_ARG` opcode for a required arg that was not supplied produces `Unknown` at the Kleene level. An `optional` arg the caller left out is not missing: it loads as not set, exactly as `Fire` loads it (spec §3A.4 phase 1; §3A.6, *When inputs are missing*)
+- Any `LOAD_ARG` opcode for a required arg that was not supplied produces `Unknown` at the Kleene level. An `optional` or defaulted arg the caller left out is not missing: it loads at its default where it has one and otherwise as not set, exactly as `Fire` loads it (spec §3A.4 phase 1; §3A.6, *When inputs are missing*)
 - The stack machine propagates `Unknown` through boolean operators per the truth table documented in `result-types.md` § Kleene Propagation Rules
 - The final result maps: `true` → `Certain`, `false` → `Impossible`, `Unknown` → `Possible`
 - When `args` is fully provided and no earlier row's guard was undetermined, `EvaluateGuardProspect` produces the same binary result as `EvaluateGuard` (no `Unknown` values enter the stack)
@@ -1099,8 +1133,11 @@ UpdateInspection InspectUpdate(Precept precept, Version version, PreceptValue[]?
     if (patch != null)
     {
         for (int i = 0; i < patch.Length; i++)
-            if (!patch[i].IsAbsent)
-                workingCopy[i] = patch[i];  // patch is slot-indexed; IsAbsent means this slot is not being updated
+            if (patch.Names(i))
+                workingCopy[i] = patch[i];  // patch is slot-indexed, with a presence mask saying which slots it names.
+                                            // A named slot may hold the not-set value, which makes an optional field
+                                            // not set; an unnamed slot is not being updated. The two must not share an
+                                            // encoding (spec § 3A.4, What a patch value may be).
     }
     
     // Recompute computed fields (phase 7)
@@ -1207,19 +1244,19 @@ Pending implementation: four opcode semantics need to be locked before builder-e
 
 ### 7.4 Action Dispatch
 
-Action dispatch reads `ActionMeta.SyntaxShape` from the Actions catalog. The 9 `ActionSyntaxShape` values cover all action kinds:
+Action dispatch reads `ActionMeta.SyntaxShape` from the Actions catalog. What each action form does and every field it writes are stated once, in `precept-language-spec.md` § 3A.4, *What can write during one operation*, including what an action does to an `optional` collection that is not set and what `clear` does to an `optional` field; this table and the pseudocode below are how the evaluator carries that out, and where they differ the spec is right. The 9 `ActionSyntaxShape` values cover all action kinds:
 
 | SyntaxShape | Example Actions | Evaluator Behavior |
 |---|---|---|
 | `AssignValue` | `set` | Pop value from action plan result, `STORE_SLOT(target)` |
-| `CollectionValue` | `add`, `enqueue`, `push`, `append` | Pop value, append/add to collection at target slot |
+| `CollectionValue` | `add`, `enqueue`, `push`, `append` | Pop value, append/add to collection at target slot; on an `optional` collection that is not set, make it set holding only that element |
 | `CollectionInto` | `dequeue`, `pop` | Remove from collection, optionally `STORE_SLOT(into)` |
-| `CollectionValueBy` | `append by`, `enqueue by` | Pop value + key, add to keyed collection |
-| `CollectionIntoBy` | `dequeue by` | Remove from keyed collection with optional into + by |
-| `FieldOnly` | `clear` | Clear collection at slot, or set slot to null |
+| `CollectionValueBy` | `append by`, `enqueue by` | Pop value + ordering value, add to the ordered collection; on an `optional` collection that is not set, make it set holding only that element |
+| `CollectionIntoBy` | `dequeue … into G by H` on a `queue of T by P` | Remove the front element; `STORE_SLOT(into)` with its value, then `STORE_SLOT(by)` with its ordering value. There is no `dequeue F by H` form: the `by` capture exists only together with `into` |
+| `FieldOnly` | `clear` | On an `optional` field, scalar or collection, set the slot to not set; on a collection that is not `optional`, empty it |
 | `InsertAt` | `insert at` | Pop value + index, insert into list at position |
 | `RemoveAtIndex` | `remove at` | Pop index, remove element at position |
-| `PutKeyValue` | `put` | Pop key + value, upsert into lookup |
+| `PutKeyValue` | `put` | Pop key + value, upsert into lookup; on an `optional` lookup that is not set, make it set holding only that entry |
 
 ```csharp
 void ExecuteAction(ActionPlan action, PreceptValue[] slots, FiredArgs args)
@@ -1234,8 +1271,10 @@ void ExecuteAction(ActionPlan action, PreceptValue[] slots, FiredArgs args)
             
         case ActionSyntaxShape.CollectionValue:
             var element = EvaluatePlan(action.Value!, slots, args);
-            var collection = slots[action.TargetSlot];
-            AddToCollection(collection, element, action.Kind);
+            if (IsNotSet(slots[action.TargetSlot]))          // optional collection, not set
+                slots[action.TargetSlot] = NewCollectionHolding(element, action.Kind);
+            else
+                AddToCollection(slots[action.TargetSlot], element, action.Kind);
             break;
             
         case ActionSyntaxShape.CollectionInto:
@@ -1244,11 +1283,17 @@ void ExecuteAction(ActionPlan action, PreceptValue[] slots, FiredArgs args)
                 slots[action.IntoSlot.Value] = removed;
             break;
             
+        case ActionSyntaxShape.CollectionIntoBy:
+            var (value, orderingValue) = RemoveFrontWithOrdering(slots[action.TargetSlot]);
+            slots[action.IntoSlot!.Value] = value;
+            slots[action.ByIntoSlot!.Value] = orderingValue;  // a different field from IntoSlot
+            break;
+            
         case ActionSyntaxShape.FieldOnly:
-            if (IsCollection(slots[action.TargetSlot]))
-                ClearCollection(slots[action.TargetSlot]);
+            if (action.TargetIsOptional)
+                slots[action.TargetSlot] = NotSet;           // optional field, scalar or collection
             else
-                slots[action.TargetSlot] = null;  // optional field
+                ClearCollection(slots[action.TargetSlot]);   // collection that is not optional
             break;
             
         // ... remaining shapes
@@ -1555,11 +1600,11 @@ IReadOnlyList<ConstraintViolation> ValidateIngress(
 
     // First, presence and type of every declared argument. A required argument
     // that is missing, or any argument of the wrong type, is a failure, and it is
-    // not "good" below. An optional argument the caller left out passes: it is
-    // not set, which is a value, so it is "good" and every constraint and ensure
-    // that reads it is evaluated, reading not set (spec §3A.4 phase 1). An argument
-    // with a default that the caller left out is given its default here and passes,
-    // so it is "good" too. A supplied name the event does not declare is recorded as
+    // not "good" below. An argument with a default that the caller left out —
+    // optional or not — is given its default here and passes, so it is "good".
+    // An optional argument without a default that the caller left out passes: it
+    // is not set, which is a value, so it is "good" and every constraint and ensure
+    // that reads it is evaluated, reading not set (spec §3A.4 phase 1). A supplied name the event does not declare is recorded as
     // a failure (InvalidArgs, "unknown key").
     var good = new HashSet<ArgDescriptor>();
     foreach (var arg in @event.ArgDescriptors)
@@ -1579,18 +1624,38 @@ IReadOnlyList<ConstraintViolation> ValidateIngress(
     // a missing required argument or a wrongly typed one, or whose proof relied on
     // a constraint that just failed, is not evaluated, and nothing is reported for
     // it beyond the failures already recorded.
+    //
+    // An on <event> ensure with a when guard is two evaluations, each held to that
+    // rule on its own (spec §3A.4 phase 1, "A guarded event ensure"): the guard,
+    // over the arguments and premises the guard needs; then, only when the guard
+    // is true, the body, over the arguments and premises the body needs. A false
+    // guard makes the ensure pass without evaluating the body, so an argument that
+    // only the body reads does not stop the ensure passing.
     var passed = new HashSet<ConstraintDescriptor>();
     foreach (var constraint in IngressConstraintsInPremiseOrder(index, @event))
-        if (constraint.ReferencedArgs.All(good.Contains)
-            && constraint.ProofPremises.All(passed.Contains)
+    {
+        if (constraint.Guard is { } guard)
+        {
+            if (!guard.ReferencedArgs.All(good.Contains)
+                || !guard.ProofPremises.All(passed.Contains))
+                continue;                                  // guard not evaluated
+            if (!EvaluateGuard(guard, slots, args))
+            {
+                passed.Add(constraint);                    // guard false: ensure passes
+                continue;
+            }
+        }
+        if (constraint.Body.ReferencedArgs.All(good.Contains)
+            && constraint.Body.ProofPremises.All(passed.Contains)
             && EvaluateConstraint(constraint, slots, args, violations))
             passed.Add(constraint);
+    }
 
     return violations;
 }
 ```
 
-`ValidateIngressForPreview`, used by `InspectFire` and `InspectCreate`, is the same check with one difference: a required argument that was not supplied is not recorded as a failure, because a preview may be given fewer inputs than the operation needs (spec §3A.6). It is still left out of `good`, so nothing that reads it is evaluated. An `optional` argument left out is treated exactly as `ValidateIngress` treats it — not set, and in `good` — and so is an argument with a `default` left out, which takes its default (spec §3A.6, *When inputs are missing*).
+`ValidateIngressForPreview`, used by `InspectFire` and `InspectCreate`, is the same check with one difference: a required argument that was not supplied is not recorded as a failure, because a preview may be given fewer inputs than the operation needs (spec §3A.6). It is still left out of `good`, so nothing that reads it is evaluated. An argument with a `default` left out is treated exactly as `ValidateIngress` treats it — it takes its default and is in `good` — and so is an `optional` argument without a `default` left out, which is not set (spec §3A.6, *When inputs are missing*).
 
 `Update` runs the same check over the patched field values, against the constraints declared on each field it writes (spec §0.7, *Governance*), with the access-mode check first and the same limit: a constraint on a field whose access or type check failed, or that reads another patched field whose access or type check failed, is not evaluated (spec §3A.4 phase 1). A constraint whose proof relied on another phase-1 constraint that failed is not evaluated either, as on the event path. A constraint that reads another field is evaluated against the slots as the patch will leave them — the patched value where the patch names the field, the starting value elsewhere, and for a computed field the value of its `<-` expression over those same slots (spec §3A.4 phase 1, *Which values a patched field's own constraints read*) — so `ValidateIngress` for a patch evaluates over the starting slots with the patched values laid over them and the computed slots it reads re-derived from that overlay, not over `version.Slots` alone, and not with a computed slot left at its starting value. Whether an edit evaluates anything beyond those is the open question noted at the start of this section.
 
@@ -1652,7 +1717,7 @@ public sealed record ConstraintViolation(
 | `ConstraintPlanIndex` | Constraint buckets: `Always`, `InState`, `FromState`, `ToState`, `OnEvent` |
 | `ExecutionRow` | Guard plan, action plans, target state, outcome kind |
 | `ExecutionPlan` | Flat opcode array for expressions |
-| `ActionPlan` | Action kind, target slot, value plan, into slot |
+| `ActionPlan` | Action kind, target slot, value plan, into slot, ordering-value (`by`) capture slot, and whether the target is `optional` |
 | `ConstraintDescriptor` | Constraint kind, anchors, expression plan, because clause |
 | `FieldDescriptor` | Slot index, type, modifiers, access modes, computed plan |
 
@@ -1976,7 +2041,7 @@ The bucket index survives the removal of the post-mutation pass because it still
 **Rationale:**
 - **Restoration is not a business transaction:** Data was committed when it satisfied the rules in effect at that time. The definition may have changed since. Constraint validation on restore would block all existing data on every schema change, making evolution impossible.
 - **Access modes are interactive controls:** They govern what the user can edit, not what values are structurally valid.
-- **Round-trip fidelity:** `precept.FromJson(version.ToJson())` must produce a semantically identical `Version`. Adding ingress validation would break this contract when the definition evolves.
+- **Round-trip fidelity:** `precept.FromJson(version.ToJson())` must produce a `Version` with the same state and the same stored values. Adding ingress validation would break this contract when the definition evolves. Computed fields are re-derived, not carried, and one whose expression calls `now()` takes the clock reading of the restore, so it can differ from the value in the version that was persisted (`precept-language-spec.md` § 3A.4, *Configurations* item 3 and *Known exceptions* item 9).
 
 **There is no facility for validating restored state, and that is deliberate.** Inspection is not one: it previews what an operation would do, and no operation evaluates the rules against a finished configuration. Restored data is trusted because it was governed when it was written (`what-i-want-2026-07-16.md:141`). A host that restores data written under an older definition, or injects values by some route other than the contract, has stepped outside the guarantee, and nothing inside the engine will notice (spec §0.7). Handling data written under an older definition is the post-MVP job of the restore path itself, through migration.
 
@@ -2196,7 +2261,7 @@ This enables AI agents and UIs to explain WHY the constraint failed, not just TH
 
 ### Computed Field Freshness in Restored Versions
 
-`Restore` recomputes every computed field from the restored stored values (`precept-language-spec.md` § 3A.4, phase 7; `runtime-api.md` § Restoration). A computed value carried in the persistence envelope is never trusted: it may have been derived under an earlier formula, and a computed field carries no information of its own, so the restored `Version` always holds the values the current definition derives. An earlier version of this section said the opposite — that `FromJson` kept persisted computed values and freshness was the caller's concern — which contradicted the specification, `runtime-api.md` and the matrix in § 15 of this document.
+`Restore` recomputes every computed field from the restored stored values (`precept-language-spec.md` § 3A.4, phase 7; `runtime-api.md` § Restoration). A computed value carried in the persistence envelope is never trusted: it may have been derived under an earlier formula, so the restored `Version` always holds the values the current definition derives. What a computed field carries beyond the stored fields is stated in `precept-language-spec.md` § 3A.4, *Configurations* item 3: nothing, unless its expression calls `now()`, in which case it carries the clock reading of the operation that derived it, and a restore derives it from its own clock reading (*Known exceptions* item 9). An earlier version of this section said the opposite — that `FromJson` kept persisted computed values and freshness was the caller's concern — which contradicted the specification, `runtime-api.md` and the matrix in § 15 of this document.
 
 ### Event-Prospect Evaluation in Update Inspection
 

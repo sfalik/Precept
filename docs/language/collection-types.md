@@ -307,7 +307,7 @@ field EventLog       as log of instant
 field AuditTrail     as log of string notempty
 ```
 
-**Behavior:** Append-only ordered sequence. Elements can be added but never removed. The append-only invariant guarantees `.count` is monotonically non-decreasing — the proof engine uses this to discharge non-emptiness proofs after any `append`. Models audit trails, event histories, and compliance records where immutability is a structural requirement, not a convention.
+**Behavior:** Append-only ordered sequence. Elements can be added, and no action removes one. Within an operation, no action lowers `.count` — the proof engine uses this to discharge non-emptiness proofs after any `append`. Append-only governs actions only: the `omit` reset puts a log back to its reset value on entry into a state that omits it, an update patch replaces the whole value of a log that is `editable`, and an `optional` log can be not set ([`precept-language-spec.md`](precept-language-spec.md) § 3A.4, *What can write during one operation* and *An `optional` collection*, item 4). Models audit trails, event histories, and compliance records where immutability is a structural requirement, not a convention.
 
 **Actions:**
 
@@ -381,7 +381,7 @@ field AuditLog      as log of string  by integer
 field EventHistory  as log of string  by integer
 ```
 
-**Behavior:** Append-only ordered log where entries are ordered by an external ordering key `P`, not by insertion order. `P` must be **unique** across all entries. Uniqueness is a precondition on `append`: authors write a `when not (F contains P)` guard to discharge it. Without the guard the proof engine raises `UnguardedCollectionAccess`; if the guard is present and evaluates false at runtime the transition rejects. The compiler cannot prove uniqueness statically in general — the same pattern as emptiness-guarded accessors.
+**Behavior:** Append-only ordered log where entries are ordered by an external ordering key `P`, not by insertion order. `P` must be **unique** across all entries. Uniqueness is a precondition on `append`: authors write a `when not (F contains P)` guard to discharge it. Without the guard the proof engine raises `UnguardedCollectionAccess`; if the guard is present and evaluates false at runtime the row does not match, and dispatch goes on to the next candidate row; what the operation returns when no row matches is stated in [`precept-language-spec.md`](precept-language-spec.md) § 3A.4, phase 2. The compiler cannot prove uniqueness statically in general — the same pattern as emptiness-guarded accessors.
 
 Models compliance records and audit logs where entries carry an external ordering key (timestamp from an external system, regulatory sequence number, business priority ID) and the log must be readable in key order. `P` values are expected to arrive mostly in order (new `P` > current max), with occasional out-of-order entries. `P` must be orderable — numeric types and `choice of T(...) ordered`.
 
@@ -428,7 +428,7 @@ from Audit on GetOldest
 
 **Backing type:** Custom immutable sorted linked list with P-order insertion and cached head + tail pointers. O(1) in-order append (new `P` > current max — the overwhelmingly common case for timestamps), O(k) near-tail out-of-order insertion, O(n) worst-case. O(1) `.first`/`.last`, O(n) `.at(index)`. Structural sharing: in-order append shares entire prefix.
 
-**Uniqueness enforcement:** `P` uniqueness is a precondition on `append`, not a runtime fault. Authors write `when not (F contains P)` (P-type argument → key membership) to guard the transition; the proof engine raises `UnguardedCollectionAccess` if the guard is absent. If the guard evaluates false at runtime the transition rejects — consistent with all other preconditions in Precept.
+**Uniqueness enforcement:** `P` uniqueness is a precondition on `append`, not a runtime fault. Authors write `when not (F contains P)` (P-type argument → key membership) to guard the transition; the proof engine raises `UnguardedCollectionAccess` if the guard is absent. If the guard evaluates false at runtime the row does not match, exactly as for any other guard: dispatch goes on to the next candidate row, and `Fire` ends `Unmatched` when none matches ([`precept-language-spec.md`](precept-language-spec.md) § 3A.4, phase 2). An author who wants a refusal with a reason writes a `reject` row for the duplicate case.
 
 The uniqueness check has **the same complexity as the append itself** — it piggybacks on the position-finding scan at no additional cost:
 
@@ -441,8 +441,8 @@ The uniqueness check has **the same complexity as the append itself** — it pig
 
 | Property | `log of T by P` | `queue of T by P` |
 |---|---|---|
-| Removal | None — append-only, entries are permanent | `dequeue` removes the front element |
-| `P` uniqueness | Required — `when not (F contains P)` precondition; transition rejects if guard fails | Not required — stable FIFO tiebreak |
+| Removal | No action removes an entry (append-only); the `omit` reset empties it on entry into a state that omits it, and an update patch replaces it whole where it is `editable` (spec § 3A.4) | `dequeue` removes the front element |
+| `P` uniqueness | Required — `when not (F contains P)` precondition; the row does not match if the guard fails (spec § 3A.4 phase 2) | Not required — stable FIFO tiebreak |
 | `.at(N)` | Available | Not available |
 | Purpose | Permanent ordered compliance record | Ordered work queue |
 
@@ -625,7 +625,7 @@ field Charges    as set of money in 'USD' nonnegative        # each element ≥ 
 The element bound participates in proof identically to the equivalent scalar-field modifier:
 
 - **Write-site (compile-time).** A value introduced into the collection (`enqueue`/`add`/`push`/`append`/`insert`/`put` and the `*-by` variants) must be provably within the element bound, the same containment obligation a `set` into a bounded field carries. That obligation is **rule preservation, not a fault gate**: an element bound is rule shorthand exactly as a field bound is (precept-language-spec.md §2.4), so keeping an element inside it is proven and refused under the same single constraint mechanism as any other rule, and it should not be quoted as one of the fault classes (`precept-language-spec.md` §0.7). `enqueue AgentQueue E.Name` discharges when `E.Name` is declared `maxlength 200` (or narrower); an unbounded or wider source rejects (`LengthBoundViolation` for length, `NumericOverflow`/`OutOfRange` for numeric — despite its name, `NumericOverflow` here names a value leaving a declared bound, not arithmetic overflow of the machine type). A `default [...]` literal's elements are checked the same way — an out-of-range default element rejects.
-- **Read-site (compile-time).** An element read (`.peek`/`.first`/`.last`/`.min`/`.max`/`.at`) carries the element bound as its value interval, so reading into a same-or-wider-bounded destination field discharges with no per-access guard — `set LastCalledParty = PartyQueue.peek` proves into a `maxlength 200` field, and `set HighestScore = Scores.max` proves into an `integer min 0 max 100` field. A quantifier binding (`each x in C` / `any x in C` / `no x in C`) likewise carries the element bound on `x` inside the predicate. For a qualified element (`money`/`quantity`), the bound normalizes to the same UCUM/currency base units as a qualified field, so `.min`/`.max` into a same-currency-and-unit destination discharges and a narrower one rejects.
+- **Read-site (compile-time).** An element read (`.peek`/`.first`/`.last`/`.min`/`.max`/`.at`) carries the element bound as its value interval wherever the bound is known of the collection at the read — from the rules of the starting configuration, or carried through the operation's earlier writes to the collection; precept-language-spec.md § 3A.4, *What each writer takes away*, states when that is, and whether the bound also holds after every write is an open point there (*Known exceptions*, item 12) — so reading into a same-or-wider-bounded destination field discharges with no per-access guard — `set LastCalledParty = PartyQueue.peek` proves into a `maxlength 200` field, and `set HighestScore = Scores.max` proves into an `integer min 0 max 100` field. A quantifier binding (`each x in C` / `any x in C` / `no x in C`) likewise carries the element bound on `x` inside the predicate. For a qualified element (`money`/`quantity`), the bound normalizes to the same UCUM/currency base units as a qualified field, so `.min`/`.max` into a same-currency-and-unit destination discharges and a narrower one rejects.
 
 Per-element modifier legality is checked against the same modifier↔type compatibility table as a scalar field (precept-language-spec.md §2.4), with the **element** type as subject: `set of integer maxlength 5` emits `InvalidModifierForType` because `maxlength` does not apply to `integer`, and `set of string min 0` emits it because `min` does not apply to `string`.
 
@@ -776,8 +776,14 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 | `mincount 1` | every collection kind | Collection must contain at least one element. A statically-literal `mincount 1` discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last` access safety on the kinds that surface those accessors. (`notempty` is string-only — in inner-type position it constrains each element, not collection cardinality.) |
 | `mincount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at least N elements |
 | `maxcount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at most N elements |
-| `optional` | any field type (including collections) | Field may be unset; requires `is set` guard before use |
+| `optional` | any field type (including collections) | Field may be unset; requires `is set` guard before use (for a collection, see the note below this table) |
 | `default [...]` | `set`, `queue`, `stack`, `log`, `bag`, `list` | Initial value — list literal of scalar elements. Not applicable to `queue of T by P` (two-axis elements) or `lookup of K to V` (key-value pairs require explicit key syntax). |
+
+> **Draft 2026-11-25** — under adversarial review; nothing may cite this section until the mark is removed.
+
+**`optional` on a collection.** What an `optional` collection starts as, which actions need it to be set, which make it set and what `clear` does to it are stated in full in [`precept-language-spec.md`](precept-language-spec.md) § 3A.4, *Configurations*, *An `optional` collection*. Four statements in this document are narrower than that rule and give way to it. The `mincount 1` row above, and every other statement here that `mincount` discharges an accessor's non-emptiness, describe a collection that is not `optional`: on an `optional` collection `mincount N` holds of the contents only when the field is set, so it discharges that obligation only together with a proof that the field is set (item 5 of the rule just cited). "Before use" in the row above means before any read of the collection's contents and before any action that removes from it or names a position in it; `add`, `enqueue`, `push`, `append` and `put` are not uses, and on a collection that is not set they make it set, holding the one element. The `clear` rows that say "Remove all elements" describe a collection that is not `optional`; on an `optional` collection `clear` makes the field not set. And the list of count obligations under *`mincount`/`maxcount` participate in proof*, below, describes a collection that is not `optional`: on an `optional` collection the count obligations of an action that adds to a field that may be not set, and of `clear`, are those stated in item 5 of the rule just cited, which also says which part of them depends on the open question of whether a constraint modifier must hold after each action or only of the configuration the handler commits (*Known exceptions*, item 12, of the same section).
+
+**Where `mincount` discharges an accessor.** Every statement in this document that a statically-literal `mincount` discharges `.min`, `.max`, `.peek`, `.peekby`, `.first` or `.last` — the `mincount 1` row above and the *Constraints* lines of the `set`, `list`, `queue of T by P` and `log` sections — holds only at the positions where the modifier is known of the collection. Those positions are stated once, in [`precept-language-spec.md`](precept-language-spec.md) §3.8, *Where `mincount` discharges an accessor*, which applies §3A.4, *What an earlier write invalidates*: in short, at the start of `Fire`, `Update` and `Restore`, until the first action in the operation that changes the collection, unless the starting state omits the collection, and during `Create` only through the value the field was given; the note cited is the full statement and its exceptions govern. After `dequeue Q`, `Q.peek` on a `queue of integer mincount 1` is not discharged by the modifier.
 
 **Constraint validation rules:**
 
@@ -793,7 +799,7 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 
 **Scalar constraints do not apply to collections.** `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). `notempty` is string-only — in a collection's inner-type position it constrains each element (`set of string notempty`), not the collection. Collections' own cardinality vocabulary is `mincount` and `maxcount`. Note that a scalar value modifier on the *inner type* is valid and binds to the element, not the field — `field AgentQueue as queue of string maxlength 200` caps each element's length (see [§ Element value modifiers](#element-value-modifiers)). Likewise `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
 
-> **Element-level constraints:** `mincount` and `maxcount` constrain the collection as a whole (cardinality). To constrain each individual element's *value*, two paths exist: (1) an **inner-type value modifier** — `queue of string maxlength 200` — declares a static per-element type bound the proof engine reads at write- and read-sites (see [§ Element value modifiers](#element-value-modifiers)); (2) a **quantifier predicate** — `rule each x in C (x > 0)` — is a runtime governance rule over the current elements *(see [§ Quantifier Predicates](#quantifier-predicates) for syntax)*. The two are complementary: the inner-type modifier carries a bound back to a read-site (so `.peek` proves into a capped field); a quantifier does not.
+> **Element-level constraints:** `mincount` and `maxcount` constrain the collection as a whole (cardinality). To constrain each individual element's *value*, two paths exist: (1) an **inner-type value modifier** — `queue of string maxlength 200` — declares a static per-element type bound the proof engine reads at write- and read-sites (see [§ Element value modifiers](#element-value-modifiers)); (2) a **quantifier predicate** — `rule each x in C (x > 0)` — is a rule over the current elements, proved like every other rule *(see [§ Quantifier Predicates](#quantifier-predicates) for syntax)*. The inner-type modifier is itself the rule `each x in C (…)` (precept-language-spec.md §2.4), so the two carry a bound to a read or capture site in the same way, and only where the `each` fact is known of the collection immediately before the read: what each action and each read carries is stated in precept-language-spec.md § 3A.4, *What an earlier write invalidates* (*What is known, and from where* and *What each writer takes away*).
 
 ---
 
@@ -992,7 +998,7 @@ from Reviewing on CheckHazmat when CartItems.countof("hazmat-item") > 0
     -> no transition
 ```
 
-**Constraints:** `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`, plus per-element inner-type value modifiers. `mincount 1` enforces `.count >= 1` (state-entry constraint). No `.first`/`.last`/`.peek` — bag is unordered, no positional accessors.
+**Constraints:** `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`, plus per-element inner-type value modifiers. `mincount 1` enforces `.count >= 1`; like every constraint modifier it is a rule ([`precept-language-spec.md`](precept-language-spec.md) § 2.4), not a state-entry constraint. No `.first`/`.last`/`.peek` — bag is unordered, no positional accessors.
 
 **Proof engine implications:** No new proof obligations beyond count-based. `.countof(Expr)` is always safe (returns 0 if absent). The proof engine must understand `remove` decrements rather than unconditionally deletes — element persists until count reaches 0. Sequential action tracking: proof engine tracks how `add`/`remove` changes `.count` within a transition row.
 
@@ -1068,7 +1074,11 @@ from Active on GetReviewer when ApprovalChain.count > GetReviewer.Index and GetR
 
 **Constraints:** `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`, plus per-element inner-type value modifiers. A statically-literal `mincount 1` discharges `.first`/`.last` access obligations.
 
-**Proof engine implications:** Index-bounds obligations (`UnguardedCollectionAccess`) for `.at(N)`, `insert F Expr at N`, and `remove F at N`. Author writes `when N >= 0 and N < F.count` (or `N <= F.count` for `insert`) guard; proof engine raises `UnguardedCollectionAccess` if absent. Sequential action tracking: proof engine tracks count changes from `insert`, `remove`, `remove at N`, and `clear` within a transition row and re-verifies subsequent access guards against updated count. Positional stability across mutations (e.g., after `remove Items at 0`, positions shift) is the author's responsibility — the proof engine proves access safety, not value-level positional invariants.
+**Proof engine implications:** Index-bounds obligations (`UnguardedCollectionAccess`) for `.at(N)`, `insert F Expr at N`, and `remove F at N`. Author writes `when N >= 0 and N < F.count` (or `N <= F.count` for `insert`) guard; proof engine raises `UnguardedCollectionAccess` if absent. Sequential action tracking: proof engine tracks count changes from `insert`, `remove`, `remove at N`, and `clear` within a transition row and re-verifies subsequent access guards against updated count. Positions shift across mutations (after `remove Items at 0`, every later element moves down one).
+
+> **Draft 2026-11-25** — under adversarial review; nothing may cite this section until the mark is removed.
+
+What a proof may rely on about positions and values after `insert`, `remove … at` and the other actions is stated in full in [`precept-language-spec.md`](precept-language-spec.md) § 3A.4, *What each writer takes away*, *Positions and accessors*. Earlier text here said the proof engine proves access safety only and never value-level positional facts; that described what is built, and the facts listed there are the intended proof power.
 
 **Backing type:** `ImmutableList<T>` (.NET) — AVL tree with structural sharing. O(log n) insert, remove, index access. O(1) `.count`.
 
@@ -1208,7 +1218,7 @@ The `dequeue ... into` form is extended with an optional `by` capture clause:
 
 - `CurrentClaim` receives the dequeued element value (type `T` — here `string`).
 - `CurrentSeverity` receives the dequeued element's ordering value (type `P` — here the declared `choice of string(...) ordered` type).
-- Both target fields must be declared and type-compatible.
+- Both target fields must be declared and type-compatible, and they must be two different fields: `dequeue F into X by X` is a compile error ([`precept-language-spec.md`](precept-language-spec.md) § 3A.4, *What can write during one operation*, which carries the draft mark this rule is under).
 - The `by` capture is optional — `dequeue ClaimQueue into CurrentClaim` remains valid and discards the ordering value.
 - With both captures the action writes three fields — the queue, the value target and the ordering-value target. Every field each action form writes is enumerated in [`precept-language-spec.md`](precept-language-spec.md) § 3A.4, *What can write during one operation*.
 

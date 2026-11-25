@@ -403,7 +403,11 @@ This pattern ensures new modifier constraints can be added to the catalog withou
 
 **Processing:**
 
-1. **Wildcard expansion:** For rows where `FromState` is null (any-state wildcard), generate one edge per declared state that does not have an explicit transition for that event. States are processed in declaration order for deterministic edge ordering — see §12 Implementation Note 1.
+1. **Wildcard expansion:** For rows where `FromState` is null (any-state wildcard), generate one edge per declared state, whether or not that state also has a row of its own for the event. States are processed in declaration order for deterministic edge ordering — see §12 Implementation Note 1.
+
+   > **Draft 2026-11-25** — under adversarial review; nothing may cite this section until the mark is removed.
+
+   A `from any` row is a candidate in every state, at the position its declaration holds among the rows for the same event; a state's own rows do not displace it ([`precept-language-spec.md`](../language/precept-language-spec.md) § 3A.4, *How rows written with `any` or a comma list become handlers*). An edge construction that skipped states with an explicit row would drop an edge that can be taken whenever the explicit rows declared before the `any` row have guards that fail, and the reachability built on it would be wrong. This is the reading §13 already takes: where a wildcard row and an explicit row both match, the graph treats both as edges.
 
 2. **Self-transition resolution:** For rows where `TargetState` is null, set `ToState = FromState`.
 

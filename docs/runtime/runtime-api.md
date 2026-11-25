@@ -159,7 +159,7 @@ EventOutcome simple = precept.Create();  // always Created
 
 `Create` is construction. It always returns `EventOutcome.Created` on success — regardless of whether an initial event is declared. `Created` means "an entity was brought into existence." Whether that creation involved firing an initial event or just applying defaults is an implementation detail — the outcome category is the same.
 
-If the precept declares an `initial` event, `Create` runs it once, atomically, through the same phases `Fire` runs — without calling `Fire`, which refuses the initial event's name (spec §3A.4 phase 1): build hollow version (defaults + initial state + omitted fields) → validate the supplied arguments at ingress → evaluate construction rows (first-match) → execute matched row's action chain → run the initial state's entry actions → computed-field recomputation → commit → return outcome. The steps, their order and the reason the hollow version is built before the arguments are checked are stated in `precept-language-spec.md` § 3A.4, *Operation execution order*, and § 3A.5; this sentence is a summary of them. There is no constraint-evaluation step between the action chain and the commit: the compiler proved that the initial event establishes every rule (spec §0.7), so a construction that ran to completion is valid by construction. If no initial event is declared, `Create` constructs from defaults, runs the initial state's entry actions against them, and returns `Created` (always succeeds by compile-time guarantee C59/C86). Construction enters the initial state; spec § 3A.4 states when entry and exit actions run.
+If the precept declares an `initial` event, `Create` runs it once, atomically, through the same phases `Fire` runs — without calling `Fire`, which refuses the initial event's name (spec §3A.4 phase 1): build hollow version (defaults + initial state + omitted fields) → validate the supplied arguments at ingress → evaluate construction rows (first-match) → execute matched row's action chain → run the initial state's entry actions → computed-field recomputation → commit → return outcome. The steps, their order and the reason the hollow version is built before the arguments are checked are stated in `precept-language-spec.md` § 3A.4, *Operation execution order*, and § 3A.5; this sentence is a summary of them. There is no constraint-evaluation step between the action chain and the commit: the compiler proved that construction — default materialization, the construction row's actions and the initial state's entry actions, or on a precept with no initial event the defaults and the entry actions — establishes every rule (spec §0.6 item 11, §0.7, § 3A.5), so a construction that ran to completion is valid by construction. If no initial event is declared, `Create` constructs from defaults, runs the initial state's entry actions against them, and returns `Created` (always succeeds by compile-time guarantee C59/C86). Construction enters the initial state; spec § 3A.4 states when entry and exit actions run.
 
 **Construction outcome space:** `Create()` returns exactly one of:
 
@@ -167,7 +167,7 @@ If the precept declares an `initial` event, `Create` runs it once, atomically, t
 |---------|---------|---------------|
 | `Created` | Construction succeeded. Entity now exists in the initial state (stateful) or with `State = null` (stateless). | A mutation row matched and its action chain ran to completion. |
 | `Rejected` | Intake refused. Entity was NOT created. | An authored `reject` row matched, OR all `when` guards failed with no unconditional fallback (synthesized reason: `"No construction row matched arguments"`). |
-| `InvalidArgs` | Ingress validation failed, before row matching — collect-all as `precept-language-spec.md` § 3A.4 phase 1 defines it, so every failure the check finds is reported. | Wrong type, unknown key, missing required argument, or an argument value that violates a constraint declared on it. |
+| `InvalidArgs` | Ingress validation failed, before row matching — collect-all as `precept-language-spec.md` § 3A.4 phase 1 defines it, so every failure the check finds is reported. | Wrong type, unknown key, missing required argument, an argument value that violates a constraint declared on it, or an `on <Event> ensure` that does not hold (spec § 3A.2 item 4). |
 | `Faulted` | A breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator. | Nothing constructs one today; whether anything ever will is undecided (`fault-system.md` Q3). |
 
 **Structurally impossible outcomes from `Create()`:**
@@ -175,7 +175,7 @@ If the precept declares an `initial` event, `Create` runs it once, atomically, t
 - `Applied` — exclusively a `Fire()` outcome. `Create()` produces `Created`, never `Applied`.
 - `Unmatched` — the compiler guarantees at least one construction row exists (`ZeroConstructionRows` diagnostic). If all guards fail at runtime, the result is `Rejected`, not `Unmatched`.
 - `UndefinedEvent` — `Create()` targets the declared initial event; the compiler ensures it has rows.
-- `ConstraintsFailed` — there is no post-mutation constraint evaluation to fail. The compiler proved that the initial event establishes every rule (spec §0.7, §3A.2).
+- `ConstraintsFailed` — there is no post-mutation constraint evaluation to fail. The compiler proved that construction establishes every rule (spec §0.7, § 3A.5).
 
 **Why `Create` returns `EventOutcome`:** Construction goes through the full event pipeline — same ingress validation of the supplied arguments, same guards, same action chain. The caller uses the same exhaustive pattern matching they use for every `Fire`, minus the impossible variants.
 
@@ -343,7 +343,7 @@ public sealed record Version
 - **Two ingress lanes for all commit and inspect operations.** The **JSON lane** (`JsonElement?`) serves wire callers — MCP, HTTP APIs, deserialization pipelines — that already have JSON on hand. The **typed lane** (`Action<IArgBuilder>?` for Create, Fire and their inspections, `Action<IFieldBuilder>?` for Update and InspectUpdate) serves in-process callers that work with typed values. Both lanes cover all callers. There are no `IReadOnlyDictionary<string, object?>` overloads anywhere. Callers with a JSON string use `JsonDocument.Parse(str).RootElement` inline — no string-input convenience overloads.
 - **Typed Restore is deliberately absent.** `Restore` takes `JsonElement` only — no `Action<IFieldBuilder>` overload. Restore is a hydration path from persisted storage, and storage always returns serialized data. In-process code never constructs a Restore call from scratch; callers use Create or Fire instead.
 - **Instance methods delegate to static evaluator.** `Version.Fire(...)` delegates to `Evaluator.Fire(this.Precept, this, ...)`. The Version is a thin facade over the stateless evaluation function (R1). This keeps entity representation separate from evaluation logic.
-- **Applicable constraints are state-scoped.** `Version.ApplicableConstraints` exposes the subset of `Precept.Constraints` that are active for the entity's current state: global rules (always), `in <CurrentState>` residency ensures, `from <CurrentState>` exit ensures, and event ensures for available events. Precomputed from the executable model's scope index — zero evaluation cost. This is the "what must be true here?" surface.
+- **Applicable constraints are state-scoped.** `Version.ApplicableConstraints` exposes the subset of `Precept.Constraints` that are active for the entity's current state: global rules (always), `in <CurrentState>` residency ensures, `from <CurrentState>` exit ensures, and event ensures for available events. Precomputed from the executable model's scope index — zero evaluation cost. It answers "what applies here?", and not every constraint it lists is true of the current version. Which of them are known of every committed version in the state is stated once, in `precept-language-spec.md` § 3A.4, *Between operations nothing is carried except what every reachable configuration satisfies*; it excludes, among others, a rule that mentions `now()` or a field the current state omits. A `from <CurrentState>` ensure is what a transition out of the state must make true, and an event ensure constrains that event's arguments.
 
 ### Fire
 
@@ -370,7 +370,7 @@ Version next = outcome switch
 
 Fire runs the event pipeline in § 3A.4 order (`precept-language-spec.md`, § 3A.4, *Operation execution order*): ingress governance (arg validation) → dispatch (row matching, first-match with guard evaluation; a winning reject row ends the operation here) → exit actions → the state change → the row's action chain on the working copy → the `omit` reset and entry actions → computed-field recomputation → commit. That section is the full statement of each step; this sentence is a summary of it. Returns one `EventOutcome` variant. See `result-types.md` for the full hierarchy.
 
-There is no constraint-evaluation stage between recomputation and commit, and no pass/fail decision the commit waits on. Ingress validation of the arguments and guard evaluation are the two checks that run, and they are exactly the premises the compiler's proofs rest on (spec §0.7). Everything else was proven at compile time; a working copy the operation completed is promoted unconditionally. The working copy is discarded only when the operation refuses before it finishes — arguments that fail ingress, or a `reject` row that wins dispatch.
+There is no constraint-evaluation stage between recomputation and commit, and no pass/fail decision the commit waits on. What the operation tests — the arguments at ingress, the row guards at dispatch, and the guards of guarded state actions — are the premises the compiler's proofs rest on (spec §0.7); everything else was proven at compile time, and a working copy the operation completed is promoted unconditionally. When the working copy is discarded instead is stated in spec § 3A.4, phase 8: an operation that refused at phase 1 or ended at phase 2 never reaches commit, which for `Fire` covers `InvalidArgs`, `UndefinedEvent`, `Unmatched` and `Rejected`.
 
 > Exit actions, the state change, the `omit` reset and entry actions run for a `transition` row, including one back to the same state, and not for a `no transition` row. Where a state carries several state actions, all of them run in declaration order. Spec § 3A.4 states both rules.
 
@@ -410,7 +410,7 @@ Constraints are exposed at three tiers, each with a distinct purpose:
 | Tier | Surface | Contents | Cost | Purpose |
 |------|---------|----------|------|---------|
 | **1. Catalog** | `Precept.Constraints` | Every declared rule, ensure, rejection | Zero — precomputed | Definition introspection: "what rules does this precept have?" |
-| **2. Applicable** | `Version.ApplicableConstraints` | Constraints active for current state | Zero — precomputed | State introspection: "what must be true here?" |
+| **2. Applicable** | `Version.ApplicableConstraints` | Constraints active for current state | Zero — precomputed | State introspection: "what applies here?" (see *Tier 2 Scope Rules* for which of them are true of the current version) |
 | **3. Evaluated** | `ConstraintResult` / `ConstraintViolation` | Per-constraint evaluation status | Evaluator cost | Operation results: "what passed, failed, or couldn't be resolved?" |
 
 All three tiers use `ConstraintDescriptor` as the canonical identity. Tier 3 results reference back to the descriptor, so callers can always trace a violation to its declaration, kind, scope, and rationale.
@@ -486,7 +486,7 @@ Appears in `UpdateOutcome.ConstraintsFailed.Violations` — the ingress failures
 | State S | `from S ensure` (exit truth — what a transition out of S must make true; proven at compile time, not evaluated) |
 | State S | `on E ensure` for every event E with rows in state S |
 
-`to <State> ensure` constraints are NOT included in `ApplicableConstraints` for the target state — they are transitional, only surfacing in Tier 3 during inspect/fire when the target state is known from row matching. They appear in `TransitionInspection.Constraints` for rows that transition into that state. This is the correct boundary: Tier 2 is "what must hold in my current state"; Tier 3 is "what applies to this specific operation" (which includes to-ensures once a target is resolved). Listing a constraint in either tier does not mean an operation evaluates it: rules and state ensures are proven at compile time and no operation evaluates them; what an operation does evaluate is its ingress check (spec §3A.4 phase 1, and phase 8 for why nothing is checked before commit).
+`to <State> ensure` constraints are NOT included in `ApplicableConstraints` for the target state — they are transitional, only surfacing in Tier 3 during inspect/fire when the target state is known from row matching. They appear in `TransitionInspection.Constraints` for rows that transition into that state. This is the correct boundary: Tier 2 is "what applies in my current state" — of which the ones true of the current version are those `precept-language-spec.md` § 3A.4, *Between operations nothing is carried except what every reachable configuration satisfies*, names, a `from` ensure is an obligation on a transition out of the state, which configuration of that transition it must hold of being not yet stated (`precept-language-spec.md` § 3A.4, *Known exceptions*, item 12), and an event ensure is a check on that event's arguments; Tier 3 is "what applies to this specific operation" (which includes to-ensures once a target is resolved). Listing a constraint in either tier does not mean an operation evaluates it: rules and state ensures are proven at compile time and no operation evaluates them; what an operation does evaluate is its ingress check (spec §3A.4 phase 1, and phase 8 for why nothing is checked before commit).
 
 For stateless precepts, `ApplicableConstraints` includes all global rules and all event ensures.
 
@@ -528,7 +528,7 @@ public interface IArgBuilder
 
 Usage: `args => args.Set<decimal>("Amount", 500m).Set<string>("ApplicantName", "Jane")`
 
-Each `Set<T>` call is resolved through the registered `TypeRuntime<T>` for zero-boxing conversion to `PreceptValue`. The builder internally produces a `PreceptValue[]` arg slot array populated via the **presence mask** — a `bool[]` of the same length, where `presence[i] == true` means arg slot `i` was explicitly set by the caller and `presence[i] == false` means it was not provided. Unset optional args remain absent (the corresponding `PreceptValue` slot is the absent sentinel); unset required args cause `InvalidArgs` at the Fire boundary before the opcode loop begins. The presence mask and slot array are both built during the `Action<IArgBuilder>` invocation and discarded after the call completes — they are not observable from outside the builder.
+Each `Set<T>` call is resolved through the registered `TypeRuntime<T>` for zero-boxing conversion to `PreceptValue`. The builder internally produces a `PreceptValue[]` arg slot array populated via the **presence mask** — a `bool[]` of the same length, where `presence[i] == true` means arg slot `i` was explicitly set by the caller and `presence[i] == false` means it was not provided. What an argument the caller did not set holds is stated in `precept-language-spec.md` § 3A.4, phase 1: an argument with a `default` takes its default, whether or not it is also `optional`; an `optional` argument without a `default` stays absent (the corresponding `PreceptValue` slot is the absent sentinel); and only a required argument — neither `optional` nor carrying a `default` — causes `InvalidArgs` at the Fire boundary before the opcode loop begins. The presence mask and slot array are both built during the `Action<IArgBuilder>` invocation and discarded after the call completes — they are not observable from outside the builder.
 
 #### IFieldBuilder
 
@@ -538,12 +538,13 @@ The fluent builder for field patches, used in the typed lane for `Update` and `I
 public interface IFieldBuilder
 {
     IFieldBuilder Set<T>(string name, T value);
+    IFieldBuilder Clear(string name);   // patch an optional field to not set
 }
 ```
 
 Usage: `fields => fields.Set<string>("ApplicantName", "Jane Doe").Set<decimal>("Amount", 500m)`
 
-Each `Set<T>` call is resolved through the registered `TypeRuntime<T>`. The patch is applied atomically — either all fields commit or none do.
+Each `Set<T>` call is resolved through the registered `TypeRuntime<T>`. `Clear` names a field with the value not set, which is valid only for an `optional` field; a field neither call names is not patched. On the JSON lane a member whose value is `null` means not set and a member left out is not patched. What a patch value may be — not set for an `optional` field, and for a collection a value with every property its kind keeps — is stated in `precept-language-spec.md` § 3A.4, *What a patch value may be*. The patch is applied atomically — either all fields commit or none do.
 
 ### Value Types
 
@@ -645,13 +646,13 @@ public sealed class FiredArgs
     public static FiredArgs Empty { get; }         // canonical empty instance for no-arg events
     public JsonElement this[string name] { get; }
     public T Get<T>(string name);
-    public bool TryGet<T>(string name, out T value); // returns false when optional arg was not provided
+    public bool TryGet<T>(string name, out T value); // returns false when an optional arg without a default was not provided
 }
 ```
 
 `Get<T>` uses the registered `TypeRuntime<T>.ToClr` for the conversion. The `JsonElement` indexer returns the raw value for callers that want to inspect or serialize it directly.
 
-`TryGet<T>` is available on `FiredArgs` only (not on `Version`). It returns `false` when an optional arg was not provided by the caller — it does NOT swallow type errors. Mismatched `T` still throws `InvalidOperationException`. Fields are either resolved or omitted; `TryGet` is only meaningful for optional args that may or may not have been included.
+`TryGet<T>` is available on `FiredArgs` only (not on `Version`). It returns `false` when an `optional` arg without a `default` was not provided by the caller; an arg with a `default` that was not provided holds its default and `TryGet` returns it (`precept-language-spec.md` § 3A.4, phase 1). It does NOT swallow type errors. Mismatched `T` still throws `InvalidOperationException`. Fields are either resolved or omitted; `TryGet` is only meaningful for optional args that may or may not have been included.
 
 `FiredArgs.Empty` is the canonical instance for events with no arguments.
 
@@ -756,7 +757,7 @@ if (t.Args.TryGet<string>("Comment", out var comment))
 
 Resolution uses the registered `TypeRuntime<T>` for the field's type — zero boxing for primitives. `Get<string>()` is a universal overload that works for every Precept-supported type; it formats to the canonical string representation.
 
-`TryGet<T>` is available on `FiredArgs` only. It returns `false` when an optional arg was not provided. It does NOT swallow type errors — mismatched `T` still throws.
+`TryGet<T>` is available on `FiredArgs` only. It returns `false` when an `optional` arg without a `default` was not provided; a defaulted arg left out holds its default. It does NOT swallow type errors — mismatched `T` still throws.
 
 ### Valid CLR Types
 
@@ -870,17 +871,16 @@ The Version surface is specified. What the executable model provides (dispatch t
 
 For stateless precepts (no `state` declarations), `CreateInitialVersion` returns a `Version` with `State = null`. This is the contract — not an error, not a degenerate edge case, the honest representation of "no state machine."
 
-**Pipeline steps:**
+**Pipeline steps.** The steps of `Create` and their order are stated once, in `precept-language-spec.md` § 3A.4, *Operation execution order*, and § 3A.5; this table only says how each differs between a stateful and a stateless precept. The state is written once, by default materialization (phase 0); nothing writes it again during construction. `Create` runs the initial event's handling itself, through the phases `Fire` runs, and does not call `Fire`, which refuses the initial event's name (spec § 3A.4 phase 1).
 
 | Step | Stateful precept | Stateless precept |
 |------|-----------------|-------------------|
-| Build hollow version | Defaults applied, `State = InitialState` | Defaults applied, `State = null` |
-| Fire initial event (if declared) | Full Fire pipeline | Full Fire pipeline — identical |
-| State-set assignment | `Version.State` ← initial state name | Omitted — no state to assign |
+| Build hollow version (phase 0) | Defaults applied, `State = InitialState` | Defaults applied, `State = null` |
+| Initial event, if declared: ingress, then the first construction row whose guard is true, then its action chain (phases 1, 2, 5) | Runs | Runs — identical |
 | `to <State> ensure` entry constraints | In scope for the initial state — proven at compile time, not evaluated here | Out of scope — no state to enter |
 | `in <State> ensure` residency constraints | In scope for the initial state — proven at compile time, not evaluated here | Out of scope — no state to enter |
 | Fields the initial state omits | Absent from the configuration construction commits; their storage holds their reset values from default materialization, and no separate `omit` reset runs (spec § 3A.4, phase 0) | Not applicable — no state |
-| Entry actions (`to <State> -> …`) | Run for the initial state, after the initial event's action chain (or against the defaults if none is declared) | Out of scope — no state to enter |
+| Entry actions (`to <State> -> …`, phase 6) | Run for the initial state, after the initial event's action chain (or against the defaults if none is declared) | Out of scope — no state to enter |
 | Arg ensures (`on <Event> ensure`) | Evaluated at ingress if initial event declared | Evaluated at ingress if initial event declared |
 | Field constraints on the supplied arguments | Evaluated at ingress | Evaluated at ingress |
 | Global rules | Proven at compile time to be established by construction — not evaluated here | Proven at compile time to be established by construction — not evaluated here |

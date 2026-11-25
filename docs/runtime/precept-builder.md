@@ -399,9 +399,13 @@ Build the `TransitionDispatchIndex` and `ReachabilityIndex` from the `StateGraph
 
 For each (source state, event) pair, pre-build the ordered list of transition rows (in guard-evaluation order). At runtime, the evaluator looks up the pair and gets a ready-to-evaluate row list — no scanning, no filtering.
 
+> **Draft 2026-11-25** — under adversarial review; nothing may cite this section until the mark is removed.
+
+A `from any` row is a candidate in every state, at the position its declaration holds among the rows for the same event ([`precept-language-spec.md`](../language/precept-language-spec.md) § 3A.4, *How rows written with `any` or a comma list become handlers*, and phase 2). So the builder places each `from any` row into the list of every (declared state, event) pair, in declaration order among that state's own rows; it is not stored under a key of its own, which a lookup by the current state would never read. A comma-list row is placed into the list of each state it names, in the same way. The null state in the key means a stateless precept only.
+
 ```csharp
 public sealed record TransitionDispatchIndex(
-    // Key: (StateDescriptor?, EventDescriptor) — null state = stateless precept or any-state wildcard
+    // Key: (StateDescriptor?, EventDescriptor) — null state = stateless precept only; `from any` rows are placed in every state's list
     // Value: ordered list of execution rows for this dispatch pair (guard-evaluation order)
     ImmutableDictionary<(StateDescriptor?, EventDescriptor), ImmutableArray<ExecutionRow>> Rows
 );

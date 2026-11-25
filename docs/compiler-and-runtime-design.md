@@ -834,7 +834,7 @@ Ingress validation, access-mode checks and row dispatch are the three things an 
 | `Fire` | event arguments | no | yes |
 | `InspectFire` | event arguments | no | yes |
 | `Update` | the field values in the patch | yes | no |
-| `InspectUpdate` | the field values in the patch | yes | no |
+| `InspectUpdate` | the field values in the patch; then, when the patch would be accepted, each event with rows in the current state, previewed with no arguments (spec § 3A.6) | yes | no for the patch; yes for each event it then previews |
 | `Create` with initial event | the initial event's arguments | no | yes (initial event) |
 | `InspectCreate` | the initial event's arguments, where there is one | no | yes (initial event) |
 | `Create` without initial event | none — it takes no input | no | no |
@@ -848,7 +848,7 @@ This matrix covers only what an operation does before it executes. The full stat
 
 The four operations (Create, Restore, Fire, Update) and their per-operation input/output contracts, including the "Update exists because Precept owns the data layer" positioning and trusted hydration on `Restore`, live in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md). Two cross-operation discriminators that this monolith uniquely captures:
 
-- **Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` (a row matched and its disposition was `reject`).** Most state machine runtimes cannot make this distinction at the type level — leaving callers to infer why an event produced no transition.
+- **Precept structurally distinguishes `Unmatched` from `Rejected`.** For `Fire`, `Unmatched` means the event has rows to dispatch and no guard was true, and `Rejected` means an authored `reject` row won; at construction no guard being true is `Rejected` too. The full statement of each outcome is spec § 3A.2. Most state machine runtimes cannot make this distinction at the type level — leaving callers to infer why an event produced no transition.
 - **`Update` exists because Precept is not a state machine runtime** — it is a domain integrity engine that owns the data layer alongside the lifecycle layer. A pure event/transition mechanism would leave direct field edits ungoverned; `Update` closes that gap without routing every data change through an event.
 
 ### Structured outcomes
@@ -858,7 +858,7 @@ The structural guarantee means that a valid executable model communicates entire
 **Diagnostics** — produced by the compiler pipeline. Authoring-time findings against source. Error diagnostics block `Precept` construction.
 
 **Runtime outcomes** — produced by runtime operations. Expected success, domain rejection, or boundary-validation results. These are normal, in-domain behavior:
-- Business outcomes: `Rejected` — a matched row whose disposition is `reject`
+- Business outcomes: `Rejected` — an authored `reject` row won, or, for `Create` only, no construction row's guard was true (spec § 3A.2)
 - Routing/availability: `Unmatched`, current provisional `UndefinedEvent`
 - Boundary validation: `InvalidArgs`, `UpdateOutcome.ConstraintsFailed` and `InvalidFields`, `RestoreInvalidInput`
 - Access enforcement: `FieldNotEditable`

@@ -1,0 +1,770 @@
+{
+ "draft": {
+  "files_changed": [
+   "/home/sfalik/source/repos/Precept/docs/language/precept-language-spec.md",
+   "/home/sfalik/source/repos/Precept/docs/language/collection-types.md"
+  ],
+  "summary": "All four gaps are now decided in spec section 3A.4, each with its reasoning, alternatives rejected, precedent and tradeoff, each under the draft mark. Nothing is committed, and none of this has been through an attack round yet.\n\n1. Omit reset. A field that any state omits (by name, comma list or `omit all`) may carry a `default` only if the expression reads no field, directly or through a computed field, and does not call `now()`. Otherwise it is a compile error. The reset value is therefore fixed by the definition, the same at construction and at every reset. The full statement follows \"Where the omit reset sits\"; section 2.2 rule 5, section 3.5, Configurations and phase 6 point to it.\n\n2. Dequeue captures. In `dequeue F into G by H`, G and H must be different fields; `dequeue F into X by X` is a compile error. The full statement is under \"What can write during one operation\"; the section 2.2 grammar note, the section 3.8 dequeue row and collection-types.md point to it.\n\n3. Optional collection. The full statement is a new paragraph in Configurations:\n- It starts not set unless it has a default, and the omit reset puts it back to the same.\n- Every read of its contents, and `remove`, `remove at`, `dequeue`, `pop` and `insert at`, need it proved set.\n- `add`, `enqueue`, `push`, `append` and `put` are allowed on a not-set field and make it set holding that one element.\n- `clear` makes it not set. This settles the disagreement in favour of spec 3.8 and 1.2; collection-types.md now says its \"Remove all elements\" rows describe a non-optional collection.\n- Count and inner-type modifiers pass when the field is not set, following the `maxplaces` rule in business-domain-types.md.\nThe clear row of the action table, the two \"what each writer takes away\" entries and phases 0 and 6 were updated to match.\n\n4. Handler path cap. A handler may hold at most eight guarded state actions (256 paths): guarded exit actions of the state left plus guarded entry actions of the state entered. Above that the definition is rejected with an explanation of how to get under the cap.\n\nKnown exceptions item 12 lost the three decided entries, and items 16 to 19 record the new rules as exceptions. Open Questions now lists eleven unstated things, records the four closed gaps, and notes three refusals with no diagnostic assigned.\n\nThe end-to-end re-read found one internal contradiction: Open Questions said \"thirteen things\" while item 12 listed fourteen, and its summary left out \"whether an argument constraint may read a field\". That is fixed. All eight want-document line citations in the spec and runtime docs (:19, :141, :143, :211, :219) were checked against the file and are correct.",
+  "decisions": [
+   "A field named in any omit declaration may carry a default only if the expression reads no field (directly or through a computed field) and does not call now(); otherwise compile error. Reasoning: rule 5 gives no moment, and either moment depends on things canon does not supply (a per-entity construction value is unknown after Restore; evaluating at the reset reads fields the target state may omit). Rejected: reuse the construction value; evaluate again at the reset; refuse every default on an omitted field. Precedent: a SQL column DEFAULT may not reference other columns; C# default parameter values are constants; D132. Tradeoff: derived starting values must be written in the construction row and in each transition that brings the field back; `omit all` restricts every field.",
+   "The two capture targets of `dequeue F into G by H` must be different fields; `dequeue F into X by X` is a compile error. Reasoning: canon orders separate actions, not the writes inside one, and any chosen order silently discards one of the two captured values. Rejected: `by` lands last; `into` lands last (each makes one clause dead text). Precedent: SQL refuses assigning one column twice in a SET list; C# refuses a duplicate member in an object initializer. Tradeoff: one more type-checker check, with no diagnostic assigned yet.",
+   "An optional collection without a default starts not set, and the omit reset puts it back to not set. Reasoning: the general rule for optional applies; the starts-empty rule is stated only for non-optional collections, and its ground does not reach a field for which not set is a value. Rejected: starting empty (makes `optional` and `is set` meaningless on collections); refusing optional on collections (contradicts canon). Precedent: SQL NULL array versus empty array. Tradeoff: no single action reaches set-and-empty from not set.",
+   "On an optional collection, every read of contents and every action that removes or names a position (remove, remove at, dequeue, pop, insert at) needs the field proved set, or the definition is rejected. The adding actions (add, enqueue, push, append, put) are allowed on a not-set field and make it set holding the one element. Reasoning: `set` is refused on collections and three kinds cannot take a default, so if adding needed presence those kinds could never become set. Rejected: every element action is a use; a new create-empty action. Precedent: MongoDB $push and $addToSet create the array on an absent field; DynamoDB ADD. Tradeoff: adding needs no guard while reading does.",
+   "`clear` on an optional collection makes it not set (spec 3.8 and 1.2 win over collection-types.md, whose 'Remove all elements' rows now describe non-optional collections). An optional log has no clear, so once set it stays set. Reasoning: section 1.2 makes clear the one way to remove an optional field's value; if clear emptied instead, not set would be unreachable after the first element. Rejected: clear empties. Precedent: MongoDB $unset. Tradeoff: emptying a set optional collection in one step is not possible; an author who wants empty as a resting value declares it non-optional.",
+   "mincount, maxcount and inner-type modifiers on an optional collection constrain it only when set; a not-set field passes them. Reasoning: applies the rule business-domain-types.md states for maxplaces on an optional field. Rejected: treating the modifier's read as an unguarded use, which would make count modifiers unusable on optional collections. Precedent: that maxplaces rule. Tradeoff: `mincount 1` discharges accessor non-emptiness only together with a presence proof.",
+   "After an adding action on an optional collection the field is known set. If it was known not set before, count is 1 and the facts stated for a known-empty collection apply; if neither was known, what is known is set, contains the element, and count at least 1. Reasoning: follows directly from the adding rule. Rejected: carrying nothing about presence after an add. Precedent: the existing count-shift rules in the same subsection. Tradeoff: one more case for the proof engine to carry.",
+   "A handler may contain at most eight guarded state actions (256 paths): guarded exit actions of the state left plus guarded entry actions of the state entered, after `any` and comma expansion; a guarded chain counts once. Above eight the definition is rejected with an explanation naming the handler, the actions counted and how to get under the cap. Reasoning: section 0.6 item 3 requires keystroke-speed recompilation and an explained hard cap, and the number must be one an author can count from the definition. Rejected: an implementation-defined value; a cap on feasible paths after pruning; a cap on work or time; merging paths past the cap. Precedent: fixed numeric limits in the JVM specification; TypeScript's fixed instantiation depth. Tradeoff: the value comes from cost reasoning, not measurement, and a provable nine-action handler is rejected; raising it later breaks nothing."
+  ],
+  "contradictions_fixed": [
+   "Spec 3.8 said clear on an optional field makes it not set while collection-types.md said clear removes all elements with no exception for optional. Resolved in favour of the spec; collection-types.md now carries a draft-marked note deferring to spec 3A.4.",
+   "Open Questions said 'Thirteen things 3A.4 found unstated' while Known exceptions item 12 listed fourteen, and the summary omitted 'whether a constraint declared on an event argument may read a field'. Now eleven in both places, with the omitted one added.",
+   "The 'not stated, item 12' cross-references for the three decided items (Configurations omitted-field bullet, the collections paragraph, phase 0, phase 6 twice, the optional-collection clear row, and two 'what each writer takes away' entries) now state the decision or point to it.",
+   "Phase 0 and the 'what default materialization gave each field' entry said not set only for an optional scalar without a default; both now say an optional field, scalar or collection.",
+   "'What each writer takes away' said no value for the handler-path cap is stated in canon; it now states the cap."
+  ],
+  "left_alone": [
+   "The remaining eleven unstated items in Known exceptions item 12 (omitted-field reads in rules and ensures, the from-ensure configuration, a required field omitted by the initial state, three Restore questions, an omitted computed field, exit-action omit writes, argument default scope, argument constraints and event ensures reading fields). They were not among the four assigned.",
+   "What a restored entity holds in the storage of a field its persisted state omits. The omit-default decision makes the reset value a property of the definition, which makes this answerable, but it was not assigned and is still listed as unstated.",
+   "Whether an Update patch may set an editable optional collection to not set, or replace it with a collection value. Canon says only that the patch replaces the whole value; not assigned.",
+   "The 'Remove all elements' rows and the nine Constraints lines in collection-types.md were not edited one by one; a single draft-marked note under the Constraint Catalog says they describe non-optional collections and points to the spec.",
+   "The fold table at docs/compiler/proof-engine.md:1978-1982 (optional with no default gives not set, listed above collection with no default gives empty). It agrees with the decision, and it describes current compiler behaviour, not design.",
+   "docs/runtime/evaluator.md, runtime-api.md, result-types.md and compiler-and-runtime-design.md. They do not restate any of the four decided points, so they needed no change; they carry no draft marks of their own and I added none.",
+   "No diagnostic codes were assigned for the three new refusals; Open Questions records this as diagnostic-catalog work. No catalog or code was touched.",
+   "The phrase 'common-surface paragraph' in an existing sentence of the collections paragraph in Configurations. It predates this pass and refers to a paragraph in collection-types.md.",
+   "docs/philosophy.md was not edited. Nothing written depends on the three outstanding owner decisions (number model, now() in rules and ensures, direct-edit check)."
+  ],
+  "candidate_questions": []
+ },
+ "rounds": [
+  {
+   "round": 1,
+   "attempts": 11,
+   "real": 10,
+   "findings": [
+    {
+     "title": "'What sits between the guard and each later position' discards guard facts on the path where a guarded exit action did not run",
+     "verdict": "real",
+     "reason": "Spec 3A.4 *What sits between* said a guard fact about any field an exit action writes is unavailable to the row, which contradicts the path-by-path rule in *A write that may not happen* and Known exceptions item 13. A guarded exit action that did not run wrote nothing.",
+     "repair": "Rewrote the sentence in precept-language-spec.md 3A.4 *What sits between the guard and each later position*: the fact is lost only on paths on which that exit action ran. On the other path it survives, together with the exit action's false guard. Added the attacker's D == 5 / D != 0 example as a worked case."
+    },
+    {
+     "title": "The guard of a guarded access mode is a premise of the update handler but is missing from phase 1's premise list and from 'What is known'",
+     "verdict": "real",
+     "reason": "*Handlers* and phase 1 (*When a guarded access mode's guard is evaluated*) make the access guard (or its negation for a guarded readonly) the update handler's premise. But the list of what a phase-1 constraint may be proved from left it out, and so did the list in *What is known*, which says it is complete. Under collect-all, a constraint is evaluated only when the access checks of the field it is declared on, and of every other patched field it reads, have passed. So the guard holds whenever the constraint is evaluated.",
+     "repair": "Phase 1 premise list: added the access-mode guards of the field the constraint is declared on and of every other patched field it reads. They are known of the starting configuration, and only where the guard reads no field the patch names. Added the D / C example. *What is known*: new entry 'The access-mode guards, at Update', saying how long the guard stays known (from phase 1 through phase 7, and lost for any field the patch writes). The premise-class paragraph now places these guards in class (c)."
+    },
+    {
+     "title": "D130 and D143 disagree on whether a row may read a source-omitted field after an earlier action assigned it",
+     "verdict": "wording-only",
+     "reason": "Canon has one answer. D130 refuses a direct read in an action's right-hand side when the anchoring state omits the field, and it makes no exception for a field the row has written. D143 adds the case D130 cannot see, a read through a computed field, and refuses it in the first assignment. The two do not conflict. But phase 5's 'as changed by the row's own earlier actions' could be read as allowing the read, so the text needed to say this outright.",
+     "repair": "Phase 5 now states that D130 refuses a direct read of a field the source state omits even after an earlier action of the same row assigned it. It also says D143 covers reads through a computed field in the first assignment, and that what such a computed read returns elsewhere in the row is the existing open point in Known exceptions item 12."
+    },
+    {
+     "title": "An optional log 'once set stays set' is false because the omit reset makes it not set",
+     "verdict": "real",
+     "reason": "Phase 6 resets every field the target omits to its starting value. For an optional collection with no default that starting value is not set, and for a non-optional log it is empty. Item 4's claim held only for actions.",
+     "repair": "*An optional collection* item 4 now says no action makes an optional log not set, but the omit reset does, just as it empties a non-optional log. 'Append-only' describes what actions may do. The clear-on-log row of the action table now says a fact resting on a log only growing is taken away by the omit reset, though not by any action."
+    },
+    {
+     "title": "evaluator.md builds the hollow version with EvaluateDefault(field), which cannot read earlier fields",
+     "verdict": "real",
+     "reason": "Phase 0 says a default may read fields declared before it. The three pseudocode loops (Create with initial event, Create without, stateless Create) evaluated each default with no access to the slots already built, and they also ran over computed slots although the comment said computed slots are not materialized.",
+     "repair": "In docs/runtime/evaluator.md \u00a77.1 all three loops now skip computed slots and call EvaluateDefault(field, slotsSoFar) in declaration order. The comments cite spec phase 0 and note that a required field with no default gets no value at this step."
+    },
+    {
+     "title": "\u00a70.6 item 11 still rejects a default that an initial-state entry action overwrites, while the base case accepts it",
+     "verdict": "real",
+     "reason": "The settlement commit 9a1f67d9 changed \u00a70.7 and \u00a73A.5 to say the base case covers the entry actions ('on a parameterless Create, the defaults followed by the entry actions'). \u00a70.6 item 11, \u00a75 and the compiler docs still limited the exemption to a default 'the construction event' overwrites. Item 11's own reason, that the placeholder 'never reaches a committed configuration', applies equally to an entry-action overwrite. So applying canon consistently answers this. Widening a stated 'one exception' is still a design step, so it carries the four-part rationale.",
+     "repair": "\u00a70.6 item 11 now points to a new draft-marked paragraph. That paragraph states the exception: a default that construction (the construction row's actions or the initial state's entry actions, on every path) provably overwrites is exempt. It notes that the built checks fold against the bare defaults, which is unbuilt proof power rather than a narrower design. Reasoning, alternatives, precedent and tradeoff are included, and the tradeoff says how the want document's 'the default configuration satisfies every rule' is read. \u00a75 PRE0115 paragraph reworded under a draft mark. diagnostic-system.md (PRE0164 paragraph) and proof-engine.md (rule-vs-default fold paragraph, per-field target, pseudocode comment) now point to \u00a70.6 item 11 with the wider wording."
+    },
+    {
+     "title": "An argument that is both optional and defaulted: the spec says it takes its default, but other text says it is not set",
+     "verdict": "real",
+     "reason": "Phase 1 says such an argument takes its default, matching how phase 0 treats a field that is both optional and defaulted. But the paragraph just before it, 3A.6 *When inputs are missing*, runtime-api IArgBuilder and TryGet, result-types' Kleene text and two evaluator comments all said an omitted optional argument is not set, without qualification. A defaulted non-optional argument was also left unclassified in runtime-api's 'required args cause InvalidArgs' sentence. The evaluator's ValidateIngress already gives defaulted arguments their default, so the step exists. The text describing it disagreed.",
+     "repair": "Spec phase 1 optional-argument paragraph: an argument without a default is not set, and one with a default takes that default. 3A.6 *When inputs are missing* and its tradeoff now say the same. runtime-api.md IArgBuilder paragraph now points to spec phase 1 and lists all three cases (defaulted, optional with no default, required). TryGet text fixed in three places. result-types.md Kleene paragraph fixed. evaluator.md comments at the InspectFire guard and EvaluateGuardProspect, the ValidateIngress comment and the ValidateIngressForPreview paragraph now put the default first."
+    },
+    {
+     "title": "Duplicate: access-mode guard missing from 'What is known' and from phase-1 premises",
+     "verdict": "real",
+     "reason": "Same defect as the second finding, with a different example (D != 0 on a guarded editable of C).",
+     "repair": "Covered by the same repair. The phase-1 example added uses exactly this construction."
+    },
+    {
+     "title": "runtime-api presents `from` ensures as 'what must be true here' of the current version",
+     "verdict": "real",
+     "reason": "Spec 3A.4 *Between operations nothing is carried except the rules* says a `from` ensure is not known of a committed configuration in the state. Which configuration it must hold of is open (Known exceptions item 12). runtime-api's 'what must be true here?' label at :346, :413 and the Tier 2 boundary sentence said otherwise. Event ensures, also listed, constrain arguments, not the version.",
+     "repair": "runtime-api.md: the :346 bullet now says the list answers 'what applies here?'. It says only global rules and the `in` ensures whose guards hold are known of every committed version in the state, and points to the spec. It describes `from` ensures as an obligation on a transition out of the state and event ensures as argument checks. The tier table label was changed to match, and the Tier 2 boundary sentence now says the same, citing item 12."
+    },
+    {
+     "title": "*Configurations* implies `log of T by P` entries can share an ordering value",
+     "verdict": "real",
+     "reason": "collection-types.md says P is unique in a `log of T by P` and makes that a precondition of `append \u2026 by P`. The *Configurations* bullet grouped the log with `queue of T by P` under 'order of arrival among elements that share an ordering value'.",
+     "repair": "Split the bullet. `queue of T by P` keeps the arrival-order tie-break. `log of T by P` is each entry with its ordering key, with no two entries sharing a key, and the bullet cites collection-types \u00a7 `log of T by P`."
+    },
+    {
+     "title": "collection-types pointer note leaves the unconditional `mincount 1` statements in place for optional collections",
+     "verdict": "real",
+     "reason": "Spec 3A.4 *An optional collection* item 5 says `mincount` on an optional collection discharges non-emptiness only together with a proof that the field is set. collection-types' `mincount 1` row and spec \u00a73.8's *Collection non-emptiness* note said it discharges unconditionally, and the pointer note listed only two statements that give way.",
+     "repair": "collection-types.md note now says three statements give way, including the `mincount 1` row and every other statement in that document that `mincount` discharges non-emptiness. Added a draft-marked note under spec \u00a73.8 *Collection non-emptiness* saying that on an optional collection `mincount` discharges non-emptiness only with a proof that the field is set, and pointing to 3A.4 item 5."
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "attempts": 11,
+   "real": 11,
+   "findings": [
+    {
+     "title": "A computed field may read now(), which breaks four statements in 3A.4",
+     "verdict": "real",
+     "reason": "Canon does not refuse now() in a computed expression. \u00a73.7 places no restriction on now(), \u00a73.5 gives a computed expression every field name, and the only refusal is the draft's own rule for the default of an omitted field. runtime-api.md \u00a7 Restoration says Restore recomputes computed fields. So these four statements were false as written: Configurations item 3 ('fully determined by them'), the empty-patch paragraph ('equal to the one it was given'), the Restore reachability sentence, and the no-InspectRestore sentence. Whether a rule may read such a computed field touches outstanding decision (b), so the repair does not depend on that answer.",
+     "repair": "Spec 3A.4: rewrote Configurations item 3. A computed value is now determined by the stored fields plus, where the expression calls now(), the clock reading of the operation that derived it. It cites \u00a73.7 and \u00a73.5 for canon permitting this, and says whether a rule or ensure may read such a field belongs to the now() owner decision. Qualified the empty-patch paragraph (same state and stored values; a now()-reading computed field takes the new clock). Qualified the Restore reachability sentence. Added a clock note to the no-InspectRestore sentence. Extended Known exceptions item 9. Added this case to the 'Waiting on it' list of the now() Open Questions entry."
+    },
+    {
+     "title": "and/or short-circuit and the if condition are missing from 'What is known'",
+     "verdict": "real",
+     "reason": "Canon does state the evaluation order: primitive-types.md \u00a7 boolean says 'Short-circuit.' for both and and or, and \u00a70.4 property 2 says exactly one branch of if/then/else is evaluated. But 3A.4's list of what is known at each position, which claims to be complete, left out the fact an earlier operand gives a later one inside the same expression. \u00a73A.6 and the cap rule both rely on that fact.",
+     "repair": "Added a bullet to 3A.4 'What is known, and from where' covering the earlier operand of and/or and the if condition, with citations, the two examples, and a link to the \u00a73A.6 sentence that relies on it. Added a sentence after the classes paragraph: these facts hold only inside the expression that produced them and are not handler premises. No new decision."
+    },
+    {
+     "title": "A construction row reading a field the initial state omits is neither refused nor listed as unsettled",
+     "verdict": "real",
+     "reason": "Known exceptions item 12 covered only writes by a construction row. Canon disagrees with itself on reads. \u00a73A.5 step 1 builds the hollow version with 'omitted fields structurally absent'. D130 refuses the read only in the state-anchored contexts it lists, and a construction row is not one of them. runtime-api.md \u00a7 Hollow context calls a read of a defaulted field valid, with no exception for an omitted one. Neither canon nor the owner's words settle it, so I did not decide it.",
+     "repair": "Extended the construction bullet of Known exceptions item 12 to cover reads. It now covers the construction guard, the construction actions, a reject row's reason string, the argument constraints and the on-InitialEvent ensures. It cites the three canonical passages and notes that if the read is allowed it returns the definition-fixed reset value, and that entry actions of the initial state are refused by D130. Updated the matching sentence in the Open Questions list. Raised as a candidate question."
+    },
+    {
+     "title": "result-types.md says event ensures are proven, not evaluated",
+     "verdict": "real",
+     "reason": "Spec 3A.4 phase 1 and \u00a73A.5 evaluate on-Event ensures at ingress, and a failure there is InvalidArgs. result-types.md:121 grouped event ensures with rules and state ensures as 'proven rather than re-evaluated', which contradicts the spec.",
+     "repair": "Rewrote the sentence in docs/runtime/result-types.md. Rules and state ensures are proven. Event ensures are evaluated only at ingress, before anything is written (spec 3A.4 phase 1), and fail as InvalidArgs, never after a mutation."
+    },
+    {
+     "title": "proof-engine.md restates the guard-fact rule more narrowly than 3A.4",
+     "verdict": "real",
+     "reason": "proof-engine.md:319 said a row guard's fact reaches the row 'only for the fields no exit action of the source state may write'. That would reject the spec's own example: a guarded exit action, `from A when D == 5 -> set D = 1`, with `D != 0` surviving on the path where it did not run. The proof engine document gave up proof power the spec states.",
+     "repair": "Rewrote the 'Unsound' bullet in docs/compiler/proof-engine.md. The fact now survives on the paths on which no exit action has written the field, and the bullet points to spec 3A.4 'What sits between the guard and each later position' for the full rule. It keeps the unguarded counterexample and adds the guarded example, which the spec requires the compiler to accept."
+    },
+    {
+     "title": "Storage of a field the persisted state omits listed as unsettled though the draft settles it",
+     "verdict": "real",
+     "reason": "Configurations says an omitted field's storage holds its reset value, and the reset value is fixed by the definition; the reasoning for fixing it names Restore. An omitted field has no value in the persisted configuration, so restore slot injection writes nothing to it and storage holds the reset value. The draft's own rules answer this. What remains unanswered is narrower: whether persisted data that does give such a field a value is refused or ignored.",
+     "repair": "Phase 0: added the Restore case, where storage holds the reset value, a later transition finds it, and a required field without a default has no value and must be assigned by the transition (D132). Phase 1: replaced 'not stated' with that statement plus the narrower open point. In the write table, the Restore slot injection row now writes every stored field the persisted state does not omit. In Known exceptions item 12 and the Open Questions summary, replaced the bullet with the narrower refuse-or-ignore question."
+    },
+    {
+     "title": "collection-types.md says log entries are permanent and count never decreases",
+     "verdict": "real",
+     "reason": "Spec 3A.4 says the omit reset puts a log back to its reset value (*An optional collection*, item 4: append-only governs actions, not the reset). collection-types.md:310 and :444 stated permanence without qualification.",
+     "repair": "In docs/language/collection-types.md, rewrote the log Behavior paragraph: no action removes an entry or lowers count within an operation; the omit reset and an optional log are exceptions, with a pointer to spec 3A.4. Changed the 'Removal' row of the log-vs-queue table to match."
+    },
+    {
+     "title": "collection-types.md says a false guard makes the transition reject",
+     "verdict": "real",
+     "reason": "Spec 3A.4 phase 2 and 3A.1 say a false guard means the row does not match. Dispatch goes on to the next candidate row, and Fire ends Unmatched if none matches. collection-types.md said Rejected in three places.",
+     "repair": "Fixed all three places in docs/language/collection-types.md (the log-by-P Behavior paragraph, the Uniqueness enforcement paragraph, and the P-uniqueness table row) to say the row does not match, with a pointer to spec 3A.4 phase 2. Added that an author who wants a refusal with a reason writes a reject row."
+    },
+    {
+     "title": "result-types.md offers 'fixed precedence' as an open option for a refused Update",
+     "verdict": "real",
+     "reason": "\u00a73A.1 requires 'the complete set of failures, not just the first one'. Reporting only the variant that comes first in a fixed precedence drops failures, so canon already excludes it. Only the shape of the record is open.",
+     "repair": "In docs/runtime/result-types.md, the Open note now says any shape must carry every failure (quoting \u00a73A.1) and that a fixed precedence is excluded. Arrays or merging the variants is still an open API-shape choice."
+    },
+    {
+     "title": "Phase 1 citations no longer say what is claimed at the place named",
+     "verdict": "real",
+     "reason": "The quote 'the value may be absent' is in \u00a73.8 (spec :1729), not \u00a72.4. runtime-api.md \u00a7 IArgBuilder now points back to the spec, so citing it as evidence was circular. diagnostic-system.md has no 'field/arg defaults'; only proof-engine.md:1668 has 'field/arg *default*'.",
+     "repair": "Spec 3A.4 phase 1: re-cited the quote to \u00a73.8 (Modifier validation, the notempty/optional note) and dropped the circular runtime-api citation. In the argument-default paragraph, dropped diagnostic-system.md and cited proof-engine.md for its 'field/arg *default*' treatment."
+    },
+    {
+     "title": "The phase-1 example decides part of outstanding owner decision (c)",
+     "verdict": "real",
+     "reason": "Under the want document's reading, `rule B > A` is evaluated at phase 1 over the patched values, so C's `max 100 / (B - A)` could be proved from it. The example said flatly that the definition is rejected. That contradicts Known exceptions item 11, which said nothing in the section depends on decision (c).",
+     "repair": "Spec 3A.4 phase 1: the example now says `B > A`, as known of the starting configuration, is not a premise. It then states the outcome under each answer to decision (c): accepted, with C's max evaluated only if `B > A` passed, or rejected unless something else proves `B - A` nonzero. Known exceptions item 11 now says that which phase-1 constraints a patched field's constraint may be proved from does depend on the decision, points to that example, and says nothing else in the section does."
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "attempts": 10,
+   "real": 10,
+   "findings": [
+    {
+     "title": "An add to an optional collection that is not set can break mincount, and the count-bound obligations in collection-types.md were not updated to cover it",
+     "verdict": "real",
+     "reason": "Spec 3A.4 Configurations item 3 makes an add to an optional collection that is not set leave one element. Item 5 says a field that is not set passes mincount. collection-types.md section Constraints ties mincount only to shrinks and maxcount only to grows, and the draft note on optional did not override that list. So `optional mincount 2` plus an add on a field that is not set commits count 1, and nothing required a proof. In the other direction, clear on an optional field makes it not set, which passes mincount, yet the list still charged it a shrink obligation. Canon answers both by applying it consistently: a modifier is a rule (2.4), and the inductive step requires every rule to hold after every operation.",
+     "repair": "docs/language/precept-language-spec.md, 3A.4 Configurations, An optional collection, item 5: added the count obligation for an add to a field that may be not set (it must prove a count of 1 is within mincount and maxcount, so with mincount 2 the field must be proved set), and the statement that clear on an optional field carries no count obligation. Added a Reasoning note saying this is canon applied (2.4, 0.7), not new design. docs/language/collection-types.md, draft note on optional: now names four narrower statements instead of three, the fourth being the count-obligation list."
+    },
+    {
+     "title": "What in-place collection writes establish leaves out facts that follow directly from the action table",
+     "verdict": "real",
+     "reason": "The section claims to state the full intended proof power. Five facts follow directly from the action table and the accessor definitions, and none was carried. (1) After clear, every element and key is absent and countof is 0. (2) Whether add to a set, put, or remove changes count by exactly one or by none, given membership known before the action. (3) The shift-down of .at after remove at N. (4) On a list, .first is .at(0) and .last is .at(count - 1), so the positional facts reach .first and .last. (5) .last is unchanged by an insert or removal below it. The section's own closing sentence (\"Nothing else ... is known\") then rejects safe definitions such as `clear S -> add S Go.X -> set R = 100 / S.count`.",
+     "repair": "docs/language/precept-language-spec.md, What each writer takes away: in The change to count, added how known membership decides between one and none, with the clear-then-add example. In Positions and accessors, added the shift-down after remove at N, the .first and .last identities on a list, the .first and .last facts that follow from them, and absence of every element and key plus .countof 0 after clear. docs/language/collection-types.md, section list, Proof engine implications: replaced the sentence saying positional value facts are the author's responsibility, which contradicted these facts, with a draft-marked pointer to the spec."
+    },
+    {
+     "title": "The reason given for rejecting a merge after a guarded state action is false: the proof model already carries either-or facts",
+     "verdict": "real",
+     "reason": "Phase 1 (A guarded event ensure) and What is known both carry the fact \"the guard was false, or the body was true\". So \"facts with alternatives in them that the proof model carries nowhere else\" is untrue, and the recorded decision rested partly on a false premise.",
+     "repair": "Rewrote that alternative-rejected entry in the spec. It now admits the proof model carries facts of that form, and rejects merging for two reasons that hold. First, merging is the join 0.4 property 3 says the language does not have, so the linear walk of 0.4 and 0.6 item 7 would stop applying. Second, a counterexample taken from one path names exactly which guarded state actions ran, while one taken from a merged fact has to be split apart before an author can read it (0.6 item 3)."
+    },
+    {
+     "title": "The evaluator's shared row loop throws on a stateless event row, which has no outcome keyword",
+     "verdict": "real",
+     "reason": "Spec 2.2 (Stateless event hook) says a stateless event row has neither `transition` nor `no transition`, and spec 3A.4 (The operations) gives Applied for it. The pseudocode in evaluator.md special-cased only construction rows, so a stateless Fire reached the `_ => throw` case of the switch.",
+     "repair": "docs/runtime/evaluator.md, Fire pseudocode: added a branch before the outcome switch. When the precept has no states, it returns Applied, citing spec 2.2 and 3A.4 The operations."
+    },
+    {
+     "title": "Spec section 5 (draft) contradicts its own first paragraph and section 0.6 item 11 about a default overwritten only by an entry action",
+     "verdict": "real",
+     "reason": "The second paragraph of the draft block still said \"A default the construction event does not provably assign\". The paragraph above it and 0.6 item 11 count the initial state's entry actions as part of construction, so the block gave two verdicts on the same definition.",
+     "repair": "docs/language/precept-language-spec.md, section 5: changed the wording to \"A default that construction does not provably overwrite \u2014 neither the construction event's actions nor the initial state's entry actions\"."
+    },
+    {
+     "title": "Known exceptions item 12 lists as unstated whether Restore refuses persisted values for omitted fields, which runtime-api.md answers; evaluator.md FromJson contradicts phase 0",
+     "verdict": "real",
+     "reason": "runtime-api.md section Restoration says the only ways Restore can fail are an undefined state name, unknown fields and a type mismatch. It also says Restore \"accepts all stored fields regardless of the current state's access declarations\", and omit is an access declaration (spec 2.2). So canon already answers that the value is not refused, and listing it as an open question broke the rule against raising answered questions. Separately, evaluator.md said FromJson populates slots from the fields object, which contradicted phase 0: restore slot injection writes nothing to an omitted field.",
+     "repair": "Spec phase 1: replaced \"whether ... is refused or ignored is not stated\" with canon's answer. The value is accepted and not written, and the field's storage holds its reset value. Removed the bullet from Known exceptions item 12. In Open Questions, changed \"Eleven things\" to \"Ten things\" and dropped the item from that list. evaluator.md, FromJson: added a pointer to spec 3A.4 phases 0 and 1 saying which slots it writes."
+    },
+    {
+     "title": "evaluator.md Decision 5 and its Computed Field Freshness section contradict Known exceptions item 9 on computed fields that call now() at Restore",
+     "verdict": "real",
+     "reason": "evaluator.md promised a \"semantically identical\" Version on a round trip, and said a computed field carries no information of its own. Spec Configurations item 3 and Known exceptions item 9 say a computed field that calls now() carries the clock reading of the operation that derived it, so a Restore can return a different value for it. This does not depend on the outstanding question about now() in rules and ensures: canon refuses now() in no computed expression.",
+     "repair": "evaluator.md Decision 5: the round-trip promise now covers the same state and the same stored values, and points to the spec for computed fields that call now(). Computed Field Freshness: replaced \"carries no information of its own\" with a pointer to Configurations item 3 and Known exceptions item 9."
+    },
+    {
+     "title": "The quantifier carry-through rule names only queue of T by P as having a two-field binding, so log of T by P and lookup are left unstated",
+     "verdict": "real",
+     "reason": "collection-types.md (Resolved Design Questions item 3) says the two-field binding \"generalizes to all two-type-parameter collections\", and its note under Quantifier Predicates on Ordering Axis gives a lookup the binding .key and .value. Under the draft rule, the element `append ... by` adds was only the value, so a rule over `e.by` could not be carried, and a definition that cannot fail was rejected. The rule also excluded put entirely, though each and no carry soundly through put when the predicate holds, or fails, of the entry for K. Spec 3.5's binding table gives queue of T by P as an example and does not say no other kind has a two-field binding, so the two canon documents do not contradict each other.",
+     "repair": "Spec, What each writer takes away, Quantifiers: for `enqueue ... by` and `append ... by`, the element added is now the pair (.value = Expr, .by = P), with the log example from the attempt. Added put on a lookup: each and no carry when the predicate holds, or is false, of the entry for K, using the .key and .value binding; any is not carried through put. Added a parenthetical saying 3.5's table gives an example, not a limit."
+    },
+    {
+     "title": "The rule that an initial-state entry action overwriting a default counts as construction is not addressed for required fields",
+     "verdict": "real",
+     "reason": "Canon answers this, but the draft did not say so. RequiredFieldsNeedInitialEvent and InitialEventMissingAssignments (3A.5) both name the initial event and its construction row. That is a locked statement, so this is not a question for the owner, and widening it to accept an entry action would stretch a principle into an answer. What was missing was the explicit statement and why it differs from the exemption for a default (0.6 item 11).",
+     "repair": "Spec 3A.4, phase 0: added that an entry action of the initial state does not meet the two diagnostics, although construction runs it. Gave the reason: the exemption for a default asks only whether a value reaches the configuration construction commits, while the two diagnostics ask which declaration gives a field its first value, and canon places that in the construction row. This matches D132 placing the assignment that brings a field back from omit in the transition's own action chain. An entry action may also be guarded, and it runs on every later transition into the initial state."
+    },
+    {
+     "title": "evaluator.md cites non-existent diagnostics C100/C101 as checking the defaults",
+     "verdict": "real",
+     "reason": "C100 and C101 appear nowhere in canon except this one line, which was already present at HEAD. The comment also described the base case as a check against \"the defaults\", which differs from 0.6 item 11.",
+     "repair": "evaluator.md, Create without initial event, step 4: replaced the C100/C101 reference with a pointer to spec 0.6 item 11, which states the base case and its exception, and named the real diagnostics, DefaultViolatesRule and UnsatisfiableInitialState."
+    }
+   ]
+  },
+  {
+   "round": 4,
+   "attempts": 10,
+   "real": 9,
+   "findings": [
+    {
+     "title": "A fact relating the assigned value to another field is said to survive a later write to that other field",
+     "verdict": "real",
+     "reason": "Spec 3A.4, What each writer takes away: the set and capture sentences said everything known of Expr stays known of F 'until F itself is written, because the expression F reads only F'. A fact carried from the guard such as F < Cap also reads Cap, and that contradicts the general rule. Under the old text, when E.X < Cap -> set F = E.X -> set Cap = E.X -> set R = 100 / (Cap - F) is accepted and divides by zero.",
+     "repair": "Rewrote both sentences in docs/language/precept-language-spec.md. A carried fact is an expression and the general rule applies to it. Only a fact that reads nothing but F lasts until F is written. A fact that relates F to another field is lost when that field is written. Added the attacker's definition as a refused example, and made the capture paragraph say the same about G and H."
+    },
+    {
+     "title": "The capture rule makes the inner-type element bound known unconditionally",
+     "verdict": "real",
+     "reason": "The capture sentence listed the element bound as a separate fact carried to G with no condition. 3A.4 elsewhere treats a modifier as known mid-operation only through the starting rules or through what a write established. Canon disagrees with itself on whether modifiers hold after every write (see the next finding), and the capture rule was sound under only one of the two readings.",
+     "repair": "Removed the bound as a separate item. It is now one of the each facts: the modifier is the rule each x in F (...), and it carries to G only where it is known of F immediately before the dequeue, either from the starting rules when nothing has written F, or carried by the quantifier facts. This is sound under both readings, and the text points to the new open item in Known exceptions item 12."
+    },
+    {
+     "title": "Two different granularities for count and value modifiers: after every action, or only at commit",
+     "verdict": "real",
+     "reason": "Item 5 of 'An optional collection' said every action must leave the field passing its count modifiers, while 3A.4 elsewhere holds rules only at commit. Canon itself gives both answers. \u00a73.5 (spec line ~1396) says a constraint modifier constrains 'the complete configuration rather than any one point in a mutation sequence', and \u00a70.7 states induction per handler. Against that: \u00a70.6 item 6, \u00a72.3 ('an element write-site must prove its source within the bound'), collection-types.md \u00a7 Element value modifiers, and \u00a7 Constraints ('every count-changing mutation ... must prove the count stays in band'). The want-document line 20 reads either way. This is canon disagreeing with itself, and neither canon nor the owner settles it.",
+     "repair": "Item 5 now states only the commit obligation, which holds under both readings, and points to a new item 12 entry. That entry quotes both sides and both of the attacker's definitions, and notes that every 'known' fact in 3A.4 is sound under either answer. The question is raised as a candidate question."
+    },
+    {
+     "title": "An Update patch has no defined way to make an optional field not set; the evaluator uses IsAbsent for 'not patched'",
+     "verdict": "real",
+     "reason": "Canon defines not set as a value of an optional field (Configurations item 2), and the patch writer replaces the whole value of an editable field. \u00a72.2 grants editable with no restriction to part of the field's values. So it follows that a patch can give not set. Nothing said so, and the evaluator's slot encoding would silently drop the request.",
+     "repair": "Added a four-part paragraph, 'What a patch value may be', after 'An empty patch'. A patch may set an optional field to not set. On the JSON lane null means not set and a missing member means not patched. Precedent is JSON Merge Patch, RFC 7396. Updated the writers table row for the patch. In evaluator.md, both Update and InspectUpdate pseudocode now use a presence mask in place of IsAbsent. runtime-api.md IFieldBuilder gains Clear(name), with the meaning of null and of a missing member stated, and a pointer to the spec."
+    },
+    {
+     "title": "FieldAccess said to report exactly the access mode Update would apply, but a guard reading now() can differ",
+     "verdict": "real",
+     "reason": "FieldAccess is not an operation, so it takes its own clock reading. A guarded access mode whose guard calls now() can then give a different answer from a later Update. Guards may call now(), and the outstanding now() decision covers only rules and ensures. The word 'exactly' was false.",
+     "repair": "The FieldAccess paragraph now says it reports the mode Update would apply to that configuration, with the one difference being a guard that calls now(). Known exceptions item 9 now names this case."
+    },
+    {
+     "title": "An update patch on an editable collection is unspecified, and the draft's statements about what can shrink a log leave it out",
+     "verdict": "real",
+     "reason": "\u00a73.8 allows editable on any field that is not computed, logs included. 'Append-only governs actions only' (collection-types.md), so a patch can replace a log whole. Three statements named only the omit reset as able to shrink a log or make an optional log not set. Separately, a patched collection that lacks a property its kind keeps, such as duplicate keys in a log of T by P, would commit a working copy that is not a configuration. By canon's own definition that is not a value of the type.",
+     "repair": "'What a patch value may be' states that a patched value must be a value of the type as Configurations item 2 defines it, so the phase 1 type check refuses duplicate keys or missing ordering values. Added the patch to: the clear-log row of the action table, item 4 of 'An optional collection', the tradeoff line of the optional-collection decision, and collection-types.md lines ~310 and ~444."
+    },
+    {
+     "title": "The draft's reading of D130 makes D143's word 'directly' and its 'first assignment' limit add nothing, and decides this without a four-part reason",
+     "verdict": "real",
+     "reason": "Phase 5 refused every direct read of a field the source state omits, even after the row had assigned it, citing D130's literal text. D143's limit to the first materializing assignment implies a later read is allowed. Canon disagrees with itself here, and the draft settled it silently.",
+     "repair": "Rewrote that part of phase 5. A read before the row assigns the field is refused under both rules. Whether a later action may read it once assigned is stated as not settled. Added an item 12 entry that sets out D130's wording against D143's, using the attacker's example. Raised it as a candidate question."
+    },
+    {
+     "title": "proof-engine.md restates the entry-action example without the initial-state condition",
+     "verdict": "real",
+     "reason": "docs/compiler/proof-engine.md presented 'to B -> set R = 100 / D' as safe with no condition. The spec makes it unsafe when B is the initial state, because construction runs B's entry actions. This is a contradiction in a restatement that should only point to the spec.",
+     "repair": "Replaced the restated example with a pointer to spec 3A.4, 'What sits between the guard and each later position'. The pointer names the initial-state condition."
+    },
+    {
+     "title": "Item 5 treats an unguarded add on a field that may be not set as splitting the handler into paths",
+     "verdict": "wording-only",
+     "reason": "The obligation is about one value about which less is known: count is 1 or the old count raised. 3A.4 already states what is known afterwards: 'it is set, contains the element, count at least 1'. No extra handler paths exist, and the cap is unaffected. Only the word 'path' was wrong.",
+     "repair": "Item 5 now says this is one value with less known about it, not two paths (pointing to Known exceptions item 13). The known count is the range that covers both cases, and the mincount 2 example is limited to the case where it is the only write."
+    },
+    {
+     "title": "At Restore, no writer puts the reset value into an omitted field",
+     "verdict": "real",
+     "reason": "The writers table said restore slot injection writes only fields the persisted state does not omit. It said an omitted field 'holds its reset value', but no writer put it there. It was also unclear whether Restore evaluates the default expression, which the 'only computed fields are evaluated' statements rule out.",
+     "repair": "The writers table row and phase 0 now say restore slot injection puts the reset value into each omitted field's storage (no value for a required field without a default). Because the definition fixes that value, the executable model carries it as a value, so putting it there evaluates no expression and Restore evaluates no default. Phase 1's sentence on persisted values for omitted fields and evaluator.md's FromJson paragraph now say the same."
+    }
+   ]
+  },
+  {
+   "round": 5,
+   "attempts": 18,
+   "real": 14,
+   "findings": [
+    {
+     "title": "Two statements disagree on what is known of count after an add to an optional collection that may be not set",
+     "verdict": "real",
+     "reason": "Configurations item 5 says what is known afterwards is the range that covers both cases. The bullet it points to kept only that the field is set, contains the element, and has count at least 1. That rejects definitions that cannot fail, and it also loses every each and no fact. The case where the field is known not set also stated no quantifier facts.",
+     "repair": "spec 3A.4, What each writer takes away, An optional collection: the known-not-set case now states count 1, that only the added element is present, and the each, any and no facts over the single element. The neither-known case now considers the action once under each case, the set case carrying what was known on that condition (for example the second half of `F is not set or each ...`), and keeps what holds in both. The text points back to item 5, gives the reporter's two examples, and adds the four-part reasons."
+    },
+    {
+     "title": "enqueue \u2026 by / append \u2026 by onto an empty collection loses .peek/.peekby/.first",
+     "verdict": "real",
+     "reason": "The section's own reasoning leaves out only facts that depend on where the ordering puts an element. When the collection is empty, the new element is the only one, so where it goes does not depend on the ordering value.",
+     "repair": "Positions and accessors: after `enqueue F Expr by P` on a queue of T by P known empty, .peek is Expr and .peekby is P. After `append F Expr by P` on a log of T by P known empty, .first, .last and .at(0) are Expr. The exclusion sentence now makes an exception when the collection was known empty or known not set."
+    },
+    {
+     "title": "Open Questions summary says ten unstated items, item 12 has twelve",
+     "verdict": "real",
+     "reason": "Checked: spec Open Questions listed ten, and item 12 has twelve bullets. The list left out when a constraint modifier must hold, and which state anchors a read after the row assigns a field the source state omits.",
+     "repair": "Changed 'Ten things' to 'Twelve things' and added the two missing items to the list."
+    },
+    {
+     "title": "\"The initial event establishes every rule\" contradicts the base case",
+     "verdict": "real",
+     "reason": "A precept with no initial event has its base case established by the defaults and the entry actions. Spec 3A.2's construction outcomes, spec 3A.5 item 2 and runtime-api.md (two places) described the base case as the initial event alone.",
+     "repair": "Spec 3A.2's ConstraintsFailed line now says construction establishes every rule: default materialization, the construction row's actions, and the entry actions. It carries a new draft mark. In spec 3A.5 item 2, 'initial event' became 'construction' in the rejection and no-re-evaluation sentences. runtime-api.md's two sentences now say construction and point to spec 0.6 item 11, 0.7 and 3A.5."
+    },
+    {
+     "title": "Writer table says default materialization writes every stored field and omits the state write",
+     "verdict": "real",
+     "reason": "Phase 0 gives a required field without a default no value yet. The writer table is the enumeration that a soundness argument relies on, and neither phase-0 writer listed its write of the state part.",
+     "repair": "The Default materialization row now lists the state part (the initial state) and each kind of starting value, including no value yet for a required field without a default. The Restore slot injection row now lists the state part (the persisted state name)."
+    },
+    {
+     "title": "runtime-api construction table orders a state-set step after firing the initial event, and calls it the Full Fire pipeline",
+     "verdict": "real",
+     "reason": "The table contradicted phase 0, which sets the state once, and spec 3A.5, which says Create does not call Fire.",
+     "repair": "runtime-api.md, Stateless Precepts: the table now opens with a pointer to spec 3A.4 and 3A.5. It states that the state is written once, at phase 0, and that Fire is not called. The 'Fire initial event / Full Fire pipeline' row and the 'State-set assignment' row are replaced by one row naming phases 1, 2 and 5. The entry-actions row is labelled phase 6."
+    },
+    {
+     "title": "The cap refusal's conditional-expression remedy relies on an unstated fact about a conditional's value",
+     "verdict": "real",
+     "reason": "No statement in the section said what is known of the value of `if C then A else B`. proof-engine.md already takes the union of the branches for sign sets and length intervals. The remedy also does not exist for collection actions.",
+     "repair": "Inside one expression: added that a fact holds of the conditional's value when it holds of each branch, each under its own condition fact, with the D example and four-part reasons. The cap paragraph now limits the conditional remedy to state actions made only of `set`. It adds moving the actions into the transition rows, where each row's own guard selects them, and says which remedies apply to collection actions."
+    },
+    {
+     "title": "A no-transition row writing a field its state omits is refused without four-part reasoning or a diagnostic",
+     "verdict": "wording-only",
+     "reason": "The refusal follows from canon. Configurations says no write may target an omitted field in that state, and D131 applies that rule to rows. The decision is the same; the text was missing the reasons and did not say which diagnostic applies.",
+     "repair": "Phase 5 now says the refusal is D131's, with diagnostic OmittedFieldSetInTargetState, because a no-transition row commits in its source state. It adds the four-part reasons, so no new diagnostic is needed."
+    },
+    {
+     "title": "Evaluator action dispatch empties an optional collection on clear, cannot add to one that is not set, and mis-states dequeue by",
+     "verdict": "real",
+     "reason": "Checked against evaluator.md. FieldOnly cleared any collection, CollectionValue had no case for a slot that is not set, and CollectionIntoBy described a 'dequeue by' form with an optional into. ActionPlan had no slot for the by capture. All of these contradict spec 3A.4.",
+     "repair": "evaluator.md: a pointer to spec 3A.4 'What can write during one operation' now sits above the table. The table rows for CollectionValue, CollectionValueBy, CollectionIntoBy, FieldOnly and PutKeyValue are corrected. The pseudocode now makes a not-set field set on add, has a CollectionIntoBy case that writes both captures, and has clear of an optional field make it not set. ActionPlan now carries the by-capture slot and whether the target is optional."
+    },
+    {
+     "title": "collection-types.md says a quantifier carries no bound to a read site and that the inner-type bound always does",
+     "verdict": "real",
+     "reason": "Spec 3A.4 says both are each facts that carry through only where they are known of the collection immediately before the action. collection-types.md settled the open point in item 12 and called a rule a runtime check, which contradicts spec 0.7.",
+     "repair": "collection-types.md: the element-level note now says a quantifier is a rule proved like every other, the modifier is itself an each rule, and both carry a bound in the same way. It points to spec 3A.4. The Read-site bullet is now conditional on the bound being known at the read, and names the open point in item 12."
+    },
+    {
+     "title": "Transition-row grammar allows actions before reject",
+     "verdict": "real",
+     "reason": "Canon disagreed with itself. Spec 3A.4 says a reject row writes nothing, the stateless event hook grammar splits its two forms, and runtime-api.md says a row cannot mix actions with rejection. The transition-row grammar was the only place that allowed the mix. Applying canon consistently answers it.",
+     "repair": "Spec 2.2 Transition row: the grammar now has a mutation row (actions, then transition or no transition) and a separate reject row with no actions. It states that an action followed by reject is a syntax error, with four-part reasons."
+    },
+    {
+     "title": "Known exceptions item 12 asks two questions the want document already answers (argument constraints and event ensures reading fields)",
+     "verdict": "not-a-flaw",
+     "reason": "The want document's sentence (:143) says what ingress evaluates: an argument's modifier-rules, with relational needs in guards. It does not say whether an argument modifier or event ensure may name a field, and :22 calls an argument modifier a precondition on its event. The draft quotes the sentence and records the canon conflict (3.5 against 3A.1 and 3A.3) honestly, and the open-questions list keeps it visible. Reading it as a firm no would stretch one sentence into a rule that invalidates several statements.",
+     "repair": ""
+    },
+    {
+     "title": "Open Questions says ten things (duplicate)",
+     "verdict": "real",
+     "reason": "The same defect as the earlier finding about ten unstated items.",
+     "repair": "Repaired with that finding."
+    },
+    {
+     "title": "Parameterless Create silently ignores arguments",
+     "verdict": "not-a-flaw",
+     "reason": "Canon says a Create with no initial event is parameterless and always returns Created (3A.5, runtime-api). Refusing passed arguments would contradict that. Ignoring them is what canon already implies, not a new decision, and item 2 explains this.",
+     "repair": ""
+    },
+    {
+     "title": "Phase 2 candidate rows for a stateful Fire leave out the event",
+     "verdict": "real",
+     "reason": "Read literally, the text makes rows of other events candidates. That contradicts the later sentence about earlier rows' guards and the evaluator's (state, event) dispatch.",
+     "repair": "Phase 2 now reads 'the transition rows for the event being fired whose from names the current state'."
+    },
+    {
+     "title": "Evaluator Working Copy lifecycle leaves out dispatch and misplaces ingress failure",
+     "verdict": "real",
+     "reason": "Confirmed: the list had no dispatch step and named the ingress failure at the argument-loading step. It also omitted Unmatched and UndefinedEvent from the outcomes that release the array.",
+     "repair": "evaluator.md Working Copy Management now points to spec 3A.4 for the phases. Each step is numbered by its phase, with ingress (phase 1) and dispatch (phase 2, including reject, Unmatched and UndefinedEvent) added. The commit step lists every outcome that releases the array."
+    },
+    {
+     "title": "runtime-api says construction is the Full Fire pipeline; spec cites runtime-api sections that do not exist",
+     "verdict": "real",
+     "reason": "Confirmed: runtime-api.md has no 'Create' or 'Precept' heading.",
+     "repair": "The Full Fire pipeline row is removed (same repair as the construction-table finding). Spec citations now name '\u00a7 Executable Model \u2192 Initial Entity' (Hollow context, the construction outcome table) and '\u00a7 Precept \u2014 Definition-Level Queries'."
+    },
+    {
+     "title": "log of T by P given a .value/.by quantifier binding without four-part rationale",
+     "verdict": "not-a-flaw",
+     "reason": "collection-types.md Resolved Design Questions item 3 says the two-field binding 'generalizes to all two-type-parameter collections', and a log of T by P has two type parameters joined by the same `by` connector as queue of T by P. Open Question 1 there asks whether the binding shape is inferred or declared, not whether a log has one. The generalized-grammar block lists the kinds that existed when it was written. The draft applies canon and says so.",
+     "repair": ""
+    }
+   ]
+  },
+  {
+   "round": 6,
+   "attempts": 8,
+   "real": 7,
+   "findings": [
+    {
+     "title": "How much a write takes away from a fact differs by where the fact came from: whole rule for rules, one field for guards",
+     "verdict": "real",
+     "reason": "Confirmed in the spec. The rules entry dropped everything a rule said after a write to any field it reads, so `B > 0` from `rule A >= 0 and B > 0` was lost after `set A = 5`. That rejects definitions that cannot fail. The guard entry, the earlier-row entry and the access-mode entry said a fact \"says nothing about that field\" after the field is written, which can be read as keeping a disjunction as a fact about its other field. That reading is unsound, and the attacker's division-by-(B-1) construction holds. Phase 1 (line 2145) used the whole-rule reading for Update. The general rule at 2318 supports the sound middle position but never stated it, so one definition had both an accepting and a rejecting reading.",
+     "repair": "Added one statement directly after the rule in *What an earlier write invalidates*: \"What is known includes what follows from it, and each consequence is carried or lost by the fields it reads.\" A write removes whole every fact that reads a field it changes, and keeps any consequence drawn before the write that reads only fields the write did not change. A disjunction that read the written field is lost whole, and consequences may not combine the old fact with the new write. Worked examples and the four-part reasons are included. The rules, row guard, event ensure, access-mode guard and earlier-row entries now say this and point to the new statement; the earlier-row entry also carries the attacker's counterexample. Phase 1 at 2145 now admits, for Update, consequences that read no patched field."
+    },
+    {
+     "title": "Rules and in-ensures treated as known of every starting configuration, which settles the open now() decision by implication",
+     "verdict": "real",
+     "reason": "The first entry of *What is known*, the Restore entry (through \"exactly as\"), phase 1, and *Between operations* all treated every rule and in-ensure as known of a committed configuration. That holds only if no rule mentions now(), directly or through a computed field. Open Questions says no analysis may assume an answer to that question. The fix stays inside the outstanding decision rather than answering it: not relying on such rules is sound whichever way it goes.",
+     "repair": "The first *What is known* entry now covers only rules and in-ensures that do not mention now(), directly or through a computed field. It states once that such a rule is never known of any starting configuration anywhere in the section, and that this assumes no answer to the outstanding decision. *Between operations* has the same qualification and points to it. Phase 1 and Restore pick it up through their existing pointers."
+    },
+    {
+     "title": "The remedy offered for the eight-state-action cap changes behaviour when a state action writes a field its guard reads",
+     "verdict": "real",
+     "reason": "Confirmed. Rewriting `to B when C -> set X = 1` as `if C then ... else X` evaluates C again after each earlier set (read-your-writes), so the rewrite can change what is committed. The other two remedies move where the guard is evaluated in the same way: merging state actions, and moving actions into the transition row (where the guard is evaluated at phase 2).",
+     "repair": "Added to the cap entry that each remedy keeps the handler's behaviour only when no write between the guard's old position and its new one changes a field the guard reads. Gave the attacker's X/Y example and required the explanation to state this condition with each remedy it names."
+    },
+    {
+     "title": "The PRE0115 paragraph's 'as soon as a construction handler exists' contradicts the new definition of a construction handler",
+     "verdict": "wording-only",
+     "reason": "Under \u00a73A.4 *Handlers*, every stateful precept has a construction handler. The \u00a75 sentence means a construction row of a declared initial event. proof-engine.md:446 had the same misuse of the term.",
+     "repair": "Spec \u00a75 and proof-engine.md:446 now say \"a construction row of a declared initial event\", and note that this is not a construction handler in the \u00a73A.4 sense."
+    },
+    {
+     "title": "\u00a73A.6 rule 2 says state actions run only for a simulated row, which contradicts rule 1 for a parameterless InspectCreate",
+     "verdict": "real",
+     "reason": "Read literally, a preview of Create with no initial event would skip the initial state's entry actions, which Create runs at phase 6. That contradicts rule 1, which requires a preview to evaluate exactly what the real operation evaluates.",
+     "repair": "Rewrote rule 2: state actions run exactly where the operation would run them. For an event, that is the simulated row when its outcome runs them. For construction, it is the initial state's entry actions after the winning construction row's chain, or after default materialization when there is no initial event."
+    },
+    {
+     "title": "runtime-api \u00a7 Fire's list of when the working copy is discarded leaves out Unmatched and UndefinedEvent",
+     "verdict": "real",
+     "reason": "runtime-api.md:373 restated the spec and got it wrong: phase 8 discards the working copy for every operation that refused at phase 1 or ended at phase 2, and that includes Unmatched and UndefinedEvent. The \"two checks that run\" wording also left out the guards of guarded state actions.",
+     "repair": "The paragraph now points to spec \u00a73A.4 phase 8, lists the Fire outcomes it covers (InvalidArgs, UndefinedEvent, Unmatched, Rejected), and names the guards of guarded state actions among what the operation tests."
+    },
+    {
+     "title": "collection-types.md decides an open point of the spec by refusing a definition the spec says is accepted under one answer, and calls one action two paths",
+     "verdict": "real",
+     "reason": "The draft note at collection-types.md:784 said that under `mincount 2` an add to a field that may be not set is refused. It dropped the spec's qualification \"where nothing later in the handler adds to the field\", so it settled open item 12 the other way. It also called the one action \"the path on which it was not set\", which spec item 5 and item 13 rule out.",
+     "repair": "Replaced the restatement with a pointer to spec \u00a73A.4 *Configurations*, *An optional collection*, item 5, and to *Known exceptions* item 12, which says what depends on the open point."
+    },
+    {
+     "title": "collection-types.md still calls bag's mincount a state-entry constraint",
+     "verdict": "real",
+     "reason": "Spec \u00a72.4 says every constraint modifier, mincount included, is shorthand for a rule. The bag section's \"(state-entry constraint)\" contradicts this.",
+     "repair": "collection-types.md:999 now says mincount is a rule (spec \u00a72.4), not a state-entry constraint."
+    }
+   ]
+  },
+  {
+   "round": 7,
+   "attempts": 10,
+   "real": 9,
+   "findings": [
+    {
+     "title": "Rules are relied on for a field the starting state omits, and the fixed reset value is not carried between operations",
+     "verdict": "real",
+     "reason": "Spec 'What is known' (first entry), the Restore entry and 'Between operations' treated every rule except those mentioning now() as known of the starting configuration. Under one answer to Known exceptions item 12 (a rule does not bind a field its state omits), that premise is unsound: the Hold/Work example would be accepted and commit X = 0 against rule X > 0. Separately, Configurations item 2 already states that an omitted field's storage holds its reset value, and the definition fixes that value, but nothing listed it as known. So a handler that brings the field back could neither be refused soundly nor accepted when it cannot fail.",
+     "repair": "precept-language-spec.md 3A.4 'What is known': added a draft-marked paragraph saying a rule or in ensure that mentions an omitted field (directly or through a computed field) is not relied on, which is sound under either answer to item 12. Added a new entry 'The reset value of each field the starting state omits', known exactly at the start of Fire and Update, with one exception: the initial-state case where a construction row writes the field, which item 12 leaves open. The new entry carries its four parts. The Restore entry now has the same two exceptions. 'Between operations' is rewritten to carry these facts, with a draft mark. The premise-class paragraph now says the reset-value fact is not one of the four classes and gives the reason."
+    },
+    {
+     "title": "An access-mode guard can read a field its own state omits (two attempts reported this)",
+     "verdict": "real",
+     "reason": "D130's list of state-anchored contexts left out the guard of a guarded access mode. Canon already answers the question: \u00a73.5 says in general that a field name resolving to a field omit in the anchoring state produces D130, and `in S when G modify ...` is anchored to S exactly as an in-state ensure is. Phase 6's claim that no expression can read the field was also too broad, because rules and on-event ensures are still open under item 12.",
+     "repair": "\u00a72.2 D130: added 'the guard of a guarded access mode' to the list, with a draft mark and four-part reasoning. Phase 6: the sentence now says no state-anchored expression can read the field (D130), and that what a rule or an on <Event> ensure mentioning the field means while it is omitted is open (item 12)."
+    },
+    {
+     "title": "The proof-power list leaves out facts the guard data does determine",
+     "verdict": "real",
+     "reason": "The list at 'A write that changes a collection in place' said it was the full intended proof power. Its closing reason was that the facts left out depend on data the proof does not have. That is false in three cases. After enqueue \u2026 by with P known not to order ahead of .peekby, the front is unchanged: the declared direction plus tie-breaking by arrival settle it. A remove of an element known absent, an add of an element known present, or a put of the value already held changes nothing. After a removal of an element known to differ from .max or .min (set), or from .first or .last (list), that accessor is unchanged. Each of these follows from the action table and one known fact, like the facts already on the list.",
+     "repair": "Added a draft-marked 'A form known to change nothing' bullet. 'Positions and accessors' now gives the ordered-placement facts for queue of T by P (ascending and descending) and log of T by P (through an each over .by), the .min/.max facts after a set removal, and the .first/.last facts after a list remove. Rewrote the 'Nothing else is known' paragraph and the last sentence of its reasoning to match."
+    },
+    {
+     "title": "The cap's remedies can change behaviour even when the stated condition holds",
+     "verdict": "real",
+     "reason": "The attacker's example checks out. Merging two state actions that are not adjacent, or moving entry actions into a row, reorders them relative to the writes they are moved across. With three entry actions where merging the first and third gives Y = 1 instead of Y = 5, behaviour changes even though nothing writes the guard's field. The text stated only the guard condition. It also did not say that D130 anchoring can forbid a move.",
+     "repair": "Rewrote the remedy passage in the cap bullet. It now states two conditions: the guard keeps its value, and the moved actions keep their order relative to every write they are moved across. The new text names what each remedy moves the actions across, gives the attacker's example, and adds the D130 limit on moving an entry action into a row."
+    },
+    {
+     "title": "The evaluator diagram puts Unmatched at commit and takes the working-copy snapshot after dispatch",
+     "verdict": "real",
+     "reason": "evaluator.md says the diagram is ordered by the spec's phases, yet it returned Unmatched in Step 3 (Commit). Spec phase 2 ends the operation there and phase 8 says such an operation never reaches commit. The 2b snapshot after guard evaluation also contradicted phase 0 and the doc's own working-copy list.",
+     "repair": "evaluator.md: Unmatched moved into box 2a and removed from Step 3. 2b is labelled as the phase-0 starting working copy, taken late. The introductory sentence now explains why taking the copy late cannot be observed (guard evaluation writes nothing) and says every early outcome is decided at phase 1 or 2. Working-copy list item 1 says the same."
+    },
+    {
+     "title": "'Everything that follows logically' overrides canon's single-hop bound",
+     "verdict": "real",
+     "reason": "\u00a70.6 Implementation status (relational reasoning) says the single-hop bound is 'deliberately retained': the engine never combines two separately-declared facts to derive a bound neither states alone. proof-engine.md 'Deferred (open) \u2014 multi-fact combination' says such combination is out of scope and the spec's rule is 'not overridden'. The draft sentence claimed unbounded logical consequence without quoting or overriding that decision. Canon answers the question, so this is not an owner question.",
+     "repair": "Rewrote the opening of 'What is known includes what follows from it'. A consequence is now one drawn from a single known fact, within the bound \u00a70.6 and proof-engine.md state, and the paragraph says it does not widen that bound. It also separates such consequences from what a write establishes from what was known just before it. The phrases 'together with everything else known at phase 2' (row-guard entry) and 'any consequence of what is known' (phase 1) were narrowed to match."
+    },
+    {
+     "title": "\u00a70.6 item 7 states the invalidation rule more narrowly and does not point to \u00a73A.4",
+     "verdict": "real",
+     "reason": "Item 7 said that only 'prior proof facts about that field' are invalidated, and only on reassignment. Read that way, Gap > 0 (with Gap <- A - B) survives set A = B, which is unsound, and the omit reset, patches and in-place collection writes are not covered. It is a second statement of the rule that differs from \u00a73A.4.",
+     "repair": "Rewrote item 7, with a draft mark, so it points to \u00a73A.4 'What an earlier write invalidates' and summarises that rule correctly. The implementation-status bullet 'Reassignment-invalidation' now has a draft-marked sentence measuring it against \u00a73A.4 and saying that anything narrower is an implementation gap. It makes no claim about what the code currently does."
+    },
+    {
+     "title": "\u00a73A.2 has no outcome for argument failures other than a constraint violation",
+     "verdict": "real",
+     "reason": "Phase 1 sends unknown argument names, missing required arguments, wrong types and failing on <Event> ensures to InvalidArgs, but item 4 described only a violated constraint on a slot.",
+     "repair": "Rewrote \u00a73A.2 item 4, inside the existing draft-marked list, to cover every check phase 1 makes on arguments and on patch values. It points patch name and access failures to items 9 and 8, and names the outcomes: InvalidArgs for Fire and Create, and the Update outcome that carries the patch's ingress failures (ConstraintsFailed). runtime-api.md's InvalidArgs row now includes a failing on <Event> ensure."
+    },
+    {
+     "title": "The cap explanation names remedies that are not available for every handler",
+     "verdict": "real",
+     "reason": "On a precept with no initial event, the construction handler has no row to move actions into. Guarded entry actions with different guards that each hold a collection action can be neither merged nor rewritten as conditional expressions. Separately, D130 can forbid moving an entry action into a row. The spec required the explanation to name what brings the handler within the cap, without saying what to do when no remedy applies.",
+     "repair": "Same rewritten passage as the remedy finding. The explanation now names only the remedies available for the handler, gives the cases where none is, and in those cases says that no rewrite applies and that the handler comes within the cap only when its guarded exit and entry actions number eight or fewer."
+    }
+   ]
+  },
+  {
+   "round": 8,
+   "attempts": 8,
+   "real": 8,
+   "findings": [
+    {
+     "title": "A leftover sentence from the old reset placement says a row's actions cannot read a field the target state omits",
+     "verdict": "real",
+     "reason": "Spec 3A.4 'What sits between the guard and each later position' still said neither the row's actions nor the entry actions can read a field the target omits, citing D131 (a write rule), and placed the reset's loss of computed-field facts among the writes between the guard and later positions. 'Where the omit reset sits' and phase 5 put the reset at phase 6, after the row, and permit the row to read source-state fields the target omits. One section gave two answers about whether `set Summary = Notes` is legal and whether `Len > 0` survives to `100 / Len`.",
+     "repair": "Rewrote that part of the paragraph in docs/language/precept-language-spec.md under a new draft mark. The reset now sits between the row's last action and the entry actions. The row's actions read target-omitted fields as the guard, the exit actions and the earlier actions left them. The Len/Notes example is now stated as safe. The reset's loss of facts about derived computed fields applies to the entry actions only, and cites D130 alone."
+    },
+    {
+     "title": "The base-case default check decides an open question (Known exceptions item 12, first point) for a field the initial state omits",
+     "verdict": "real",
+     "reason": "\u00a70.6 item 11 said the checks against defaults are the base-case requirement 'applied to every field nothing in construction overwrites', and \u00a73A.5 said such a default is 'part of the base case'. For a field the initial state omits, the configuration Create commits has no value for it. Whether a rule that mentions it binds there is item 12's first point, which canon leaves open and on which no analysis may assume an answer. Under one answer the attacker's definition is rejected and under the other it is accepted, so the text settled item 12 by default.",
+     "repair": "In \u00a70.6 item 11 (draft region), limited the default check to fields the initial state does not omit. For an omitted field, stated what follows under each answer to item 12, pointed to 3A.4 'What is known' for what a handler that brings the field back must establish, and said nothing assumes an answer. Added a qualifier in \u00a73A.5 pointing to it. Added this case to item 12's first point. Nothing new is decided, because item 12 already records the question."
+    },
+    {
+     "title": "collection-types.md still says a literal `mincount 1` discharges accessor safety at any position, including after a removal",
+     "verdict": "real",
+     "reason": "collection-types.md:776 and the Constraints lines at :354, :427, :1073 and :1155 state the discharge without qualification. Spec 3A.4 says a modifier is known only through the starting configuration's rules for fields nothing has written, or through a write. It is lost at any in-place change to the collection, and during Create it is known only through the value the field was given. So `dequeue Q -> set X = Q.peek` would compile and then fault.",
+     "repair": "Added a paragraph to the draft-marked block in docs/language/collection-types.md. It says every statement in that document about `mincount` discharging an accessor holds only where the modifier is known, and points to the new spec \u00a73.8 note. It gives the dequeue example."
+    },
+    {
+     "title": "The unqualified rule that `mincount 1` discharges accessor safety contradicts 3A.4: a modifier is not known during Create, and is lost after a write",
+     "verdict": "real",
+     "reason": "Spec \u00a73.8 (line 1733, outside any draft mark) and proof-engine.md:2089 state the discharge at every position, and the draft narrowed it only for optional collections. Under 3A.4, definition A (`.peek` in a construction row on an empty queue) and definition B (`.peek` after `dequeue`) are both refused. \u00a73.8 accepts both, which breaks the fault guarantee and quietly assumes one answer to item 12's modifier question.",
+     "repair": "Added a draft-marked note in spec \u00a73.8, 'Where `mincount` discharges an accessor'. It applies 3A.4: the modifier is known at the start of Fire, Update and Restore until the first change to the collection, and during Create only through the field's value. It refuses both examples, leaves item 12's modifier question open, and says the other documents mean this. Added a draft-marked paragraph after proof-engine.md's Modifier-proof strategy. It says the built strategy discharges at every site, which is an unsound implementation gap, and points to the spec. The collection-types repair is described above."
+    },
+    {
+     "title": "runtime-api.md cites a heading that no longer exists and says every global rule is true of the current version",
+     "verdict": "real",
+     "reason": "runtime-api.md:346 cites '*Between operations nothing is carried except the rules*', which is no longer a heading. It also restates the rule as 'global rules and in ensures whose guards hold', leaving out the spec's exclusions for rules that mention now() or a field the state omits.",
+     "repair": "Replaced the restatement at runtime-api.md (Applicable constraints bullet) with a pointer to the current heading, 'Between operations nothing is carried except what every reachable configuration satisfies'. It names the two exclusions as examples and does not restate the rule."
+    },
+    {
+     "title": "runtime-api.md cites a heading that does not exist, and claims more is known between operations than 3A.4 allows",
+     "verdict": "real",
+     "reason": "Same defect as the previous finding, plus the Tier 2 Scope Rules paragraph, which restates the same overbroad claim. If the claim were read as covering rules that mention now(), it would assume an answer to the outstanding owner decision.",
+     "repair": "Also rewrote the Tier 2 Scope Rules sentence in runtime-api.md so that it defers to the spec heading. Neither runtime-api passage now says anything about now() rules beyond pointing to the spec, which assumes no answer."
+    },
+    {
+     "title": "result-types.md says a preview's ArgErrors is structural only and stops constraint evaluation; the spec and evaluator.md say it covers every phase-1 failure and is collect-all",
+     "verdict": "real",
+     "reason": "Spec \u00a73A.6 rule 2 and \u00a73A.4 phase 1 make preview ingress the whole of phase 1: argument constraints and event ensures included, collect-all. evaluator.md:1046 agrees. result-types.md:205, :214 and :279 described a structural-only check that stops all constraint evaluation. Under that reading, an ensure-only failure would leave OverallProspect unforced while Fire returns InvalidArgs.",
+     "repair": "In docs/runtime/result-types.md, rewrote the ArgErrors field comment and bullet to cover the whole phase-1 check, collect-all, and to point to spec \u00a73A.4 phase 1 and \u00a73A.6 rule 2. When the list is non-empty, nothing after phase 1 is evaluated and the prospect is Impossible. Rewrote the ArgError description the same way, and noted that a failure belonging to no single argument does not fit ArgName. That shape question is now joined to the existing open note on the shape InvalidArgs needs, not decided. Fixed the matching field comment in docs/runtime/evaluator.md."
+    },
+    {
+     "title": "The description of UpdateInspection names a member the record does not have, and assumes a patch can be incomplete",
+     "verdict": "real",
+     "reason": "The UpdateInspection record declares only Fields, Constraints and Events, yet the bullets described a HypotheticalResult member gated on 'the patch is complete'. Spec \u00a73A.6 says every patch, the empty one included, is a complete input. This was already listed as a mechanical drift item and had not been repaired.",
+     "repair": "Removed the HypotheticalResult bullet from result-types.md. Added two sentences after 'Returned by Version.InspectUpdate': a patch that fails ingress is not applied and nothing is recomputed from it (spec \u00a73A.6 rule 2), and every patch is a complete input (spec \u00a73A.6, When inputs are missing). A stale `RowInspection.HypotheticalResult` row in evaluator.md's guarantees table (around line 1953) names an older type and was left untouched as out of this finding's scope."
+    }
+   ]
+  },
+  {
+   "round": 9,
+   "attempts": 10,
+   "real": 10,
+   "findings": [
+    {
+     "title": "A preview can evaluate a row after one whose guard is certainly true, when an earlier guard is undetermined",
+     "verdict": "real",
+     "reason": "Spec 3A.6 stopped evaluation only once a row had 'certainly won dispatch', and result-types.md made later rows Impossible only after a Certain row. With an earlier undetermined guard, a later row whose guard is certainly true is only Possible, so the text allowed evaluating rows the operation can never reach. That breaks 3A.6 rule 2. The evaluator pseudocode (winnerFound on any certainly true guard) was already right.",
+     "repair": "Spec 3A.6 rule 2: once a row's guard is certainly true, no later row is evaluated, whether or not that row has certainly won; the report wording now says 'an earlier row's guard is certainly true'. result-types.md prospect propagation rules and the Prospect and PostFields descriptions were changed to match."
+    },
+    {
+     "title": "A wrongly typed patch value is ConstraintsFailed in the spec but InvalidFields in result-types",
+     "verdict": "real",
+     "reason": "Spec 3A.2 item 4 put a wrong-type patch value under ConstraintsFailed. result-types.md, evaluator.md (:362, :1857) and runtime-api.md all give a type mismatch as InvalidFields, and ConstraintsFailed as constraint violations only.",
+     "repair": "Spec 3A.2 item 4 now lists only constraint violations for a patch (ConstraintsFailed, pointing to result-types.md \u00a7 UpdateOutcome). Item 9 now states that an undeclared field name or a value of the wrong type is InvalidFields, and that how one refused patch reports several kinds of failure is open in result-types."
+    },
+    {
+     "title": "Evaluator ingress pseudocode skips a guarded event ensure whole when its body reads a bad argument",
+     "verdict": "real",
+     "reason": "Spec phase 1, 'A guarded event ensure', makes the guard and the body two separate evaluations, with a false guard passing the ensure. evaluator.md ValidateIngress checked the guard's and body's arguments together, so the ensure was never added to `passed`, and ensures proved from it went unevaluated. That changes what collect-all reports.",
+     "repair": "evaluator.md ValidateIngress: a guarded ensure first evaluates its guard (needing only the guard's arguments and premises). A false guard adds the ensure to `passed` without evaluating the body; a true guard leads to the body being evaluated under its own arguments and premises. ValidateIngressForPreview is described as the same check, so it inherits the fix."
+    },
+    {
+     "title": "Restore writes persisted values at phase 0, before phase 1 checks that they are declared and well typed",
+     "verdict": "real",
+     "reason": "Phase 0 injected the persisted state and values, and decided which fields were omitted, before phase 1's structural check. That needs writes that cannot be made for an undeclared state or field, or for a mistyped value.",
+     "repair": "Phase 0 now has Restore make the structural check first and write nothing if it fails; only then does slot injection run. This is a design decision, so it carries reasoning, alternatives rejected, precedent and the tradeoff accepted. Phase 1 now points to phase 0 for the check, and the phase table rows for Restore were updated."
+    },
+    {
+     "title": "The between-operations rule ends in a truncated sentence",
+     "verdict": "real",
+     "reason": "The sentence at spec :2405 ended with 'with the one exception that entry states (...)', so it did not say which fields the exception covers.",
+     "repair": "The exception is now written out: a field the initial state omits, in a configuration in the initial state, where a construction row writes that field. It points to the second entry of 'What is known', which gives the reason."
+    },
+    {
+     "title": "D132 read by purpose for a capture but by wording for an entry action",
+     "verdict": "real",
+     "reason": "The outcome follows canon: D132 places the assignment in 'the transition action chain' and calls itself the dual of InitialEventMissingAssignments, which names the construction row. But the reason the draft gave for excluding entry actions ('may be guarded') does not cover an unguarded one. The capture rule and the entry-action rule also answer different questions (which kinds of write count, and where the write must be), and the draft never said so. Changing the outcome would go past D132's stated placement, so the repair is to the reasons only.",
+     "repair": "Spec 3A.4 Configurations (omitted field): the exclusion now rests on D132's placement ('guarded or not') and states that the capture rule decides which kinds of write count, not where the write must be. It carries reasoning, alternatives rejected, precedent and the tradeoff accepted (a redundant write in the row where an unguarded entry action always assigns the field). The phase 0 construction text now points to that reason instead of the 'two reasons'. The capture paragraph now says a capture meets D132 or InitialEventMissingAssignments only where it is in the row's own action chain."
+    },
+    {
+     "title": "compiler-and-runtime-design.md defines Rejected as 'a row matched'",
+     "verdict": "real",
+     "reason": "Lines 851 and 860 restated the outcome meanings and contradicted spec 3A.2 and phase 2, where Create returns Rejected when no construction guard is true. They also contradicted the document's own commit-outcome table.",
+     "repair": "Both definitions were rewritten. Unmatched and Rejected for Fire are now stated with Create's no-guard-true case as Rejected, and both point to spec \u00a7 3A.2."
+    },
+    {
+     "title": "Per-operation matrix says InspectUpdate does no row dispatch and checks only the patch",
+     "verdict": "real",
+     "reason": "Spec 3A.6 has InspectUpdate preview each event with rows in the current state, which includes that event's ingress and its row dispatch, when the patch would be accepted.",
+     "repair": "The InspectUpdate row of the matrix in compiler-and-runtime-design.md now adds, after the patch, the event previews run with no arguments, and row dispatch 'yes for each event it then previews'. It points to spec \u00a7 3A.6."
+    },
+    {
+     "title": "collection-types.md says a failed append-by uniqueness guard ends Unmatched, which is wrong for construction",
+     "verdict": "real",
+     "reason": "The sentence restated the outcome as Unmatched for every dispatch. Phase 2 gives Rejected for Create.",
+     "repair": "collection-types.md \u00a7 log of T by P now says dispatch goes on to the next candidate row, and points to spec \u00a7 3A.4 phase 2 for what is returned when none matches."
+    },
+    {
+     "title": "\u00a73A.2 item 5 defines Unmatched only for transition rows",
+     "verdict": "real",
+     "reason": "Phase 2 returns Unmatched for a stateless precept's on <Event> rows, which are not transition rows. Item 5 had not been widened the way item 6 was.",
+     "repair": "Spec 3A.2 item 5 now defines Unmatched as Fire having candidate rows (transition rows from the current state, or on a stateless precept the event's on <Event> rows) with every guard false. It notes that the same case at construction is Rejected."
+    }
+   ]
+  },
+  {
+   "round": 10,
+   "attempts": 7,
+   "real": 6,
+   "findings": [
+    {
+     "title": "The draft says mincount is known at the start of every Fire, which is unsound for a collection the starting state omits and contradicts 3A.4",
+     "verdict": "real",
+     "reason": "3A.4 'What is known', first entry, says a rule that mentions a field the starting state omits is not known of the starting configuration. A modifier is a rule (\u00a72.4). But spec \u00a73.8 'Where mincount discharges an accessor', collection-types.md:786 and proof-engine.md:2093 each said the modifier is known at the start of Fire, Update and Restore with no exception for an omitted collection. Strategy 10 in proof-engine.md, which seeds the count interval from the band, had the same gap, and also for Create and for an optional collection not proved set.",
+     "repair": "Spec \u00a73.8: the sentence now excepts a collection the starting state omits (what is known of it is its reset value) and an optional collection not proved set, and points to 3A.4. collection-types.md:786 and proof-engine.md:2093 now carry the omitted-collection exception and say the \u00a73.8 note is the full statement. proof-engine.md Strategy 10: a draft-marked paragraph after the delta table says the band seed is not available during Create, for an omitted collection, or for an optional collection not proved set, and points to the 3A.4 entries that say what is known instead."
+    },
+    {
+     "title": "The Restore rule makes a Fire's outcome depend on whether the entity was persisted, under one answer to Known exceptions item 12",
+     "verdict": "real",
+     "reason": "The attempt is correct. If a construction row may write a field the initial state omits, the storage holds a value the configuration does not include. Restore slot injection puts the reset value there, so two entities with the same configuration can commit different values from the same Fire, against \u00a70.1 principle 3 (determinism). Item 12's third point, which leaves that write undecided, did not record that the answer reaches Restore and determinism. This is incompleteness in Known exceptions. It does not need a new decision, because the point is already recorded as not stated.",
+     "repair": "Item 12, third point: added that under the answer allowing such a write, either phase 0's Restore rule or what a configuration includes must change too, against determinism otherwise; under the answer refusing it, neither changes. Nothing assumes an answer."
+    },
+    {
+     "title": "The conditional-expression remedy for the cap can turn an accepted handler into a refused one when the target is optional",
+     "verdict": "real",
+     "reason": "Spec \u00a73.6 (String interpolation) says an optional field read 'enrolls a presence obligation exactly as it would in any value position'. The rewrite `set X = if C then 1 else X` adds a read of X that the original lacks, and the two conditions the section listed did not exclude this case. So the explanation could name a remedy that fails.",
+     "repair": "The cap paragraph now gives three conditions. The third requires every read the remedy adds to be permitted and provably safe where it lands. The paragraph gives the optional Note example and says the conditional rewrite is named only where each set target may be read safely at that position."
+    },
+    {
+     "title": "'What a patch value may be' does not say what a set or lookup patch that repeats an element or key does",
+     "verdict": "real",
+     "reason": "The paragraph refused a repeated key only for log of T by P. For set and lookup it left three possible outcomes for the same patch (Updated, InvalidFields, ConstraintsFailed). Canon does not cover how the JSON lane encodes a set, so the paragraph was incomplete. The consistent rule is the one already stated for log of T by P, applied to the other kinds whose elements or keys are unique.",
+     "repair": "Added to the first bullet: a value that repeats a set element (under the inner type's comparer) or a lookup key is not a value of the type and fails the type check (InvalidFields, \u00a73A.2 item 9). It is not collapsed. Kinds that keep repeats are unaffected. The four-part reasons are given: reasoning; alternatives rejected (collapse, take as given); precedent (JSON Schema uniqueItems, a database unique key); tradeoff accepted."
+    },
+    {
+     "title": "A write whose right-hand side mentions its own destination carries a false fact forward (set and capture)",
+     "verdict": "real",
+     "reason": "Read literally, :2359 carries every fact known of Expr (or of .peek) to the target. That includes facts that read the target's old value, so `Q.peek < D` before `dequeue Q into D` would make `D < D` known. That fact is unsatisfiable, every obligation then discharges, and the definition would be accepted and divide by zero. The informal 'shifted by one' bullet does not restrict the general rule.",
+     "repair": "In 'A write that replaces a whole value', one stated limit now applies to every carried fact. A fact that also reads a field the action writes (the target, or for a capture the collection or the other target) speaks of that field's old value. It is carried only after the old value is eliminated through the write's own relation, as in `set X = X + 1` shifting a range. Otherwise it is dropped. Examples cover dequeue into D, `set Cap = E.X` and `X == X + 1`. The four-part reasons cite Floyd's forward assignment rule, and the tradeoff respects \u00a70.6's single-fact bound."
+    },
+    {
+     "title": "The section's `from any` dispatch rule contradicts graph-analyzer and builder canon, and the evaluator lookup does not reach `any` rows",
+     "verdict": "real",
+     "reason": "The spec's rule follows from canon applied consistently. \u00a72.2 says `any` is 'the state wildcard', and \u00a73A.1 says rows are evaluated 'in declaration order \u2014 the first matching guard wins'. graph-analyzer.md \u00a713 also treats a wildcard row and an explicit row that both match as both taken. But graph-analyzer.md \u00a76.1 step 1 gave fallback edge semantics. The precept-builder.md dispatch key comment stored `any` rows under a null key that the evaluator's (state, event) lookup never reads. The spec paragraph also stated the rule without the four-part reasons.",
+     "repair": "graph-analyzer.md \u00a76.1: an `any` row now produces an edge for every declared state, with a draft-marked paragraph pointing to the spec. precept-builder.md \u00a7 TransitionDispatchIndex: a draft-marked paragraph says `any` and comma-list rows are placed in each state's list in declaration order, and the key comment now says a null state means a stateless precept only. evaluator.md Fire and InspectFire lookups: a comment says the list already holds the state's own rows, comma-list rows and `any` rows in declaration order. Spec 3A.4 Handlers: added the four-part reasons for the `any` dispatch rule."
+    },
+    {
+     "title": "Two-field quantifier binding for `log of T by P` is decided without a design record",
+     "verdict": "not-a-flaw",
+     "reason": "Canon already answers this. collection-types.md says 'two-type-parameter collections expose a two-field binding in quantifier scope', and its Resolved Design Questions item 3 says the binding 'generalizes to all two-type-parameter collections'. The spec's own grammar (\u00a72, `log of CollectionInnerType by CollectionInnerType`) makes log of T by P a two-type-parameter kind. \u00a73.5 gives queue of T by P only as an example. The collection-types Grammar Fit sketch is dated 2026-04-29, before log of T by P was added on 2026-05-01, so it is stale, not a contrary decision. Open Questions (New) item 1 asks whether the binding shape is implicit or explicit, not whether log of T by P has one.",
+     "repair": "Wording only: the spec's parenthetical now cites both general statements in collection-types.md and the spec grammar, and explains the Grammar Fit sketch omission, rather than arguing from \u00a73.5's silence."
+    }
+   ]
+  }
+ ],
+ "two_clean_rounds": false,
+ "questions": [
+  {
+   "question": "Before Create enters the initial state, it evaluates the construction row's guard and actions, a construction reject row's reason, the initial event's argument constraints, and its on-InitialEvent ensures. May any of these read a field the initial state omits? And, as already listed, may the construction row write one?",
+   "why_not_answered": "Canon disagrees with itself. \u00a73A.5 step 1 builds the hollow version with 'omitted fields structurally absent'. \u00a72.2 D130 refuses reading an omitted field only in the state-anchored contexts it lists, and a construction row is not one of them (\u00a73A.5: 'not yet in any state'). runtime-api.md \u00a7 Hollow context calls a read of a defaulted field in a construction guard valid, with no exception for an omitted one. The owner's words do not address it.",
+   "check": {
+    "verdict": "answered-by-canon-or-owner",
+    "answer_if_any": "No to both. None of the expressions Create evaluates before entering the initial state may read a field the initial state omits. The construction row may not write one either. Canon settles both points once its statements are applied the same way they are applied everywhere else.\n\n1. Writes are refused, as D131 refuses them, and for the same reason. Construction commits a configuration in the initial state: \"Create on a stateful precept enters the initial state\" (spec:2229, settled 2026-11-25 and committed). The general rule for configurations is that a field the state omits is one where \"no write may target it there\" (spec:2051). Every other operation that commits a configuration already refuses such a write: D131 for a transition row's target state; the phase 5 text for a no-transition row, which reads D131's \"target state\" as \"the state the row commits in\" (spec:2198); and Update's access-mode failure for a patch (spec:1985). Construction would be the only exception.\n\n   The rest of canon holds together only if the write is refused:\n   - spec:2199 says Create skips the omit reset \"because phase 0 already gave every field the initial state omits its reset value\". That is true only if nothing writes the field in between.\n   - spec:2344 rests \"no writer can change it while the state omits it\" on exactly this refusal.\n   - spec:2430 itself shows that allowing the write breaks principle 3 (determinism). An entity that was persisted and restored would get the reset value from restore slot injection, while one that was not would keep the row's write. \"Under the answer that such a write is refused, neither does [have to change].\"\n\n   A consequence follows from D132, which canon calls \"the structural dual of InitialEventMissingAssignments\". D132 requires an assignment only for a field the target state does not omit. So InitialEventMissingAssignments does not apply to a required field that the initial state omits. That field has no value there, as in any state that omits it, and D132 requires the assignment when a later transition brings it back. This is application, not a new rule.\n\n2. Reads are refused. The hollow version every one of these expressions is evaluated against is built with \"initial state set, omitted fields structurally absent\" (spec:2515). \u00a73.5 states the general rule, not limited to D130's list of contexts: \"reading a structurally absent field is a compile error\" (spec:1408, committed 2026-05-12). The 2026-11-25 settlement relies on the same premise: \"the fields the initial state omits are absent from what construction builds (\u00a73A.5)\" (spec:2229).\n\n   The two texts that seem to point the other way do not:\n   - \"At construction time, the entity is not yet in any state\" (spec:2539) is the reason for the syntax: no `from` prefix. It is not a statement about which fields exist. The settled phase order and step 1 (\"initial state set\") answer that.\n   - runtime-api.md:190-193 makes \"Defaulted fields: Valid\" on the ground that they \"are pre-populated on the hollow version\". An omitted field is structurally absent from that version, so the passage says nothing about it either way.\n\n   D130's own reasoning (spec:1128) rejects letting one context read the reset value, because it \"decides for this one context what a read of an omitted field means\". Allowing it in a construction guard would be exactly that.\n\nWhat stays open is open for separate reasons, and these are not new owner questions:\n- For the initial event's argument constraints and its `on <InitialEvent> ensure` declarations, the answer is conditional. If those may read fields at all, they may not read an omitted one. Whether they may read fields at all is its own open item in spec:2427 ff. (want:143).\n- Whether a rule must hold of an omitted field's default in the base case is the first bullet of spec item 12. It concerns rules, not executed reads, and this question does not ask it.\n\nThe \"not stated\" text in Known exceptions item 12 (spec:2430) and the matching exception at spec:2344 should be replaced by this answer, not sent to the owner.",
+    "quotes": "All line numbers are from the working tree of docs/language/precept-language-spec.md unless stated. Line 1408 was committed 2026-05-12 (40bcd746). Line 2229 is also in HEAD at 2168.\n\n- spec:1408 (\u00a73.5): \"Field names that resolve to fields declared `omit` in the anchoring state are syntactically in scope but produce `OmittedFieldReadInState` (D130) \u2014 reading a structurally absent field is a compile error.\"\n- spec:2515 (\u00a73A.5 step 1): \"Build a hollow version (defaults applied, initial state set, omitted fields structurally absent) \u2014 \u00a73A.4 phase 0, default materialization.\"\n- spec:2229 (\u00a73A.4, settled): \"`Create` on a stateful precept enters the initial state ... This follows from how canon already treats construction: the initial state's entry ensures must hold of what construction produces, and the fields the initial state omits are absent from what construction builds (\u00a73A.5).\"\n- spec:2051 (Configurations): \"A field the current state **omits** ... has no value in this configuration. It is structurally absent: no expression anchored in that state may read it and no write may target it there (\u00a72.2, D130 and D131).\"\n- spec:1130: \"**D131 \u2014 OmittedFieldSetInTargetState:** A `set` (or any write) action that targets a field `omit` in the transition's target state is a compile error.\"\n- spec:2198 (phase 5, no-transition row): \"The refusal is D131's ... for a `no transition` row the state the row commits in is its source state, so that is the state D131's 'target state' names.\"\n- spec:1985: \"**Access mode failure.** Patch targets a field not editable in the current state \u2014 either `readonly` (read-only) or `omit` (structurally absent).\"\n- spec:2199: \"for `Create` the reset is not run, because phase 0 already gave every field the initial state omits its reset value. That is the whole of it only if the construction row cannot write a field the initial state omits\"\n- spec:2344: \"no writer can change it while the state omits it: a row may not write it (\u00a72.2 D131 ...), an entry action of that state may not (D131), and a patch may not (\u00a73A.2 item 8).\"\n- spec:2430 (item 12): \"A `Fire` that brings the field back would then commit a different value from an entity that was persisted and restored than from one that was not ... against \u00a70.1 principle 3 (determinism). ... under the answer that such a write is refused, neither does.\"\n- spec:96: \"**Deterministic semantics.** Same definition, same data, same outcome \u2014 always.\"\n- spec:1128 (D130 rationale, draft): \"*Alternatives rejected:* leaving the guard out of the list, which lets it read the reset value, or nothing, and decides for this one context what a read of an omitted field means.\"\n- spec:1124 (D132): \"This is the structural dual of `InitialEventMissingAssignments` (D94) applied to state-crossing transitions.\"\n- spec:2539: \"At construction time, the entity is not yet in any state \u2014 it is being brought into existence. The `from` prefix would be misinformation\"\n- docs/runtime/runtime-api.md:192: \"**Defaulted fields:** Valid \u2014 fields with declared `default` values are pre-populated on the hollow version.\"\n\nNone of the owner's own documents mentions omitted fields at construction: what-i-want-2026-07-16.md, the-walk.md and history-rulings.md. The v1 PreceptLanguageDesign.md (c987ae32^) predates `omit`."
+   }
+  },
+  {
+   "question": "Restore receives persisted data that gives a value for a field the persisted state omits. Should it refuse that data as invalid input, or accept it and not write the value?",
+   "why_not_answered": "runtime-api.md \u00a7 Restoration lists the only ways Restore can fail: undefined state, unknown fields, type mismatch. A field the state omits is still a declared field, so none of these covers it. No canon text or owner statement says whether such data is invalid or is to be ignored. Either way the field's storage holds its reset value.",
+   "check": {
+    "verdict": "answered-by-canon-or-owner",
+    "answer_if_any": "Canon answers both halves. Restore accepts the data, and it does not write the value. Restore must not refuse this data.\n\n1. Accept, do not refuse. Canon lists the ways Restore can fail and closes the list: \"the only ways restore can fail are structural: an undefined state name, unknown fields, a type mismatch. `RestoreOutcome` carries those and nothing else\" (runtime-api.md:281; spec \u00a73A.2, precept-language-spec.md:2011). A field the persisted state omits is still a declared field, so it is not an \"unknown field\". Phase 0 defines that check as \"every field named is declared\" (spec:2147).\n\nCanon also says outright that the current state's per-state field declarations are not checked on restore: \"`Restore` accepts all stored fields regardless of the current state's access declarations\" (runtime-api.md:283). `omit` is one of those declarations:\n- \u00a72.2 says `AccessMode` and `OmitDeclaration` together \"govern per-state field access\" (spec:1073).\n- Composition rule 3 puts `modify|omit` in the same state-level override layer (spec:1111).\n- `Update` reports a patch to an omitted field as an \"Access mode failure\" (spec:1985).\n\nSo Restore bypasses `omit` just as it bypasses `readonly` (compiler-and-runtime-design.md:843; evaluator.md:2039). Refusing the data would also mean checking persisted data against the current definition. The owner's words rule that out: restored data is \"trusted and unchecked, because it was governed when it was written\" (what-i-want-2026-07-16.md:141).\n\n2. Do not write the value. Restore returns the configuration that an earlier operation committed:\n- philosophy.md:24: restore \"returns a configuration that was already committed\".\n- spec:2058: \"it returns the state and stored field values that an earlier operation committed\".\n\nA committed configuration holds no value for a field its state omits, and canon fixes what the storage holds instead: \"A field the current state omits ... has no value in this configuration ... What the runtime keeps in the field's storage while the field is omitted is its reset value\" (spec:2051, *Configurations* item 2; this text is also in HEAD).\n\nIf Restore wrote the persisted value into that storage, a later transition that brings the field back would find that value there. An entity that was never persisted would find the reset value. The two entities hold the same configuration but would commit different results, which breaks \u00a70.1 principle 3 (determinism). The spec makes exactly this argument at Known exceptions item 12 (spec:2430): storage holding something other than the reset value, while restore puts the reset value there, \"would then commit a different value from an entity that was persisted and restored than from one that was not, though both hold the same configuration\".\n\nSo the value is accepted, ignored, and the storage gets the reset value. For a required field without a default, the storage gets no value, and D132 makes the transition that brings the field back assign it. This is the reading the working-tree draft already writes at spec:2147 (phase 0), spec:2267 (the restore slot injection row) and evaluator.md:859.\n\nCaveat for the reviewer: committed HEAD does not agree with itself here. The HEAD writer table says restore slot injection writes \"every stored field named in the persisted data\" (HEAD precept-language-spec.md:2198). HEAD's *Configurations* item 2 (HEAD:2021) says an omitted field's storage holds its reset value. The draft settles this the way *Configurations* item 2, principle 3 and runtime-api.md:283 require. That is canon applied consistently, not a new decision. The question does not depend on any of the three outstanding owner decisions.",
+    "quotes": "runtime-api.md:281: \"Restore does not re-validate \u2014 restored data is trusted as valid at the time it was persisted (spec \u00a70.7) \u2014 so the only ways restore can fail are structural: an undefined state name, unknown fields, a type mismatch. `RestoreOutcome` carries those and nothing else.\"\nruntime-api.md:283: \"**Access modes are bypassed.** Fields that are `readonly` in the restored state were `editable` when previously written. `Restore` accepts all stored fields regardless of the current state's access declarations.\"\nprecept-language-spec.md:2011: \"Entity restoration from persisted data produces a distinct outcome space: successful restoration, or invalid input (structural mismatch \u2014 undefined state, unknown fields, type mismatch).\"\nprecept-language-spec.md:1073: \"Two separate constructs govern per-state field access: `AccessMode` (optional pre-verb guard + `modify` + adjective) and `OmitDeclaration` (omit, no guard).\"\nprecept-language-spec.md:1111: \"3. **State-level override always wins** \u2014 an explicit `in <State> modify|omit` declaration overrides the field's baseline for that (field, state) pair only.\"\nprecept-language-spec.md:1985: \"8. **Access mode failure.** Patch targets a field not editable in the current state \u2014 either `readonly` (read-only) or `omit` (structurally absent).\"\ncompiler-and-runtime-design.md:843: \"(1) `Restore` bypasses ingress validation, access-mode checks and row dispatch alike \u2014 persisted data was governed when it was written, so hydration reconstitutes it rather than re-checking it (spec \u00a70.7)\"\nwhat-i-want-2026-07-16.md:141: \"Restore/rehydration is *not* ingress \u2014 data coming back from persistence is trusted and unchecked, because it was governed when it was written.\"\nphilosophy.md:24: \"And an entity comes back from storage by restore, which changes nothing: it returns a configuration that was already committed.\"\nprecept-language-spec.md:2058: \"`Restore` does not add to the reachable configurations: it returns the state and stored field values that an earlier operation committed, which is the one precondition of \u00a70.7.\"\nprecept-language-spec.md:2051 (also HEAD:2021): \"A field the current state **omits** (`in <State> omit F`, \u00a72.2) has no value in this configuration. ... What the runtime keeps in the field's storage while the field is omitted is its reset value\"\nprecept-language-spec.md:2430 (Known exceptions item 12): \"A `Fire` that brings the field back would then commit a different value from an entity that was persisted and restored than from one that was not, though both hold the same configuration, against \u00a70.1 principle 3 (determinism).\"\nHEAD precept-language-spec.md:2198 (the committed wording the draft replaces): \"| Restore slot injection | 0, `Restore` only | every stored field named in the persisted data | \u00a70.7 |\""
+   }
+  },
+  {
+   "question": "May a computed field's `<-` expression call now()? And if a rule or ensure reads such a computed field, does that fall under the outstanding decision on whether rules and ensures may mention now()?",
+   "why_not_answered": "Canon places no restriction on now() in a computed expression (\u00a73.7, \u00a73.5), and temporal-type-system.md only says 'Guards and actions may read now()'. The want document's open question asks whether time 'belongs only in guards', which may be meant to cover computed fields too. The section is now written to be true either way, and it treats a rule reading such a field as part of decision (b), but the owner has not said whether he sees it that way.",
+   "check": {
+    "verdict": "answered-by-canon-or-owner",
+    "answer_if_any": "This is not a new owner question. Both halves are answered. The second half sits inside outstanding decision (b), and canon and the owner's own words already put it there.\n\n1. Can a computed field's `<-` expression call now()? Yes. Committed canon allows it and refuses it nowhere.\n- \u00a73.5 gives a computed expression every field name except those that would form a cycle.\n- \u00a73.7 lists now() with no position restriction.\n- None of the computed-field validation checks in \u00a73.x is about now(); the list is self-reference, transitive cycle, type mismatch, computed-with-default and computed-as-write-target.\n- temporal-type-system.md says now() is evaluated with one reading per operation (\"same inputs, same outputs within a single fire\"). It names guards and actions as readers. That sentence permits; it does not exclude.\n- A computed field reading now() asserts nothing. It is evaluated at operation time with that operation's clock reading, the same as an action that reads now(). So the want document's worry does not apply to it on its own terms. That worry is about a claim that \"can become false with no event in flight\", and only a rule or ensure makes a claim.\n- So the field is allowed. Its `<-` fault obligations are discharged at each read position, like any other computed expression.\n\n2. Does a rule or ensure that reads such a field fall under decision (b)? Yes. This follows from canon applied consistently, not from a new ruling.\n- Committed canon says a read through a computed field is a read of what it derives from. Spec at HEAD:2180 says \"a computed field has no value of its own (*Configurations*), so reading it is reading what it derives from\". HEAD:2252 says \"A field is read through a computed field as well as directly\". D143 says \"directly or through a computed-field dependency\".\n- So a rule that reads `Overdue <- now() > DueDate` mentions the clock through that field, exactly as it would mention `A` through `Gap <- A - B`.\n- The owner's open question is defined by what goes wrong, not by spelling. In his words, a time-referencing rule \"can become false with no event in flight \u2014 nothing writes `today`, there is no ingress point for it, and the inductive model has no step where pure passage of time fits\". A rule over a now()-computed field has exactly that property. It is a \"rule that references the current moment\" in his sense.\n- A constraint modifier on such a computed field (for example `max '30 days'` on `Age <- now() - OpenedAt`) is also covered. Modifiers are rule shorthand (\u00a72.4), so it is the same case.\n\n3. What stays open is decision (b) itself. If the owner rules strictly (\"time belongs only in guards\"), then how far that ruling reaches into computed fields is part of applying (b). It is not a separate question. Until he rules, write nothing that depends on the answer.\n- The working-tree text at precept-language-spec.md:2052 and :2689 already takes this position, and its reasoning matches committed canon. It is uncommitted agent text, though, not authority. The authority is the HEAD passages and the want-document line quoted below.\n\nNote: the deleted v1 design docs (commit c987ae32^: PreceptLanguageDesign, ProofEngineDesign, TypeCheckerDesign, EngineDesign, RuntimeApiDesign) say nothing about now(), the clock or \"today\". the-walk.md and history-rulings.md add nothing beyond the want line and the 2026-08-27 reaffirmation.",
+    "quotes": "docs/Working/what-i-want-2026-07-16.md:219 \u2014 \"**Time-referencing rules.** A rule like `ExpiryDate > today` can become false with no event in flight \u2014 nothing writes `today`, there is no ingress point for it, and the inductive model has no step where pure passage of time fits. Do rules that reference the current moment exist at all, or does time belong only in guards (evaluated at event time, like any other premise)? Deliberately left open.\"\n\ndocs/working-reset/phase-2/five-items-walk-2026-08-27.md:120 \u2014 \"**His words: *\"it is undecided, add it to the list\"*.**\"\n\nprecept-language-spec.md at HEAD, \u00a73.5 scope table (HEAD:1379) \u2014 \"Computed expression (`field X as T <- Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles)\"\n\nprecept-language-spec.md at HEAD:1627 (\u00a73.7) \u2014 \"| `now()` | `() \u2192 instant` | `instant` | \u2014 |\"\n\nprecept-language-spec.md at HEAD:2180 \u2014 \"This is the reading D143 (\u00a72.2) states for the assignment that brings a required field back from `omit` \u2014 \\\"directly or through a computed-field dependency\\\" \u2014 applied to the same kind of read at construction; a computed field has no value of its own (*Configurations*), so reading it is reading what it derives from.\"\n\nprecept-language-spec.md at HEAD:2252 \u2014 \"A field is read through a computed field as well as directly: a write to `A` is a write to everything any computed field derives from `A`.\"\n\nprecept-language-spec.md at HEAD:2258 \u2014 \"Each says something about the fields it reads as they stood at phase 0 \u2014 the fields it mentions, and every field a computed field it mentions derives from (the rule above).\"\n\nprecept-language-spec.md:1182 (\u00a72.4) \u2014 \"**Constraint modifiers are shorthand for rules.** A constraint modifier \u2014 `nonnegative`, `positive`, ... `min`, `max`, ... \u2014 desugars to the equivalent `rule` with a generated rationale.\"\n\ndocs/language/temporal-type-system.md:568 \u2014 \"Precept guarantees internal consistency (same inputs, same outputs within a single fire) but cannot freeze the clock. Guards and actions may read `now()`.\"\n\nprecept-language-spec.md at HEAD:2573 \u2014 \"Waiting on it: how a rule mentioning `now()` is proved, and whether the type checker refuses `now()` in rule and ensure positions. Until he rules there is no default: no analysis may assume that rules or ensures mentioning `now()` are allowed, nor that they are refused.\""
+   }
+  },
+  {
+   "question": "Must a constraint modifier (a value bound, an inner-type element bound, mincount or maxcount, or a relational modifier like max B) hold after every write that changes a field it constrains, or only of the configuration a handler commits? For example, should 'add Tags E.A -> add Tags E.B' into an optional set with mincount 2 be accepted, since it commits two elements but the first add leaves one?",
+   "why_not_answered": "Canon gives both answers. \u00a73.5 says a constraint modifier constrains 'the complete configuration rather than any one point in a mutation sequence', and \u00a70.7 states the induction per handler. Against that, \u00a70.6 item 6, \u00a72.3, collection-types.md \u00a7 Element value modifiers and \u00a7 Constraints each attach the obligation to every write or every count-changing mutation. The want document (line 20, 'obligations attach to every write site') reads either way. The answer changes which definitions are accepted. It is recorded in spec 3A.4 Known exceptions item 12, and every 'known' fact in 3A.4 is written to be sound under either answer.",
+   "check": {
+    "verdict": "answered-by-canon-or-owner",
+    "answer_if_any": "The owner has answered this directly. A constraint modifier holds of the configuration a handler commits, not after every write. The one exception is when the modifier is what keeps an expression from faulting: then it must hold at the point that expression is evaluated.\n\nWhy this follows:\n1. A constraint modifier desugars to a rule. Spec \u00a72.4 (precept-language-spec.md:1182) says this for all the cardinality and value modifiers, mincount and maxcount included. \u00a72.3 (line 1170) says the same of inner-type element modifiers: each \"desugars to a per-element rule\". \u00a70.7 says it again for bounds. The v1 design said the same: field constraints \"desugar at parse time \u2014 field constraints become `rule` nodes ... No new runtime behavior\". Every v1 constraint was evaluated once, against the \"proposed world (post-mutation, pre-commit)\".\n2. The owner ruled on when a rule must hold. This is walk item 9, re-asked on 2026-07-26 with a worked handler that breaks a rule part-way through and restores it by the end. He answered \"yes, end state only\", and the walk records that this \"inverts the printed answer for constraints\". He then ruled on the fault half with a fault caveat attached, and gave a restatement that is \"the one to build against\".\n3. Read this way, \u00a73.5 (\"constrains the complete configuration rather than any one point in a mutation sequence\") and \u00a70.7 (\"the inductive step is that every handler preserves every rule\") agree with the ruling. The other passages say what is owed, not when it is owed:\n   - \u00a70.6 item 6, \"assignment ... provably outside the target field's constraint range\"\n   - \u00a72.3, \"an element write-site must prove its source within the bound\"\n   - collection-types \u00a7 Element value modifiers and \u00a7 Constraints, \"every count-changing mutation ... must prove the count stays in band\"\n   - want:20, \"obligations attach to every write site\"\n   Each says which writes carry an obligation, the symmetric write site. None says the obligation is judged at that write rather than at commit. Where they are worded per write, that is drift from the ruling, to be corrected toward it. It is not a second answer. history-rulings.md row 40 already records the end-state rule as \"not in canon\" (searched \"end of the handler\", \"intermediate\", \"point of evaluation\"). So canon has never written the ruling down, which explains the per-write wording.\n\nWhat follows for the examples:\n- `add Tags E.A -> add Tags E.B` into an optional `set` with `mincount 2`, under a guard `E.A != E.B`, commits two elements and is accepted.\n- `set A = 20 -> set B = 30` from `B = 10` with `A max B` is accepted.\n\nThe fault caveat: if a modifier is what makes an expression fault-free, for example `Months positive` making a division safe, it must hold where that expression is evaluated. The walk calls this a reading of his sentence, not his words, and says to \"confirm it rather than assume it\". That caveat changes neither example above, because no fault in them depends on mincount or max B.\n\nSpec 3A.4 Known exceptions item 12 (spec:2438) should be closed as answered by walk item 9, not left as an owner question. The per-write wording in \u00a70.6 item 6, \u00a72.3 and collection-types \u00a7 Element value modifiers and \u00a7 Constraints should be reconciled to \"holds of the committed configuration\". The rule-relied-on-for-a-fault caveat should be stated alongside it.",
+    "quotes": "docs/working-reset/phase-1/the-walk.md:261-263: \"**9.** Obligations are judged over a handler's whole set of writes, never per write \u2014 intermediate states are unobserved, so the shipped compiler, which rejects a plan whose final state is legal, must be widened to accept it\"\nthe-walk.md:274-277: \"**\u2611 mine** ... \u2014 **re-asked 2026-07-26 in plain terms** (first pass drew \"derived\"; re-asked with a worked handler that breaks a rule mid-way and restores it by the end, and with the fault caveat stated, he answered \"yes, end state only\").\"\nthe-walk.md:278-280: \"**This inverts the printed answer for constraints.** A handler is judged on the configuration it commits, not write by write, and today's compiler \u2014 which rejects a handler whose end state is legal \u2014 is wrong and gets widened.\"\nthe-walk.md:284-285 (owner verbatim): \"this should not compile. rules only have to hold at the end of the handler, but faults must be prevented unequivocally.\"\nthe-walk.md:287-288 (owner verbatim, \"the one to build against\"): \"Faults must always be prevented by the compiler. Other rules that don't prevent faults only need to be true at the end of the handler.\"\nthe-walk.md:302-308: \"**A rule relied on to discharge a fault inherits that strictness.** ... This is the reading of his sentence rather than his words, and phase 5 should confirm it rather than assume it. - **Every other rule is judged on the configuration the handler commits.** Intermediate states are unobserved.\"\ndocs/working-reset/design-completion/inputs/history-rulings.md:93 (row 40): \"Non-fault rules are judged on the configuration the handler commits; faults are prevented at the point of evaluation. ... | walk:261\u2013308 | not in canon. ... the end-state rule and the split are not (searched \"end of the handler\", \"intermediate\", \"point of evaluation\")\"\ndocs/language/precept-language-spec.md:1182 (\u00a72.4): \"A constraint modifier \u2014 `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces` \u2014 desugars to the equivalent `rule` with a generated rationale.\"\nprecept-language-spec.md:1170 (\u00a72.3): \"An inner-type value modifier ... desugars to a per-element rule (\u00a72.4) and participates in proof identically\"\nprecept-language-spec.md:1406 (\u00a73.5): \"a *constraint modifier*, which is rule shorthand (\u00a72.4) \u2014 constrains the complete configuration rather than any one point in a mutation sequence\"\nprecept-language-spec.md (\u00a70.7): \"the inductive step is that every handler preserves every rule\"\ngit show c987ae32^:docs/PreceptLanguageDesign.md:602: \"They desugar at parse time \u2014 field constraints become `rule` nodes; event-arg constraints become `on E ensure` nodes. No new runtime behavior.\"\nPreceptLanguageDesign.md:27: \"All validation evaluates against the \"proposed world\" (post-mutation, pre-commit).\""
+   }
+  },
+  {
+   "question": "Once a transition row has assigned a field that its source state omits (for example the assignment D132 requires), may a later action in the same row read that field? For example, 'set Notes = Submit.N -> set Summary = Notes' from a state that omits Notes.",
+   "why_not_answered": "\u00a72.2 D130 refuses any read in an action's right-hand side of a field omitted in the anchoring state, with no exception for one the row has written. \u00a72.2 D143 refuses only 'the first assignment that materializes that field', 'directly or through a computed-field dependency', which implies later reads are allowed and would make D143's wording redundant under D130's reading. Canon disagrees with itself and the owner has not ruled. It is recorded in spec 3A.4 Known exceptions item 12 and in phase 5.",
+   "check": {
+    "verdict": "answered-by-canon-or-owner",
+    "answer_if_any": "Yes. A later action in the same row may read a field the source state omits once an earlier action in that row has assigned it. In 'set Notes = Submit.N -> set Summary = Notes' from a state that omits Notes, the read of Notes in the second action is allowed. A read of that field before its first assignment stays refused: by D130 in any earlier action, and by D143 inside the first assignment itself, directly or through a computed field.\n\nWhy canon already answers this, with nothing stretched:\n\n1. Canon handles the same shape at construction, and that rule is ordered by assignment. At construction a required field with no default has no value until an action gives it one, which is exactly the situation of a field brought back from omit. Canon refuses a read only before the first assignment. PRE0142 refuses the read inside the field's own first assignment, and PRE0144 refuses a read of another field \"before that other field's first assignment in the same action chain establishes a value\". So a read after that assignment is allowed. D132 calls itself \"the structural dual of InitialEventMissingAssignments (D94) applied to state-crossing transitions\", and D143 is the transition copy of PRE0142, added in the same commit as PRE0144 (00e68f19). Refusing a read after assignment only for transitions would treat this case differently from construction for no stated reason.\n\n2. Sequencing is a general rule. \u00a70.4 property 3 says \"Each assignment in a row sees the state left by all preceding assignments\", and \u00a70.6 item 7 says \"each subsequent action sees the proof state left by all preceding actions\". The owner's fault ruling applies this ordering: a check happens \"at the point of evaluation, against the values in force there\", and his own Months example (set to 0, then to 12, then divide: compiles) turns on reading a value an earlier action wrote. The v1 language design said the same: \"read-your-writes\".\n\n3. D130 refuses a read because there is no value to read, not because of the declaration. Its own reasoning: \"for a required field without a default there is no value to read at all (\u00a70.1 principle 10)\". \u00a73.5 describes the refused read as \"reading a structurally absent field\". After the row has assigned the field, the working copy holds a value, so that reason does not apply. Reading D130 as refusing every read in the row, with no exception for a field the row wrote, would make D143's limit to \"the first assignment\" and its word \"directly\" mean nothing. The reading that keeps both rules meaningful is: D130 covers reads before the assignment, D143 covers the assignment itself, and reads after it are allowed.\n\n4. The draft phase 5 text already says a row's actions read the fields of the source state \"as changed by the exit actions and by the row's own earlier actions\". Line 2404 already lets the row's actions read a field the target state omits \"as ... the row's earlier actions left it\". The case asked about is the same rule applied to a field the source state omits.\n\nWhat still needs doing is editing, not an owner decision: D130's action-RHS clause should carry the exception, a read of a field after an earlier action in the same row has assigned it. Then spec \u00a73A.4 Known exceptions item 12's last entry, its echo in the Open Questions list, and the matching sentence in phase 5 can be removed. This answer does not cover what a computed field that derives from such a field returns elsewhere in the row. That is a separate item-12 entry: a computed expression that mentions a field, in a state that omits it. This answer does not settle it.",
+    "quotes": "docs/language/precept-language-spec.md:1117 (D132): \"This is the structural dual of `InitialEventMissingAssignments` (D94) applied to state-crossing transitions.\"\ndocs/language/precept-language-spec.md:1119 (D143): \"The first assignment that materializes that field on the transition cannot read the field directly or through a computed-field dependency before any value exists in the source state.\"\ndocs/language/precept-language-spec.md:1128 (D130, reasoning): \"for a required field without a default there is no value to read at all (\u00a70.1 principle 10).\"\ndocs/language/precept-language-spec.md:1408: \"Field names that resolve to fields declared `omit` in the anchoring state are syntactically in scope but produce `OmittedFieldReadInState` (D130) \u2014 reading a structurally absent field is a compile error.\"\ndocs/language/precept-language-spec.md:2535: \"`UninitializedCrossFieldReadInInitialAssignment`: An initial-event assignment reads another required field before that other field's first assignment in the same action chain establishes a value.\"\ndocs/compiler/diagnostic-system.md:207: \"`PRE0142` means the field is assigned, but the RHS reads an undefined value while doing so.\"\ndocs/compiler/diagnostic-system.md:211: \"PRE0144 ... reads another required field before that other field's first assignment later in the same action chain establishes a value.\"\ndocs/language/precept-language-spec.md:164 (\u00a70.4 property 3): \"Each assignment in a row sees the state left by all preceding assignments.\"\ndocs/language/precept-language-spec.md:247 (\u00a70.6 item 7; line 233 in the walk's citation): \"Actions in a chain are sequenced \u2014 each subsequent action sees the proof state left by all preceding actions.\"\ndocs/language/precept-language-spec.md:2198 (phase 5, draft): \"A row's actions read the fields of the state the row was written `from`, as changed by the exit actions and by the row's own earlier actions (\u00a72.2, D130 and D143)\"\ndocs/language/precept-language-spec.md:2404: \"So the row's actions read a field the target state omits as the guard, the exit actions and the row's earlier actions left it\"\ndocs/working-reset/phase-1/the-walk.md:297-301 (owner's example, as recorded): \"He supplied the contrasting pair himself. Setting `Months` to 0, then to 12, then dividing by `Months` **compiles**: by the time the division runs, `Months` is 12 ... This is the sequencing already in canon at `precept-language-spec.md:233` \u2014 each action sees the state left by the ones before it\"\ndocs/working-reset/design-completion/inputs/history-rulings.md:93 (owner verbatim): \"Faults must always be prevented by the compiler. Other rules that don't prevent faults only need to be true at the end of the handler.\"\ngit show c987ae32^:docs/PreceptLanguageDesign.md:1365 (v1): \"Actions execute left-to-right with read-your-writes \u2014 each action sees the results of prior actions.\"\ngit show c987ae32^:docs/PreceptLanguageDesign.md:47 (v1): \"Sequential execution, read-your-writes. Uniform across transition rows and state entry/exit actions.\"\nCommit 00e68f19 message: \"D144 UninitializedCrossFieldReadInInitialAssignment: in an initial event's action chain, a set action cannot read another required field before that field's first assignment earlier in the same chain has established a value.\" (D143 was added in the same commit as the transition counterpart.)"
+   }
+  }
+ ]
+}
