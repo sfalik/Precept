@@ -44,9 +44,9 @@
 
 The runtime uses three type families to represent operation results:
 
-1. **EventOutcome** (8 variants) — returned by `Version.Fire`. One committed result.
+1. **EventOutcome** (8 variants) — returned by `Precept.Create` and `Version.Fire`. One committed result.
 2. **UpdateOutcome** (4 variants) — returned by `Version.Update`. One committed result.
-3. **Inspection types** (EventInspection, UpdateInspection) — returned by `Version.InspectFire` and `Version.InspectUpdate`. Progressive annotated landscape.
+3. **Inspection types** (EventInspection, UpdateInspection) — returned by `Precept.InspectCreate`, `Version.InspectFire` and `Version.InspectUpdate`. Progressive annotated landscape.
 
 A `Fault` — a breach of one of the engine's own invariants — has its shape settled: should anything ever construct one, it is returned as the `EventOutcome.Faulted(Fault)` variant, a structured value inside the outcome hierarchy, never thrown. Nothing constructs one today and whether anything ever will is undecided (`fault-system.md` Q3). See `fault-system.md`.
 
@@ -94,6 +94,7 @@ Sealed hierarchy. Callers pattern-match; any unhandled variant produces a compil
 ```csharp
 public abstract record EventOutcome
 {
+    public sealed record Created(Version Result, FiredArgs Args) : EventOutcome;
     public sealed record Transitioned(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;
     public sealed record Applied(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;
     public sealed record Rejected(string Reason, FiredArgs Args) : EventOutcome;
@@ -106,19 +107,20 @@ public abstract record EventOutcome
 
 | Variant | Meaning | Pipeline stage | Stateless reachable? |
 |---------|---------|----------------|---------------------|
+| `Created` | Construction succeeded — `Create` only, with or without an initial event; the entity exists in the initial state, or with `State = null` on a stateless precept (spec §3A.2, *Construction outcomes*) | Commit (§3A.4) | Yes |
 | `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit (§3A.4) | No (no states) |
 | `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit (§3A.4) | Yes |
 | `Rejected` | Authored `reject` row matched — business prohibition; `Args` carries what was submitted | Dispatch — reject row matched (§3A.4) | Yes |
 | `InvalidArgs` | Ingress validation failure — wrong type, unknown key, or an argument value that violates a constraint declared on it | Ingress governance (§3A.4) | Yes |
 | `Unmatched` | All guards failed (including `when` precondition) — no row matched; `EvaluatedRows` carries per-candidate guard trace | Dispatch — no row matched (§3A.4) | Yes |
-| `UndefinedEvent` | No transition rows or hooks for this event in current state | Dispatch — no rows for (state, event) (§3A.4) | Yes |
+| `UndefinedEvent` | `Fire` only. The event name is not a declared event, or names the initial event, which cannot be fired after construction; or the event is declared but has no rows in the current state | The first two at the start of ingress governance, before any argument is checked (§3A.4 phase 1); the third at dispatch, after the arguments passed ingress (§3A.4 phase 2) | Yes |
 | `Faulted` | A breach of one of the engine's own invariants — a defect in the compiler, the builder or the evaluator, not a business outcome | — | Yes |
 
 **`Rejected` vs `InvalidArgs`:** `Rejected` is a business decision authored in the precept (`-> reject "reason"`). `InvalidArgs` is a caller error — the args don't match the event's declared contract. Parallel with `UpdateOutcome.InvalidFields`. DDD's "business rejection vs. invalid input" distinction.
 
 **There is no `EventOutcome.ConstraintsFailed`.** The variant used to mean "the working copy was built and then failed a constraint check." No such check runs: the compiler proved every handler preserves every rule (spec §0.7), and §3A.4's phase order has no constraint-evaluation phase between recomputation and commit. Global rules, state ensures (`in`/`to`/`from`) and event ensures are all proven rather than re-evaluated, so no outcome reports them failing after a mutation.
 
-What does fail at runtime is ingress: an argument value that violates a constraint declared on it. That is `InvalidArgs`, and per spec §3A.2 it is collect-all — every failing argument is reported, not just the first.
+What does fail at runtime is ingress: an argument value that violates a constraint declared on it. That is `InvalidArgs`, and it is collect-all as spec §3A.4 phase 1 defines it — every failure the check finds is reported, not just the first; a constraint over a value that failed an earlier check, or whose proof relied on a phase-1 constraint that failed, is not evaluated.
 
 > **Open — the shape `InvalidArgs` needs.** `InvalidArgs(string Reason)` carries one string. Collect-all reporting of constraint violations on arguments wants the structured per-violation detail `ConstraintViolation` already carries (`Because`, `RelevantFields`, `FailingSubexpression`), the same way `UpdateOutcome.ConstraintsFailed` carries it for a patch. Whether `InvalidArgs` gains a `Violations` array, splits into two variants (structural arg errors vs. constraint failures on args), or stays a string is an API-shape decision neither the want document nor the specification settles. Left as-is here rather than guessed at.
 
@@ -146,8 +148,10 @@ public abstract record UpdateOutcome
 |---------|---------|----------------|
 | `Updated` | Patch passed its ingress check and was applied; new Version committed | Commit |
 | `ConstraintsFailed` | A patched value violates a constraint declared on the field it was entering — refused before the patch was applied, collect-all | Ingress governance (§3A.4) |
-| `FieldNotEditable` | Field's declared access mode (`Readonly`) prevents direct editing in current state | Access mode check |
+| `FieldNotEditable` | Field's access mode in the current state (`Readonly`, or `Omit`) prevents direct editing; for a guarded access mode, decided by its guard over the starting configuration | Ingress governance — access mode check (§3A.4 phase 1) |
 | `InvalidFields` | Type mismatch or structurally invalid patch | Type check |
+
+> **Open — the shape of a refused `Update`.** Phase 1 of `Update` is collect-all across the whole patch (spec §3A.4 phase 1, §3A.1): every non-editable field, every mistyped value and every failed constraint that phase 1 evaluates is found — a constraint over a value that passed its earlier checks, and whose proof relied on no phase-1 constraint that failed. `FieldNotEditable` names one field, `InvalidFields` carries one string and `ConstraintsFailed` carries constraint violations only, so no single variant can report everything one refused patch can fail on. Whether the variants gain arrays, merge, or are reported in a fixed precedence is an API-shape decision neither the want document nor the specification settles — the same question as the shape of `InvalidArgs` above. What is evaluated does not depend on it.
 
 **`UpdateOutcome.ConstraintsFailed` is an ingress failure, not a post-mutation one.** The constraints it reports are the ones declared on the fields the patch writes, checked as the values enter and before anything derives from them (spec §0.7, *Governance*). The variant name reads as though the check were a sweep over the finished working copy; it is not, and the name should be revisited when the `Update` API is next opened.
 
@@ -175,7 +179,7 @@ public enum ConstraintStatus { Satisfied, Violated, Unresolvable }
 ```
 
 **Prospect propagation rules (first-match):**
-- A `Certain` row makes all subsequent rows `Impossible`.
+- A `Certain` row makes all subsequent rows `Impossible`. They are reported so without being evaluated — neither guard nor actions — because `Fire` never reaches them (`precept-language-spec.md` § 3A.6, *What a preview evaluates*).
 - An `Impossible` row opens up the next row (may become Certain or Possible).
 - A `Possible` row leaves subsequent rows at most `Possible`.
 
@@ -189,7 +193,7 @@ public enum ConstraintStatus { Satisfied, Violated, Unresolvable }
 | false | or | Unknown | Possible |
 | Unknown | not | — | Possible |
 
-Where "Unknown" = the expression references an arg not yet provided.
+Where "Unknown" = the expression reads a required argument not yet provided, or it was not evaluated because a premise its compile-time proof relied on is itself `Unknown` — an earlier row's guard, the row's own guard, a guarded state action's guard, or an earlier operand of the same `and`/`or` or the condition of an `if` (spec §3A.6, *When inputs are missing*; `evaluator.md` § `EvaluateGuardProspect`). So in `Unknown and X`, where the proof of `X` relied on the first operand, `X` is not evaluated and the result is `Unknown`, reported as `Possible`.
 
 ### EventInspection
 
@@ -241,10 +245,10 @@ public sealed record TransitionInspection(
     ImmutableArray<FieldSnapshot> PostFields);
 ```
 
-- `Prospect` — would this row fire? `Certain` when the guard passed; `Possible` when guard evaluation is ambiguous due to missing args; `Impossible` when the guard failed. The guard alone decides: dispatch is first-matching-guard-wins (spec §3A.4 phase 2), so no constraint result can turn a guard-passing row into a non-firing one.
+- `Prospect` — would this row fire? `Certain` when its guard is certainly true and every earlier row's guard is certainly false (spec §3A.6); `Possible` when its guard is undetermined because an input is missing, or when its guard is true but an earlier row's guard is undetermined (see *Prospect propagation* above); `Impossible` when the guard failed, or when an earlier row certainly wins, in which case this row's guard was not evaluated. The guard alone decides: dispatch is first-matching-guard-wins (spec §3A.4 phase 2), so no constraint result can turn a guard-passing row into a non-firing one.
 - `Effect` — a discriminated union encoding the row's outcome kind. Replaces the previous `string? TargetState` nullable encoding. Consumers pattern-match on `Effect` to determine transition target, no-transition, or rejection. See `RowEffect` below.
 - `GuardSummary` — human-readable description of the guard condition. All rule failure surfaces carry a human-readable description (contract rule). `null` when no guard applies or when the guard passed without ambiguity. Populated by the runtime when the guard fails or evaluates to `Possible` (ambiguous due to missing args).
-- `PostFields` — ALL non-omitted fields in the target state, post-mutation + recomputation. Fields whose access mode changes upon transition reflect the target state's mode.
+- `PostFields` — for a row that was simulated, every field the target state does not omit, as `Fire` would leave it: after exit actions, the row's actions, the `omit` reset, entry actions and recomputation. Fields whose access mode changes upon transition reflect the target state's mode. Empty for a row that was not simulated — a row reported as unable to fire because an earlier row certainly wins, or a row whose guard is certainly false — because a preview evaluates nothing the operation would not (spec §3A.6, *What a preview evaluates*).
 - `Constraints` — constraint evaluation results for this specific row.
 
 > **Open — what the `ConstraintResult` arrays mean now.** `TransitionInspection.Constraints`, `UpdateInspection.Constraints` and `EventInspection.EventEnsures` were shaped around a pipeline that evaluated rules against the finished working copy. Execution no longer does that, and spec §3A.6 says inspection has no constraint-evaluation phase to preview because there is none to preview. What the want document asks inspection to report instead is proof provenance — "no check needed here, and here are the premises it was proven from" (`what-i-want-2026-07-16.md:211`) — but neither that document nor the specification says which type carries it. The three arrays are left exactly as they are, and their descriptions above still describe the old model. Deciding whether they become ingress results, proof-provenance records, or a plain report of which declared constraints happen to hold in the previewed configuration is a design question, not a correction.
@@ -372,7 +376,7 @@ public enum FieldAccessMode { Read, Write }
 | F# discriminated unions | Exhaustive match, per-case payload | Same pattern in C# via sealed records. |
 | K8s dry-run | Same response type as real operation, `managedFields` annotation | Commit and inspection share structural vocabulary. |
 | Terraform plan | Progressive resolution — known values vs. `(known after apply)` | `FieldSnapshot.IsResolved` and `ConstraintStatus.Unresolvable` follow this pattern. |
-| OPA `deny[msg]` | Collect-all violation set | Ingress validation reports every violation, not the first — `InvalidArgs` for event and construction arguments, `UpdateOutcome.ConstraintsFailed` for a patch. Collect-all applies at ingress only; there is no post-mutation evaluation left to collect from. |
+| OPA `deny[msg]` | Collect-all violation set | Ingress validation reports every violation it finds, not the first (spec §3A.4 phase 1 states what it leaves unevaluated) — `InvalidArgs` for event and construction arguments, `UpdateOutcome.ConstraintsFailed` for a patch. Collect-all applies at ingress only; there is no post-mutation evaluation left to collect from. |
 | DDD per-command results | Each command returns its own result type | Two families (EventOutcome, UpdateOutcome), not unified. |
 | gRPC status codes | FAILED_PRECONDITION / INVALID_ARGUMENT / ABORTED | Maps to Rejected / InvalidArgs / Unmatched. |
 
@@ -412,7 +416,7 @@ The working copy data structure must carry an `IsResolved` flag per slot, mirror
 
 ### Kleene three-value guard evaluation
 
-Guard evaluation under partial args must use Kleene three-value logic. Comparisons referencing a missing arg produce Unknown. Boolean operators propagate Unknown according to the truth table above. The evaluator must not throw or fault when encountering an unresolvable subexpression — it must propagate the Unknown signal through the expression tree and map the final result to a `Prospect` value.
+Guard evaluation under partial args must use Kleene three-value logic. Comparisons referencing a missing arg — a required argument that was not supplied; an `optional` argument left out is not set, not missing (spec §3A.6, *When inputs are missing*) — produce Unknown. Boolean operators propagate Unknown according to the truth table above. The evaluator must not throw or fault when encountering an unresolvable subexpression — it must propagate the Unknown signal through the expression tree and map the final result to a `Prospect` value.
 
 ---
 

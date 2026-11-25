@@ -534,6 +534,8 @@ public enum ActionSecondaryRole
 }
 ```
 
+**Gap: `TypedBindingAction` has room for one capture target, and `dequeue F into G by H` writes two.** The language permits `dequeue F into G by H` on a `queue of T by P`, which writes `F`, `G` and `H` ([`collection-types.md`](../language/collection-types.md) § Dequeue with Ordering Value Capture; the full list of every action form's write destinations is `precept-language-spec.md` § 3A.4, *Write destinations of every action form*). `Binding` holds the `into` target `G` only; the record has no field for the `by` target `H`. Any consumer that takes write sites from this record — fact invalidation in the proof engine, the evaluator's write plan — cannot see the write to `H`, so a fact about `H` appears to survive the dequeue. The typed model needs to carry the ordering-value capture target as well, for the `into … by …` form only; how (a second field or a separate subtype for that form) is a type-checker design choice not made here.
+
 **`ActionSecondaryRole` rationale:** A single nullable `SecondaryExpression` without a discriminator forces the Evaluator to back-reference `ActionKind` to determine dispatch — defeating the DU's purpose. The enum carries role semantics; the Evaluator switches on it. Invariant: `SecondaryRole.HasValue == (SecondaryExpression != null)`, enforced at construction time. Start with `Index` and `Key` only; `Priority` can be added if the Evaluator genuinely distinguishes it from `Key`.
 
 #### Typed Expressions (DU)

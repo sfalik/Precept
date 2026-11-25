@@ -148,7 +148,7 @@ The guarantee *statement* — what an author can rely on — is in the language 
 
 **Fault prevention** (compile-time — proof engine). The type checker stamps a proof obligation at every fault-prone site — where "site" is not a memorized operator list but any node whose catalog construct declares `ProofRequirements`, or any value flowing into a bound-carrying field (see §1.2 for the site-determination rule; the parenthetical cases here are illustrations: division → divisor non-zero; arithmetic into a bounded field → interval containment; collection access → non-empty; assignment → declared-bound containment). The proof engine discharges each obligation by proof over the reachable configurations, from the **four classes of premise the author declared** (spec §0.7): field modifiers, constraints on event arguments, the handler's guard, and the rules that already hold in the pre-state. The base case is that the default configuration and every initial event establish every rule; the inductive step is that every handler preserves every rule. The fourth class is the one that is easy to leave out and cannot be: a handler that adds a non-negative amount to a balance preserves `Balance >= -OverdraftLimit` *only* because the rule held before the event — no guard and no argument bound reaches it on its own. (A statically-known operand discharges immediately; there is no configuration to induct over.) Where a proof cannot close, the compiler rejects and names the premise that would close it. Discharge is **prove-or-reject**: an obligation the engine cannot prove emits its diagnostic. The obligation is *created at every site* and gated only on *discharge* — never on creation. Gating creation on provability (skipping the obligation when an interval is unbounded) is a soundness inversion: an unprovable bound must emit, never skip.
 
-**Governance** (runtime). Ingress (`TypeRuntime` / `TypeRuntimeMeta`) enforces every declared constraint on externally-sourced values — event arguments, construction inputs, field edits — before the working copy derives any dependent value. Enforcement is operation-blind, and it upholds the declared contract of the slot the value enters. Mutations run on a working copy so that they either all take effect or none does and no partial state is observable; promotion is not conditional on a constraint check. There is no post-mutation pass left to make a pass/fail decision, because every handler was proven at compile time to preserve every rule. No invalid configuration commits because none can be produced.
+**Governance** (runtime). Ingress (`TypeRuntime` / `TypeRuntimeMeta`) enforces every declared constraint on externally-sourced values — event arguments (at construction, the initial event's arguments, which are the only input `Create` takes) and field edits — before the working copy derives any dependent value, as `precept-language-spec.md` § 3A.4 phase 1 states it. Enforcement is operation-blind, and it upholds the declared contract of the slot the value enters. Mutations run on a working copy so that they either all take effect or none does and no partial state is observable; promotion is not conditional on a constraint check. There is no post-mutation pass left to make a pass/fail decision, because every handler was proven at compile time to preserve every rule. No invalid configuration commits because none can be produced.
 
 **Composition.** The compile-time proof for an externally-sourced operand rests on a premise the author declared — a modifier on the field or the argument, the handler's guard, or a rule that already held; ingress governance makes that premise true of the actual value. The compiler never inspects the value — it proves the rule from the declared premises and rejects when the proof cannot close. The runtime check is the discharge of that declared precondition, not a fallback for a proof the compiler skipped.
 
@@ -756,9 +756,9 @@ The full `Precept` executable model — descriptor tables, dispatch indexes, exe
 | routing | per-state and stateless event-row dispatch indexes, target-state routing metadata | fire and inspect fire |
 | topology | reachability index (state → reachable states), pathfinding residue (goal-directed navigation) | structural queries, MCP, AI navigation, inspect |
 | execution | prebuilt flat evaluation plans: slot-addressed opcodes with field-slot references, literal constants, operation codes, and result slots — keyed to descriptors and resolved semantic identities | evaluator |
-| recomputation | dependency graph and evaluation order for computed fields | fire, update, restore, inspect |
+| recomputation | dependency graph and evaluation order for computed fields, and the derivation of a computed field read before recomputation (spec § 3A.4, *What a computed field returns when it is read during an operation*) | create, fire, update, restore, and the three previews |
 | access | per-state field access-mode index and query surface | update and inspect update |
-| constraints | explicit executable plan indexes for `always`, `in`, `to`, `from`, and `on` anchors | create, restore, fire, update, inspect |
+| constraints | explicit executable plan indexes for `always`, `in`, `to`, `from`, and `on` anchors, plus the constraints declared on each argument and field | ingress only (spec § 3A.4 phase 1): the `on` index and argument constraints for create, fire and their previews; field constraints for update and inspect update. What else update's ingress evaluates — the want document's working assumption adds every rule that mentions a patched field, which sits in the `always` index — waits on an outstanding owner decision (spec § 3A.4, *Known exceptions*, item 11). Apart from that, no operation evaluates the `always`, `in`, `to` or `from` indexes, and restore evaluates no constraint (spec § 3A.4, *Known exceptions*); those indexes are built for the constraint queries (`Precept.Constraints`, `Version.ApplicableConstraints`) |
 | inspection | row/source/result-shaping metadata for `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, `FieldSnapshot` | inspection surfaces |
 
 ### `Version` serialization contract
@@ -767,7 +767,7 @@ Host applications must persist and hand back to `Restore` the following: the cur
 
 > **Precept Innovations**
 > - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. Without this, the evaluator would need to walk expression trees at runtime and re-resolve operation kinds and field names on every operation. Flat plans make evaluation predictable-time and the execution trace trivially inspectable.
-> - **Dispatch-optimized constraint indexes.** Constraints are grouped by activation anchor into precomputed buckets — the evaluator never scans or filters at dispatch time. Five anchor families, four activation indexes, built once during the Precept Builder stage.
+> - **Anchor-grouped constraint indexes.** Constraints are grouped by activation anchor into precomputed buckets, built once during the Precept Builder stage — five anchor families, four activation indexes. At runtime the `on` bucket is evaluated at ingress, and whether a direct edit also evaluates rules from the `always` bucket waits on an outstanding owner decision (spec § 3A.4, *Known exceptions*, item 11); otherwise the buckets serve the constraint queries, because the compiler proved that every handler makes true what it must — every rule, and the state ensures that bind it (spec § 3A.4, *Handlers*; a `to` ensure binds only a handler that enters the state) — so nothing is checked before commit (phase 8).
 > - **`ConstraintInfluenceMap` as a built artifact.** The dependency from constraints to contributing fields, with expression-text excerpts, becomes a first-class runtime artifact — enabling AI agents to reason causally about constraint satisfaction.
 
 See [`docs/runtime/precept-builder.md`](../runtime/precept-builder.md) for the full stage design including the six transformation passes.
@@ -835,13 +835,16 @@ Ingress validation, access-mode checks and row dispatch are the three things an 
 | `InspectFire` | event arguments | no | yes |
 | `Update` | the field values in the patch | yes | no |
 | `InspectUpdate` | the field values in the patch | yes | no |
-| `Create` with initial event | construction inputs and initial-event arguments | no | yes (initial event) |
-| `Create` without initial event | construction inputs | no | no |
+| `Create` with initial event | the initial event's arguments | no | yes (initial event) |
+| `InspectCreate` | the initial event's arguments, where there is one | no | yes (initial event) |
+| `Create` without initial event | none — it takes no input | no | no |
 | `Restore` | none — trusted hydration | no | no |
 
 Two rules: (1) `Restore` bypasses ingress validation, access-mode checks and row dispatch alike — persisted data was governed when it was written, so hydration reconstitutes it rather than re-checking it (spec §0.7); it does recompute computed fields. (2) `to` ensures are transitional — they scope to entering a state, not to residing in it.
 
 Inspection and commit paths execute the same prebuilt plans. Disposition alone differs — report vs. enforce.
+
+This matrix covers only what an operation does before it executes. The full statement of what each operation is — every step, the order of the steps, which steps each operation skips, and every write a step can make — is [`precept-language-spec.md`](language/precept-language-spec.md) § 3A.4; what a preview may and may not evaluate is § 3A.6 there.
 
 The four operations (Create, Restore, Fire, Update) and their per-operation input/output contracts, including the "Update exists because Precept owns the data layer" positioning and trusted hydration on `Restore`, live in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md). Two cross-operation discriminators that this monolith uniquely captures:
 
@@ -857,8 +860,8 @@ The structural guarantee means that a valid executable model communicates entire
 **Runtime outcomes** — produced by runtime operations. Expected success, domain rejection, or boundary-validation results. These are normal, in-domain behavior:
 - Business outcomes: `Rejected` — a matched row whose disposition is `reject`
 - Routing/availability: `Unmatched`, current provisional `UndefinedEvent`
-- Boundary validation: `InvalidArgs`, `InvalidInput`, `RestoreInvalidInput`
-- Access enforcement: `AccessDenied`
+- Boundary validation: `InvalidArgs`, `UpdateOutcome.ConstraintsFailed` and `InvalidFields`, `RestoreInvalidInput`
+- Access enforcement: `FieldNotEditable`
 
 No outcome in these families reports a constraint failure found after a mutation, and there cannot be one: a definition only compiles if every handler was proven to preserve every rule, so no operation can reach the point of committing a configuration that breaks one. An outcome for that case would name something the compiler already made impossible.
 
@@ -879,9 +882,12 @@ One variant does carry the name, and it is not that case. `UpdateOutcome.Constra
 
 | Operation | Success | Domain outcome | Boundary-validation | Invariant breach |
 |---|---|---|---|---|
-| `Create` / `Fire` | `Applied`, `Transitioned` | `Rejected`, `Unmatched` | `InvalidArgs`, provisional `UndefinedEvent` | `Fault` |
-| `Update` | `FieldWriteCommitted` | `AccessDenied` | `InvalidInput` | `Fault` |
+| `Create` | `Created` | `Rejected` (an authored `reject` row, or no construction row matched) | `InvalidArgs` | `Fault` |
+| `Fire` | `Transitioned`, `Applied` | `Rejected`, `Unmatched` | `InvalidArgs`, provisional `UndefinedEvent` | `Fault` |
+| `Update` | `Updated` | `FieldNotEditable` | `ConstraintsFailed`, `InvalidFields` | `Fault` |
 | `Restore` | `Restored` | — | `RestoreInvalidInput` | `Fault` |
+
+The outcome names are those of `runtime/result-types.md`; which phase of an operation produces each is `precept-language-spec.md` § 3A.4, and the construction outcome space (no `Applied`, `Unmatched` or `UndefinedEvent` from `Create`) is § 3A.2, *Construction outcomes*.
 
 The invariant-breach column says which classification an engine defect would fall under, not what any
 operation returns today: nothing constructs a `Fault`, and whether an engine defect is reported as one at
@@ -889,7 +895,7 @@ all is undecided (`runtime/fault-system.md` Q3). The column also runs ahead of `
 `runtime-api.md`, which give `UpdateOutcome` and `RestoreOutcome` no fault variant — that gap closes when
 the producer question does.
 
-**Inspection** shares the same prebuilt plans as commit — it is not a second evaluator. `InspectFire` / `InspectUpdate` preview every possible transition (or field-edit outcome) — which rows match, which guards hold, and whether the supplied values pass ingress — using the same plans in report mode rather than enforce mode. What inspection does *not* do is predict a post-mutation constraint verdict, because no such check runs; a rule that a proof already discharged has nothing to report at runtime beyond the premises it was proven from. The full shape of `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, and `FieldSnapshot` lives in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md).
+**Inspection** shares the same prebuilt plans as commit — it is not a second evaluator. `InspectFire` / `InspectUpdate` preview every possible transition (or field-edit outcome) — which rows match, which guards hold, and whether the supplied values pass ingress — using the same plans in report mode rather than enforce mode. A preview evaluates what the operation would and nothing else: a row that an earlier row certainly beats is reported without being evaluated (spec § 3A.6). What inspection does *not* do is predict a post-mutation constraint verdict, because no such check runs; a rule that a proof already discharged has nothing to report at runtime beyond the premises it was proven from. The full shape of `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, and `FieldSnapshot` lives in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md).
 
 ### Constraint query contract
 

@@ -474,8 +474,8 @@ The second keyword (`ensure`, `modify`, `omit`) is the disambiguation token. `re
 
 ```
 on  EventName  [when Guard]  ensure  Expr  [because  "..."]            → EventEnsure
-on  EventName  ->  actions                                             → EventRow
-on  EventName  ->  reject  "reason"                                    → EventRowReject
+on  EventName  [when Guard]  ->  actions                               → EventRow
+on  EventName  [when Guard]  ->  reject  "reason"                      → EventRowReject
 ```
 
 The second keyword (`ensure` vs `->`) is the disambiguation token. After `->`, the parser inspects the next token: if it is `reject`, the construct is `EventRowReject`; otherwise it is `EventRow` (the unmarked success path).

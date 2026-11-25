@@ -333,7 +333,7 @@ public sealed record FieldDescriptor(
 
 `ClrType` is resolved from `TypeMeta.ClrType` (the base element type) plus collection wrapping for collection-typed fields. This is the valid `T` for `version.Get<T>(fieldName)`. For `list of integer`, `ClrType` is `typeof(IReadOnlyList<long>)`.
 
-**`AccessModes` property:** `FieldDescriptor` needs an `AccessModes` property for per-state access-mode lookup (per evaluator.md §7.5). The exact shape (`ImmutableDictionary<StateDescriptor?, AccessMode>` vs. `ImmutableArray<(StateDescriptor?, AccessMode)>`) is a pending implementation decision.
+**`AccessModes` property:** `FieldDescriptor` needs an `AccessModes` property for per-state access-mode lookup (per evaluator.md §7.5). The exact shape (`ImmutableDictionary<StateDescriptor?, AccessMode>` vs. `ImmutableArray<(StateDescriptor?, AccessMode)>`) is a pending implementation decision. Whatever the shape, an entry cannot always be a fixed mode: a guarded access mode (spec §2.2 composition rule 4a) makes the field's editability depend on data, so its entry carries the guard's plan and the mode on each side of it, and the evaluator evaluates the guard at `Update`'s phase 1 against the starting configuration (spec §3A.4 phase 1; evaluator.md §7.5).
 
 Slot indexes are assigned during this pass: fields receive sequential `SlotIndex` values in declaration order, starting at 0. Computed fields get slots too — their values are recalculated by the evaluator on each transition.
 
@@ -389,7 +389,7 @@ The slot layout is the evaluator's register file specification. Every entity ins
 
 > **Vocabulary:** These are **field slots** — runtime storage positions in the `PreceptValue[]` working-copy array, owned by `SlotLayout`, built during `Precept.From()`. They are distinct from **construct slots** (`ParsedConstruct.Slots` / `SlotValue`), which are compile-time parse positions owned by the Constructs catalog. The two concepts do not share lifecycle, representation, or owner. When discussion crosses layers, use these terms explicitly.
 
-**Computed slots:** Fields with `IsComputed == true` are collected into the `ComputedSlots` array. After every state transition, the evaluator walks this array and recalculates each computed field's value before the working copy is committed.
+**Computed slots:** Fields with `IsComputed == true` are collected into the `ComputedSlots` array, in dependency order — a computed field that reads another computed field comes after it; the order always exists because a dependency cycle is a compile error (`CircularComputedField`). In every operation — every `Fire`, `Update`, `Create` and `Restore`, not only a state transition — the evaluator walks this array and recalculates each computed field's value before the working copy is committed (`precept-language-spec.md` § 3A.4, phase 7).
 
 ### Pass 3 — Dispatch Index Pass
 
@@ -498,7 +498,7 @@ public sealed record ActionPlan(
 public enum TransitionOutcome { Transition, NoTransition, Reject }
 ```
 
-**Reject reason lowering (CC#11):** `TransitionOutcome.Reject` rows carry an authored `because` message. `ExecutionRow.RejectReason` is the canonical home — `null` for non-reject rows, populated from the `because` clause text for reject rows. The evaluator reads `winningRow.RejectReason` to return the authored `Rejected(string reason)` outcome without re-reading source.
+**Reject reason lowering (CC#11):** `TransitionOutcome.Reject` rows carry an authored reason, written `reject StringExpr` (spec § 2.2). It is a string expression and may interpolate fields and arguments (spec § 3.6, *String interpolation*), so it is not fixed text: the language evaluates it when, and only when, the row wins dispatch (spec § 3A.4 phase 2). `ExecutionRow.RejectReason` is the canonical home — `null` for non-reject rows; for reject rows it carries the authored text as written, together with an `ExecutionPlan` for the interpolated string when the reason has interpolation holes. The evaluator runs that plan for the winning row to produce the `Rejected(string reason)` outcome without re-reading source; for a reason with no holes the text is the result. Inspection reports the text as written for a reject row it did not reach (spec § 3A.6). The exact shape of the field that carries the plan is not settled here.
 
 **Catalog-driven compilation:** The expression compiler reads `Operations.GetMeta(kind)`, `Functions.GetMeta(kind)`, and `Types.GetAccessor(type, name)` to emit the correct opcodes. It does not hardcode per-operation behavior — it dispatches on catalog entries. When emitting `BinaryOp` or `UnaryOp`, the builder resolves the `OperationMeta`, fetches the executor delegate from the corresponding `TypeRuntimeMeta.BinaryExecutors[localIndex]` (or `UnaryExecutors`), and embeds it directly in the opcode record. The evaluator never indexes `TypeRuntimeMeta` arrays — the delegate is already embedded.
 

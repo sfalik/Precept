@@ -318,8 +318,8 @@ field AuditTrail     as log of string notempty
 No removal operations exist by design. `clear`, `remove`, and all other mutation actions are type errors on a log field.
 
 ```precept
-from any on any
-    -> append AuditTrail "{CurrentState} -> {Event.Name}"
+from Open on Escalate
+    -> append AuditTrail "Escalated from Open"
     -> no transition
 
 from InReview on AddNote
@@ -1210,6 +1210,7 @@ The `dequeue ... into` form is extended with an optional `by` capture clause:
 - `CurrentSeverity` receives the dequeued element's ordering value (type `P` — here the declared `choice of string(...) ordered` type).
 - Both target fields must be declared and type-compatible.
 - The `by` capture is optional — `dequeue ClaimQueue into CurrentClaim` remains valid and discards the ordering value.
+- With both captures the action writes three fields — the queue, the value target and the ordering-value target. Every field each action form writes is enumerated in [`precept-language-spec.md`](precept-language-spec.md) § 3A.4, *What can write during one operation*.
 
 #### Quantifier Predicates on Ordering Axis
 

@@ -123,10 +123,11 @@ The evaluator's inner loop is: look up a prebuilt plan, check each entering valu
 | `Create` | Commit | Construct initial entity instance |
 | `Fire` | Commit | Execute event, apply mutations, transition state |
 | `Update` | Commit | Apply field patch, enforce access modes and constraints |
-| `InspectFire` | Inspect | Preview all transition rows without committing |
+| `InspectCreate` | Inspect | Preview what `Create` would do, row by row over the construction rows, without committing — evaluating only what `Create` would evaluate (spec §3A.6) |
+| `InspectFire` | Inspect | Preview what `Fire` would do, row by row, without committing — evaluating only what `Fire` would evaluate (spec §3A.6) |
 | `InspectUpdate` | Inspect | Preview field patch effects without committing |
 
-Inspection and commit paths execute the **same prebuilt plans** — the only difference is disposition (report vs. enforce).
+Inspection and commit paths execute the **same prebuilt plans**, in the same order, and inspection evaluates nothing commit would not (`precept-language-spec.md` § 3A.6, *What a preview evaluates*) — the only difference is disposition (report vs. enforce).
 
 ---
 
@@ -138,10 +139,10 @@ Inspection and commit paths execute the **same prebuilt plans** — the only dif
 |---|---|
 | **Opcode execution** | Walk flat slot-addressed opcode arrays; push/pop from evaluation stack; read/write field slots |
 | **Transition row dispatch** | Look up `TransitionDispatchIndex[(state, event)]` → ordered `ExecutionRow` list; evaluate guards; select candidate |
-| **Ingress validation** | For externally-supplied values (event args, construction inputs, an update patch): evaluate the constraints declared on the slot each value enters, before the value is applied; collect all violations |
+| **Ingress validation** | For externally-supplied values (event args — at construction, the initial event's args — and an update patch): evaluate the constraints declared on the slot each value enters, before the value is applied; collect-all, as `precept-language-spec.md` § 3A.4 phase 1 defines it, including what it leaves unevaluated |
 | **Action plan execution** | Execute `ActionPlan` arrays from `ExecutionRow`; apply mutations to working copy |
-| **Access mode enforcement** | For Update: check `FieldDescriptor.AccessModes[currentState]` before accepting patch |
-| **Computed field recomputation** | After mutations and before commit: walk `SlotLayout.ComputedSlots` and re-evaluate |
+| **Access mode enforcement** | For Update: check `FieldDescriptor.AccessModes[currentState]` before accepting patch, evaluating the guard of a guarded entry against the starting configuration (§ 7.5) |
+| **Computed field recomputation** | After mutations and before commit: walk `SlotLayout.ComputedSlots`, which is in dependency order, and re-evaluate (spec §3A.4 phase 7) |
 | **Structured outcome production** | Produce `EventOutcome`, `UpdateOutcome` discriminated unions — never throw for in-domain failures |
 | **Inspection production** | Produce `EventInspection`, `UpdateInspection` with full row-by-row detail, and the ingress check results on an update patch. What they report where execution has no constraint verdict to preview is undecided — see § Open Questions |
 
@@ -321,11 +322,12 @@ Runtime quantity args are normalized to UCUM base units at the **intake boundary
 
 ### Output: Commit Operations
 
-**EventOutcome** (returned by `Fire` and `Create`):
+**EventOutcome** (returned by `Fire` and `Create`). The full definition, with what each variant means and which phase produces it, is `result-types.md` § EventOutcome; this listing repeats it for the evaluator's reference and must not differ from it.
 
 ```csharp
 public abstract record EventOutcome
 {
+    public sealed record Created(Version Result, FiredArgs Args) : EventOutcome;      // Create only — construction succeeded
     // CC#23: Mutations attached directly to success variants — evaluator diffs working copy against original slots
     public sealed record Transitioned(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;  // State change succeeded
     public sealed record Applied(Version Result, FiredArgs Args, ImmutableArray<FieldMutation> Mutations) : EventOutcome;       // No-transition row or stateless event succeeded
@@ -333,7 +335,7 @@ public abstract record EventOutcome
     public sealed record InvalidArgs(string Reason) : EventOutcome;                    // Ingress validation failure on the supplied args
     // CC#24: EvaluatedRows carries per-candidate TransitionInspection for tooling debug trace
     public sealed record Unmatched(ImmutableArray<TransitionInspection> EvaluatedRows) : EventOutcome;
-    public sealed record UndefinedEvent() : EventOutcome;                              // No rows for event in current state
+    public sealed record UndefinedEvent() : EventOutcome;                              // Fire only — undeclared name or the initial event (before ingress), or no rows in the current state (at dispatch)
     public sealed record Faulted(Fault Fault) : EventOutcome;                          // engine-invariant breach — a defect in the compiler, builder or evaluator
 }
 ```
@@ -482,10 +484,8 @@ The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); 
 │  │  applied to the working copy, resolving against the state being left.   │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  2d. State Change + omit Reset (§3A.4 — The state change)               │  │
-│  │  Working copy's state becomes row.TargetState. The `omit` reset         │  │
-│  │  (composition rule 5) applies here, as part of entering the target      │  │
-│  │  state — before the row's own action chain runs.                        │  │
+│  │  2d. State Change (§3A.4 — The state change)                            │  │
+│  │  Working copy's state becomes row.TargetState. No field is written.     │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  2e. Row Action Execution (§3A.4 — Mutation)                            │  │
@@ -493,9 +493,11 @@ The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); 
 │  │  in written order, each write seeing all preceding writes.               │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  2f. Entry Actions (§3A.4 — Entry actions)                              │  │
-│  │  State actions declared on the state being entered (`to <State> -> …`)  │  │
-│  │  applied, resolving against the state being entered.                    │  │
+│  │  2f. Entering the Target State (§3A.4 — Entering the target state)      │  │
+│  │  The `omit` reset (composition rule 5) first: fields the target state   │  │
+│  │  omits go back to their reset values. Then the state actions declared   │  │
+│  │  on the state being entered (`to <State> -> …`) are applied, resolving  │  │
+│  │  against the state being entered.                                       │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  2g. Computed Field Recomputation (§3A.4 — Computed-field recomputation)│  │
@@ -514,7 +516,7 @@ The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); 
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Which rows run 2c, 2d and 2f, and how many state actions run.** Spec §3A.4 settles both. A `transition` row — including one back to the same state — runs exit actions, the state change and `omit` reset, and entry actions; a `no transition` row runs none of them. Construction runs the initial state's entry actions after the construction row's action chain, and no exit actions. When a state carries several state actions at one position, all of them run in declaration order, each seeing the writes of those before it; a guarded one runs only when its guard holds. See `precept-language-spec.md` § 3A.4, *Operation execution order*.
+**Which rows run 2c, 2d and 2f, and how many state actions run.** Spec §3A.4 settles both. A `transition` row — including one back to the same state — runs exit actions, the state change, and (after the row's own actions) the `omit` reset and entry actions; a `no transition` row runs none of them. Construction runs the initial state's entry actions after the construction row's action chain, and no exit actions. When a state carries several state actions at one position, all of them run in declaration order, each seeing the writes of those before it; a guarded one runs only when its guard holds. See `precept-language-spec.md` § 3A.4, *Operation execution order*.
 
 ### Working Copy Management
 
@@ -524,15 +526,17 @@ The evaluator never mutates the input `Version`. The Fire lifecycle for one even
 2. **Populate:** Copy `Version.Slots` into the rented array (field slots)
 3. **Load args:** The `FiredArgs` value carries the `PreceptValue[]` arg slot array materialized by `IArgBuilder` at the Fire boundary (ingress governance already validated these — §3A.4 phase 1). Event args are already `PreceptValue` — no per-opcode conversion needed. `LOAD_ARG` reads from this array by pre-resolved slot index.
 4. **Exit actions (§3A.4 — Exit actions):** State actions declared on the state being left (`from <State> -> …`) applied to the working copy.
-5. **State change + omit reset (§3A.4 — The state change):** The working copy's state becomes the row's target state; the `omit` reset (composition rule 5) applies here.
+5. **State change (§3A.4 — The state change):** The working copy's state becomes the row's target state. No field is written.
 6. **Mutate (§3A.4 — Mutation):** Execute the row's action chain against the working copy, in written order.
-7. **Entry actions (§3A.4 — Entry actions):** State actions declared on the state being entered (`to <State> -> …`) applied.
-8. **Recompute (§3A.4 — Computed-field recomputation):** Walk `SlotLayout.ComputedSlots`; re-evaluate each computed field.
+7. **Entering the target state (§3A.4 — Entering the target state):** The `omit` reset (composition rule 5), then the state actions declared on the state being entered (`to <State> -> …`).
+8. **Recompute (§3A.4 — Computed-field recomputation):** Walk `SlotLayout.ComputedSlots`, in dependency order, so a computed field that reads another is derived after it; re-evaluate each computed field.
 9. **Commit (§3A.4 — Commit):** Donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone). Promotion is unconditional once the row's action chain has run: the compiler proved the handler preserves every rule (spec §0.7), so there is no verdict to wait for. The array goes back to `ArrayPool<PreceptValue>.Shared` only when the operation never reached this step — the arguments failed their ingress check at step 3, or the winning row was a `reject` row.
+
+**Reading a computed field anywhere in an operation.** The specification defines a read of a computed field, anywhere in an operation, as the value of its expression over the working copy at that moment (`precept-language-spec.md` § 3A.4, *What a computed field returns when it is read during an operation*). That covers every position, not only steps 4–7: a `default` expression read while `Create` builds the hollow version, an argument constraint or `on <Event> ensure` at ingress, a row's guard and a reject reason at dispatch, and the state actions and row actions. Step 8 fixes the values the committed version carries; it is not the only moment a computed slot may be read as current. The evaluator therefore must not answer a read of a computed slot with the value left there by the previous operation, nor, while the hollow version is being built, with whatever the slot happens to hold before anything has derived it: such a read derives the field from the slots materialized so far (the specification refuses at compile time any such read whose dependencies have no value yet — § 3A.4 phase 0). Whether it evaluates the field's `ComputedPlan` at the read, or re-derives the affected computed slots after each write to something they depend on, is an implementation choice that has not been made.
 
 This is why a refused operation leaves no side effects: the working copy it was building is never promoted, and the entity the caller holds is untouched. On success, the working array becomes the committed `Version.Slots` — no extra allocation.
 
-> **Follows § 3A.4's *Operation execution order*.** This lifecycle, the flow diagram above, and the `Fire` pseudocode below now enumerate exit actions, the state change and `omit` reset, and entry actions alongside the row's own writes, in the order fixed by `precept-language-spec.md` § 3A.4. Steps 4, 5 and 7 run for a `transition` row, including one back to the same state, and are skipped for a `no transition` row; at construction only step 7 runs. Each of steps 4 and 7 runs every state action declared at that position, in declaration order. § 3A.4 states both rules.
+> **Follows § 3A.4's *Operation execution order*.** This lifecycle, the flow diagram above, and the `Fire` pseudocode below now enumerate exit actions, the state change, and the `omit` reset and entry actions alongside the row's own writes, in the order fixed by `precept-language-spec.md` § 3A.4. Steps 4, 5 and 7 run for a `transition` row, including one back to the same state, and are skipped for a `no transition` row; at construction only the second half of step 7 runs — the initial state's entry actions, not the `omit` reset, because the hollow version already gave every field the initial state omits its reset value (spec § 3A.4 phase 6, and *Known exceptions*, item 7). Each of steps 4 and 7 runs every state action declared at that position, in declaration order. § 3A.4 states both rules.
 
 ---
 
@@ -567,22 +571,39 @@ internal static PreceptValue EvaluatePlan(ExecutionPlan plan, PreceptValue[] slo
 
 #### Create
 
-`Create` constructs the initial entity instance. Behavior depends on whether the precept declares an initial event:
+`Create` constructs the initial entity instance. Its steps and their order are stated in `precept-language-spec.md` § 3A.4, *Operation execution order* (phase 0 is default materialization) and § 3A.5; the pseudocode below is how the evaluator carries them out. A successful `Create` returns `EventOutcome.Created`, with or without an initial event — when it runs the row loop shared with `Fire` below, the success variant is reported as `Created`. Behavior depends on whether the precept declares an initial event:
 
 **With initial event:**
 
 ```csharp
 EventOutcome Create(FiredArgs? args)
 {
-    // 1. Build hollow version: default slot values + initial state
+    // Phase 0 — build the hollow version: every stored field's default, in
+    // declaration order, including fields the initial state omits (their storage
+    // holds their reset values), + initial state. Spec §3A.4 phase 0.
     var hollowSlots = new PreceptValue[precept.SlotLayout.FieldCount];
+    // A computed slot is not materialized here; a default, guard or ensure that
+    // reads one before step 8 derives it at the read ("Reading a computed field
+    // anywhere in an operation", § Working Copy Management).
     for (int i = 0; i < hollowSlots.Length; i++)
         hollowSlots[i] = EvaluateDefault(precept.Fields[i]);
     
     var hollow = new Version(precept, precept.InitialState, hollowSlots);
-    
-    // 2. Fire the initial event atomically
-    return Fire(precept, hollow, precept.InitialEvent!, args ?? FiredArgs.Empty);
+
+    // Phase 1 — ingress governance on the initial event's arguments, after the
+    // hollow version exists: phase 0 precedes phase 1 in every operation (spec
+    // §3A.4; §3A.5 gives the reasons). Collect-all.
+    var violations = ValidateIngress(args ?? FiredArgs.Empty, precept.InitialEvent!, hollow);
+    if (violations.Count > 0)
+        return new EventOutcome.InvalidArgs(violations);
+
+    // Phases 2–8 — the same row loop as the body of Fire below, from step 2 on,
+    // run over the construction rows rather than a dispatch-table lookup (the
+    // initial event is not in the post-construction dispatch table). Construction
+    // enters the initial state and leaves none, a success is reported as Created,
+    // and no matching row is Rejected rather than Unmatched (spec §3A.2, §3A.4).
+    return RunRows(precept, hollow, precept.ConstructionRows, precept.InitialEvent!,
+                   args ?? FiredArgs.Empty, construction: true);
 }
 ```
 
@@ -609,7 +630,7 @@ EventOutcome Create()
     //    commits — the default configuration with the initial state's entry
     //    actions applied — satisfies every rule (spec §0.7, base case; C100/C101
     //    check the defaults), so there is nothing to re-check here.
-    return new EventOutcome.Applied(new Version(precept, precept.InitialState, slots));
+    return new EventOutcome.Created(new Version(precept, precept.InitialState, slots));
 }
 ```
 
@@ -633,11 +654,11 @@ EventOutcome Create()  // stateless precept — no initial event
 
     // 3. Commit. Same as the stateful case: the global rules were proven to hold
     //    of the default configuration at compile time (spec §0.7, base case).
-    return new EventOutcome.Applied(new Version(precept, state: null, slots));
+    return new EventOutcome.Created(new Version(precept, state: null, slots));
 }
 ```
 
-With an initial event on a stateless precept, the Fire pipeline runs normally — the hollow version is built with `State = null` and passed into `Fire`. State-entry semantics are absent because `to <State> ensure` and `in <State> ensure` require a named state; with `State = null` those constraint buckets are structurally empty.
+With an initial event on a stateless precept, `Create` runs exactly the *With initial event* pseudocode above: the hollow version is built with `State = null`, then ingress runs on the initial event's arguments, then the construction rows run through `RunRows` with `construction: true`. It does not go through `Fire`, which refuses the initial event's name (spec §3A.4 phase 1). There are no entry actions, because no state is entered. The steps and their order are stated in `precept-language-spec.md` § 3A.4, *Operation execution order*, and § 3A.5, *Stateless Precepts*.
 
 **CC#26 locked semantics (2026-05-06):**
 - State-set step omitted — `Version.State = null`, no initial state to assign
@@ -654,6 +675,14 @@ With an initial event on a stateless precept, the Fire pipeline runs normally �
 ```csharp
 EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, FiredArgs args)
 {
+    // 0. Event resolution and ingress governance (§3A.4 phase 1) have already run at
+    //    the API boundary, in that order: an undeclared event name, or the initial
+    //    event's name, returned UndefinedEvent before any argument was checked
+    //    (Fire-once guarantee, spec §3A.5); otherwise the arguments in `args` passed
+    //    their checks, or Fire returned InvalidArgs without reaching this point.
+    //    Construction does not come through here — Create runs the same row loop
+    //    below over the construction rows (see Create above).
+
     // 1. Look up dispatch index
     if (!precept.DispatchIndex.Rows.TryGetValue((version.CurrentState, @event), out var rows))
         return new UndefinedEvent();
@@ -667,9 +696,12 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         if (row.Guard != null && !EvaluateGuard(row.Guard, version.Slots, args))
             continue;  // Guard failed — try the next row
 
-        // A reject row wins dispatch without executing anything.
+        // A reject row wins dispatch without writing anything. Its reason string is
+        // the one thing evaluated for it after the guard (it may interpolate fields
+        // and arguments, spec §3A.4 phase 2), and it is evaluated only here, for the
+        // row that won.
         if (row.Outcome == TransitionOutcome.Reject)
-            return new EventOutcome.Rejected(row.RejectReason ?? "Rejected", firedArgs);
+            return new EventOutcome.Rejected(EvaluateRejectReason(row, version.Slots, args), firedArgs);
 
         // 2b. Snapshot working copy
         var workingCopy = version.Slots.ToArray();
@@ -677,8 +709,9 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         // A transition row (TargetState != null, including a transition back to the
         // same state) leaves its source state and enters its target. A `no transition`
         // row leaves and enters nothing. A construction row (the initial event) leaves
-        // nothing and enters the initial state the hollow version already carries,
-        // whose omit reset the hollow build already applied (spec §3A.4, §3A.5).
+        // nothing and enters the initial state the hollow version already carries;
+        // the hollow build already gave every field that state omits its reset value
+        // (spec §3A.4 phase 0), so the omit reset is not run for it (phase 6).
         bool leaves = row.TargetState != null;
         bool enters = leaves || @event.IsInitial;
         var targetState = row.TargetState ?? version.CurrentState;
@@ -689,19 +722,23 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         if (leaves)
             ExecuteStateActions(version.CurrentState!.ExitActions, workingCopy, args);
 
-        // 2d. State change + omit reset (§3A.4 — The state change): the working
-        // copy's state becomes the row's target state; the omit reset (composition
-        // rule 5) applies here, before the row's own action chain runs.
-        if (leaves)
-            ApplyOmitReset(targetState, workingCopy);
+        // 2d. State change (§3A.4 — The state change): the working copy's state
+        // becomes the row's target state. No field is written here.
 
-        // 2e. Row action execution (§3A.4 — Mutation)
+        // 2e. Row action execution (§3A.4 — Mutation). The row's actions read the
+        // source state's fields, so the omit reset must not have run yet.
         foreach (var action in row.Actions)
             ExecuteAction(action, workingCopy, args);
 
-        // 2f. Entry actions (§3A.4 — Entry actions): every state action on the state
+        // 2f. Entering the target state (§3A.4 — Entering the target state): first
+        // the omit reset (composition rule 5), then every state action on the state
         // being entered, in declaration order, resolved against the state being
         // entered. A guarded one runs only when its guard holds.
+        // A field without a default is put back to the starting value phase 0 gives
+        // it; a required field without a default is left with no value (spec §3A.4
+        // phase 6).
+        if (leaves)
+            ApplyOmitReset(targetState, workingCopy);
         if (enters && targetState != null)
             ExecuteStateActions(targetState.EntryActions, workingCopy, args);
 
@@ -716,6 +753,11 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         // CC#23: compute field-level diff against pre-mutation slots before constructing outcome
         var mutations = BuildMutations(version.Slots, workingCopy, precept.Fields);
 
+        // A construction row allows neither `transition` nor `no transition`
+        // (spec §3A.5), so its outcome is reported here, before the switch.
+        if (@event.IsInitial)
+            return new EventOutcome.Created(new Version(precept, version.CurrentState, workingCopy), firedArgs);
+
         return row.Outcome switch
         {
             TransitionOutcome.Transition   => new EventOutcome.Transitioned(new Version(precept, newState, workingCopy), firedArgs, mutations),
@@ -724,7 +766,13 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         };
     }
 
-    // 3. No row's guard passed.
+    // 3. No row's guard passed. At construction that is Rejected, not Unmatched
+    // (spec §3A.2, *Construction outcomes*). What reason text a no-match
+    // construction's Rejected carries is not stated in result-types.md, which
+    // describes Rejected only for an authored reject row.
+    if (@event.IsInitial)
+        return new EventOutcome.Rejected(NoConstructionRowMatchedReason(), firedArgs);
+
     // CC#24: attach per-candidate trace so callers can explain why no row matched
     return new EventOutcome.Unmatched(evaluatedRowTraces.ToImmutableArray());
 }
@@ -734,31 +782,28 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
 
 **Why the loop returns on the first guard that passes.** Dispatch is first-match, in declaration order, and the remaining rows are not evaluated (spec §3A.4 phase 2). Nothing downstream can disqualify the row the guard selected — constraint evaluation used to, and no longer exists — so there is no candidate list to resolve and no ambiguity to fault on. The grammar split between mutation rows and reject rows, and the decision not to allow state-agnostic handlers in a stateful precept, remove the remaining ways two rows could compete for the same operation.
 
-`ExecutionRow.RejectReason` carries the lowered `because` message from an authored reject row. The field is `string? RejectReason` on `ExecutionRow` — resolved by CC#11 and mirrored in `TypedTransitionRow`. The lowered message is stored at build time by the Precept Builder and read by the evaluator at runtime with no further resolution needed.
+`ExecutionRow.RejectReason` carries the authored reason of a reject row (`reject StringExpr`). It is resolved by CC#11 and mirrored in `TypedTransitionRow`. A reason may interpolate fields and arguments, so it is a string expression, not fixed text: `EvaluateRejectReason` runs its interpolation plan against the starting slots and the arguments — the values the guard read — and returns the text as written when it has no holes (`precept-builder.md`, *Reject reason lowering*). It is evaluated only for the row that wins dispatch (spec § 3A.4 phase 2).
 
 ```csharp
 UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
 {
-    // 1. Access mode checks
-    if (patch != null)
-    {
-        for (int i = 0; i < patch.Length; i++)
-        {
-            if (patch[i].IsAbsent) continue;
-            var field = precept.Fields[i];
-            var mode = GetAccessMode(field, version.CurrentState);
-            if (mode != AccessMode.Writable)
-                return new UpdateOutcome.FieldNotEditable(field.Name, mode == AccessMode.ReadOnly ? FieldAccessMode.Readonly : FieldAccessMode.Omit);
-        }
-    }
-    
-    // 2. Ingress governance (§3A.4 phase 1): each incoming value is held to the
-    //    constraints declared on the field it is entering, before it is applied
-    //    and before anything derives from it (spec §0.7).
-    //    Collect-all: every failing value is reported, not just the first.
-    var violations = ValidateIngress(patch, precept.Fields, version.CurrentState);
-    if (violations.Count > 0)
-        return new UpdateOutcome.ConstraintsFailed(violations);
+    // 1–2. Phase 1 (spec §3A.4): what is checked, in what order, and what
+    //    collect-all leaves unevaluated is stated there; this is how it is carried
+    //    out. Access modes first, every patched field, with the guard of a guarded
+    //    access mode evaluated against the starting configuration (version.Slots).
+    //    Then the type of each patched value. Then the constraints declared on each
+    //    patched field — only for values that passed their access and type checks,
+    //    and only when every phase-1 constraint its proof relied on passed — each
+    //    read against the starting slots with the patched values laid over them and
+    //    every computed slot it reads re-derived from that overlay.
+    //    Collect-all: every failure found is kept, not just the first.
+    var accessFailures = CheckAccessModes(patch, precept.Fields, version);
+    var violations = ValidateIngress(patch, precept.Fields, version, skip: accessFailures);
+    if (accessFailures.Count > 0 || violations.Count > 0)
+        // How one UpdateOutcome reports access failures, type failures and
+        // constraint failures together is an open outcome-shape question
+        // (result-types.md § UpdateOutcome); what was evaluated is fixed above.
+        return RefuseUpdate(accessFailures, violations);
 
     // 3. Apply patch to working copy
     var workingCopy = version.Slots.ToArray();
@@ -781,7 +826,7 @@ UpdateOutcome Update(Precept precept, Version version, PreceptValue[]? patch)
 
 #### FromJson (Hydration — Not an Evaluator Operation)
 
-`FromJson` is handled at the `Precept` API boundary, not by the evaluator. It parses the persistence envelope, validates the `$precept` name, resolves the `$state`, and populates the slot array from the `fields` object — then constructs `Version` directly. No constraint validation occurs. Access modes are bypassed. The evaluator is not invoked.
+`FromJson` is handled at the `Precept` API boundary. It parses the persistence envelope, validates the `$precept` name, resolves the `$state`, and populates the slot array from the `fields` object, then recomputes computed fields and constructs `Version`. No constraint validation occurs. Access modes are bypassed. No row is dispatched and no action runs; the only expressions evaluated are the computed fields' (`precept-language-spec.md` § 3A.4: recomputation runs in every operation, `Restore` included).
 
 See `runtime-api.md` § Restoration for the full behavioral specification.
 
@@ -789,7 +834,7 @@ See `runtime-api.md` § Restoration for the full behavioral specification.
 
 #### InspectFire(event, args)
 
-Returns `EventInspection` — one `TransitionInspection` per declared transition row for the current state/event:
+Returns `EventInspection` — one `TransitionInspection` per declared transition row for the current state/event. What a preview may and may not evaluate is stated in `precept-language-spec.md` § 3A.6, *What a preview evaluates*: everything `Fire` would evaluate, in the same order, and nothing `Fire` would not. An earlier version of this pseudocode ran a later row's actions before noting that an earlier row had already won, and left out exit actions, the `omit` reset and entry actions; both were defects against that rule and are repaired here.
 
 ```csharp
 EventInspection InspectFire(Precept precept, Version version, EventDescriptor @event, FiredArgs? args)
@@ -797,15 +842,29 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
     var eventName = @event.Name;
     var declaredArgs = @event.ArgDescriptors;
 
-    // ── Arg validation gate ──────────────────────────────────────
-    // Args validated before evaluator is invoked. On failure, return directly
-    // with Impossible prospect and populated ArgErrors — no guard/constraint evaluation.
-    if (args is not null)
-    {
-        var argErrors = ValidateArgs(args, @event.ArgDescriptors);
-        if (argErrors.Length > 0)
-            return new EventInspection(eventName, Prospect.Impossible, declaredArgs, argErrors, [], [], []);
-    }
+    // ── Event resolution, before anything is checked ─────────────
+    // As for Fire (spec §3A.4 phase 1): the initial event is not in the
+    // post-construction event space, so a preview of it ends here, Impossible, with
+    // no argument errors — its argument constraints and its `on <InitialEvent> ensure`
+    // declarations are evaluated only by Create and InspectCreate. (An undeclared
+    // name never reaches this point: it has no EventDescriptor.)
+    if (@event == precept.InitialEvent)
+        return new EventInspection(eventName, Prospect.Impossible, declaredArgs, [], [], [], []);
+
+    // ── Ingress gate (phase 1) ───────────────────────────────────
+    // The same phase-1 check Fire runs (ValidateIngress, §7.6): the type of each
+    // supplied argument, the constraints declared on each argument, and the event's
+    // `on <Event> ensure` declarations. It runs whether or not any argument was
+    // supplied — an ensure that reads only fields is evaluated even with `args` null,
+    // which is how InspectUpdate's event previews call this. An argument that was not
+    // supplied is not a failure here, and a check that reads one is not evaluated
+    // (spec §3A.6, "When inputs are missing"). On any failure Fire would refuse at
+    // phase 1, so nothing after it is evaluated (spec §3A.6, rule 2): return directly
+    // with Impossible prospect and the failures — no guard, no row.
+    var argErrors = ValidateIngressForPreview(precept.ConstraintPlanIndex, @event,
+                                              version.Slots, args ?? FiredArgs.Empty);
+    if (argErrors.Length > 0)
+        return new EventInspection(eventName, Prospect.Impossible, declaredArgs, argErrors, [], [], []);
 
     // ── Dispatch lookup ──────────────────────────────────────────
     if (!precept.DispatchIndex.Rows.TryGetValue((version.CurrentState, @event), out var rows))
@@ -819,13 +878,28 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
 
     var transitionInspections = new List<TransitionInspection>();
     var overallProspect = Prospect.Impossible;
-    ExecutionRow? winningRow = null;
+    bool winnerFound = false;      // an earlier row's guard is certainly true
+    bool earlierPossible = false;  // an earlier row's guard is undetermined
     
     foreach (var row in rows)
     {
+        // ── Rows Fire would never reach ──────────────────────────
+        // Dispatch is first-match (§3A.4 phase 2). Once a guard is certainly true,
+        // Fire evaluates nothing in any later row, so inspection evaluates nothing
+        // in it either — not its guard, not its actions (spec §3A.6, "What a preview
+        // evaluates"). The row is still reported, as Impossible, on dispatch grounds.
+        if (winnerFound)
+        {
+            transitionInspections.Add(new TransitionInspection(
+                Prospect.Impossible, BuildRowEffect(row), null, [], []));
+            continue;
+        }
+
         // ── Guard evaluation ─────────────────────────────────────
         // Inspect path uses EvaluateGuardProspect (Kleene ternary), not EvaluateGuard (bool).
-        // Missing args → Unknown → propagates via Kleene truth table to Possible.
+        // Missing required args → Unknown → propagates via Kleene truth table to Possible.
+        // An optional arg the caller left out is not missing: it loads as not set
+        // (spec §3A.4 phase 1, §3A.6 "When inputs are missing").
         // Full args → standard binary evaluation (Certain or Impossible).
         Prospect guardProspect;
         string? guardSummary = null;
@@ -836,56 +910,69 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
         }
         else
         {
-            guardProspect = EvaluateGuardProspect(row.Guard, version.Slots, args);
-            if (guardProspect == Prospect.Impossible)
-                guardSummary = SummarizeGuard(row.Guard);   // Human-readable guard description
-            else if (guardProspect == Prospect.Possible)
-                guardSummary = SummarizeGuard(row.Guard);   // Ambiguous — show the guard expression
+            // When an earlier row's guard was undetermined, Fire might or might not
+            // reach this row, so the falsity of that earlier guard is not established.
+            // An expression whose proof relied on it — this guard, the reject reason,
+            // the row's actions — is not evaluated and comes back undetermined
+            // (spec §3A.6, "When inputs are missing"). `earlierPossible` carries that.
+            guardProspect = EvaluateGuardProspect(row.Guard, version.Slots, args, earlierPossible);
+            if (guardProspect != Prospect.Certain)
+                guardSummary = SummarizeGuard(row.Guard);   // failed, or ambiguous — show the guard
         }
         
+        var effect = BuildRowEffect(row);
+
         if (guardProspect == Prospect.Impossible)
         {
-            // Guard failed — row is impossible
-            var effect = BuildRowEffect(row);
+            // Guard certainly false — only the guard was evaluated. The row's actions,
+            // its reject reason and the state actions it would trigger are not run.
             transitionInspections.Add(new TransitionInspection(
                 Prospect.Impossible, effect, guardSummary, [], []));
             continue;
         }
         
-        // Guard passed or is ambiguous — simulate execution
-        var workingCopy = version.Slots.ToArray();
-        foreach (var action in row.Actions)
-            ExecuteAction(action, workingCopy, args ?? FiredArgs.Empty);
-        
-        foreach (var slot in precept.SlotLayout.ComputedSlots)
-            workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, args ?? FiredArgs.Empty);
-        
+        // ── Guard certainly or possibly true — simulate what Fire would run ──
+        // SimulateRow is steps 2b–2g of Fire, in the same order, on a copy that is
+        // never committed: exit actions, the state change, the row's actions, the
+        // omit reset and entry actions, then computed-field recomputation — the
+        // state-action steps only for a `transition` row. A reject row writes
+        // nothing, so there is nothing to simulate and PostFields is empty.
+        // When the guard is only Possible, or an argument is missing, SimulateRow
+        // runs in three-valued mode: an expression whose inputs or proof premises
+        // are not established is not evaluated, and what it would have written is
+        // marked undetermined (see "Undetermined values" below).
+        ImmutableArray<FieldSnapshot> postFields = [];
+        if (row.Outcome == TransitionOutcome.Reject)
+            effect = new RowEffect.Rejection(EvaluateRejectReasonProspect(row, version.Slots, args, guardProspect, earlierPossible));
+        else
+        {
+            var workingCopy = SimulateRow(precept, version, @event, row, args, guardProspect, earlierPossible);
+            postFields = BuildFieldSnapshots(workingCopy, precept.Fields);
+        }
+
         // What fills `constraintResults` is unsettled — see "What inspection reports
         // in place of a constraint verdict" below. Execution has no constraint-
         // evaluation phase, so there is none to preview.
         var constraintResults = BuildConstraintResults(...);
-        var postFields = BuildFieldSnapshots(workingCopy, precept.Fields);
-        var effect = BuildRowEffect(row);
 
         // The guard alone decides. Nothing downstream can disqualify a row the guard
-        // selected (§3A.4 phase 2), so the prospect is the guard's own verdict.
-        var prospect = guardProspect;
+        // selected (§3A.4 phase 2). A row is Certain only when its guard is certainly
+        // true and no earlier row's guard is undetermined; after an undetermined
+        // guard, later rows are at most Possible (result-types.md § Prospect
+        // propagation).
+        var prospect = (guardProspect == Prospect.Certain && !earlierPossible)
+            ? Prospect.Certain
+            : Prospect.Possible;
 
-        // First-match-wins: the first Certain row is the winner, and every later row
-        // is Impossible because it can never be reached.
-        if (prospect == Prospect.Certain && winningRow == null)
-        {
-            winningRow = row;
+        if (guardProspect == Prospect.Certain)
+            winnerFound = true;            // Fire never goes past this row
+        else
+            earlierPossible = true;
+
+        if (prospect == Prospect.Certain)
             overallProspect = Prospect.Certain;
-        }
-        else if (winningRow != null)
-        {
-            prospect = Prospect.Impossible;        // An earlier row already wins
-        }
-        else if (prospect == Prospect.Possible && overallProspect == Prospect.Impossible)
-        {
+        else if (overallProspect == Prospect.Impossible)
             overallProspect = Prospect.Possible;
-        }
         
         transitionInspections.Add(new TransitionInspection(
             prospect, effect, guardSummary, constraintResults, postFields));
@@ -895,46 +982,92 @@ EventInspection InspectFire(Precept precept, Version version, EventDescriptor @e
 }
 
 // ── RowEffect construction ───────────────────────────────────────
-// Maps ExecutionRow.Outcome to the RowEffect DU:
+// Maps ExecutionRow.Outcome to the RowEffect DU. Evaluates nothing: a reject row's
+// reason is carried as written, interpolations unfilled. Only a reject row that
+// Fire would reach — its guard certainly or possibly true and no earlier row
+// certainly winning — has its reason evaluated, through EvaluateRejectReason in
+// three-valued mode, and the result replaces the text as written (spec §3A.6).
 RowEffect BuildRowEffect(ExecutionRow row) => row.Outcome switch
 {
     TransitionOutcome.Transition => new RowEffect.TransitionTo(row.TargetState!.Name),
     TransitionOutcome.NoTransition => new RowEffect.NoTransition(),
-    TransitionOutcome.Reject => new RowEffect.Rejection(row.RejectReason ?? ""),
+    TransitionOutcome.Reject => new RowEffect.Rejection(row.RejectReason?.Text ?? ""),
 };
 ```
 
 **Undetermined values, not only undetermined guards.** Three-valued evaluation on the inspect path applies to values as well as guards, for the same reason and by the same rule: an expression whose inputs are not all supplied has no consequence the evaluator can reach, so it is not evaluated and its result is reported as undetermined. This is what makes inspection best-effort without exempting it from the fault guarantee (`precept-language-spec.md` § 3A.6).
 
-The case that forces it: a row simulates its actions when its guard is merely `Possible` (below), because the caller wants the projected field values. Those actions can contain a fault-prone expression whose compile-time proof consumed the guard and an argument constraint — exactly the premises that are absent when the guard came back `Unknown`. Evaluating it anyway would fault inside a preview. Reporting it undetermined is both honest and safe, and it costs the caller nothing they could have had: the value genuinely is not determined until the missing input arrives. Projected fields therefore divide into those computed and those undetermined, per row.
+The case that forces it: a row simulates its actions when its guard is merely `Possible` (above), because the caller wants the projected field values. Those actions can contain a fault-prone expression whose compile-time proof consumed the guard and an argument constraint — exactly the premises that are absent when the guard came back `Unknown`. Evaluating it anyway would fault inside a preview. Reporting it undetermined is both honest and safe, and it costs the caller nothing they could have had: the value genuinely is not determined until the missing input arrives. Projected fields therefore divide into those computed and those undetermined, per row.
 
 **`EvaluateGuardProspect` — Kleene ternary guard evaluation for the inspect path:**
 
-The commit path calls `EvaluateGuard(plan, slots, args)` → `bool`. The inspect path calls `EvaluateGuardProspect(plan, slots, args?)` → `Prospect`, which implements Kleene three-value logic:
+The commit path calls `EvaluateGuard(plan, slots, args)` → `bool`. The inspect path calls `EvaluateGuardProspect(plan, slots, args?, earlierPossible)` → `Prospect`, which implements Kleene three-value logic:
 
-- Any `LOAD_ARG` opcode for a missing arg produces `Unknown` at the Kleene level
+- Any `LOAD_ARG` opcode for a required arg that was not supplied produces `Unknown` at the Kleene level. An `optional` arg the caller left out is not missing: it loads as not set, exactly as `Fire` loads it (spec §3A.4 phase 1; §3A.6, *When inputs are missing*)
 - The stack machine propagates `Unknown` through boolean operators per the truth table documented in `result-types.md` § Kleene Propagation Rules
 - The final result maps: `true` → `Certain`, `false` → `Impossible`, `Unknown` → `Possible`
-- When `args` is fully provided, `EvaluateGuardProspect` produces the same binary result as `EvaluateGuard` (no `Unknown` values enter the stack)
+- When `args` is fully provided and no earlier row's guard was undetermined, `EvaluateGuardProspect` produces the same binary result as `EvaluateGuard` (no `Unknown` values enter the stack)
+- When an earlier row's guard was undetermined (the `earlierPossible` argument), a sub-expression whose compile-time proof relied on an earlier row's guard being false is not evaluated and produces `Unknown`; the same flag governs `EvaluateRejectReasonProspect` and `SimulateRow`. Which sub-expressions those are is recorded with the proof (spec §3A.6)
+- `EvaluateRejectReasonProspect` and `SimulateRow` also take the row's own `guardProspect`. When it is `Possible`, a sub-expression whose compile-time proof relied on the row's own guard is not evaluated and produces `Unknown`, exactly as for an earlier guard: the guard it sits behind is undetermined (spec §3A.6, *When inputs are missing*). That holds wherever `SimulateRow` evaluates: the reason string, the row's own actions, and the exit and entry actions it runs for the row, their guards included — a state action may rely on the row's guard when every handler that runs it supplies that guard (spec §3A.4, *What sits between the guard and each later position*). The same holds for a guarded state action whose own guard comes back `Unknown`: what follows it and relied on its guard, or on its guard's negation, is not evaluated, and every field it could write is undetermined. A reason string is a position like any other
+- Inside one expression the same rule applies to operands. When the compiler's proof of an operand relied on an earlier operand of the same `and` or `or`, or on the condition of an `if … then … else`, and that earlier operand or condition is `Unknown`, the operand is not evaluated and produces `Unknown`; the Kleene table in `result-types.md` combines it as it combines any other `Unknown`. With `Go.K > 0 and D >= Go.K and 100 / D > 1` and `K` not supplied, the third operand is not evaluated, because its divisor was proved nonzero from the first two (spec §3A.6, *When inputs are missing*). Which operands those are is recorded with the proof, as for the row-level cases above
 
 **Bootstrap path before D8/R4 ships:** Without per-node arg-dependency sets, the evaluator implements a conservative approximation: any expression referencing any arg (detected by attempting evaluation and catching the absent-arg condition) → mark that guard expression as `Unknown → Possible`. This is conservative (may over-report `Possible`) but never wrong. When D8/R4 ships, the precise Kleene evaluation replaces the approximation automatically.
 
 **`DeclaredArgs` population:** Read directly from `EventDescriptor.ArgDescriptors` — one array reference, zero computation. Includes both required and optional args so consumers can render a complete input form.
 
-**`ArgError` collection path:** At the `Version.InspectFire` API boundary, arg validation runs against `EventDescriptor.ArgDescriptors` before the evaluator is invoked. If validation produces errors, the evaluator is not called; the API returns `EventInspection(EventName, Impossible, DeclaredArgs, argErrors, [], [], [])` directly. This matches the commit path where `Fire` returns `EventOutcome.InvalidArgs(reason)` on arg validation failure.
+**`ArgError` collection path:** At the `Version.InspectFire` API boundary, the phase-1 check — argument types, the constraints declared on each argument, and the event's `on <Event> ensure` declarations, limited to what the supplied values let it evaluate — runs before the evaluator is invoked, and after the event name is resolved: the initial event's name, like an undeclared one, is refused before any argument is checked, exactly as `Fire` does (spec §3A.4 phase 1). If validation produces errors, the evaluator is not called; the API returns `EventInspection(EventName, Impossible, DeclaredArgs, argErrors, [], [], [])` directly. This matches the commit path where `Fire` returns `EventOutcome.InvalidArgs(reason)` on arg validation failure.
 
-**Multiple passing rows are not ambiguous.** Dispatch is first-matching-guard-wins in declaration order (spec §3A.4 phase 2), and nothing downstream can disqualify the row the guard selected, so the first `Certain` row is the winner and every row after it is `Impossible` — it can never be reached. This is the propagation rule `result-types.md` § Prospect propagation already states. Inspection reports `Certain` for that row, not `Possible`.
+**Multiple passing rows are not ambiguous.** Dispatch is first-matching-guard-wins in declaration order (spec §3A.4 phase 2), and nothing downstream can disqualify the row the guard selected, so the first `Certain` row is the winner and every row after it is `Impossible` — it can never be reached, and for that reason nothing in it is evaluated. This is the propagation rule `result-types.md` § Prospect propagation already states. Inspection reports `Certain` for that row, not `Possible`.
 
-**Event-level ensures:** `EventEnsures` in `EventInspection` carries event-scoped constraint results (`on<event>` constraints). It currently passes an empty array, and what should fill it is part of the open question below rather than a wiring task.
+**Event-level ensures:** The ingress gate at the top of `InspectFire` evaluates the event's `on <Event> ensure` declarations, as `Fire`'s phase 1 does, and a failure ends the preview there. That is separate from what the report carries: `EventEnsures` in `EventInspection` carries event-scoped constraint results (`on<event>` constraints). It currently passes an empty array, and what should fill it is part of the open question below rather than a wiring task.
 
 **What inspection reports in place of a constraint verdict.** Execution has no constraint-evaluation phase, so inspection has none to preview (spec §3A.6). What the want document asks inspection to report instead is proof provenance — "no check needed here, and here are the premises it was proven from" (`what-i-want-2026-07-16.md:211`) — but neither that document nor the specification says which type carries it. `TransitionInspection.Constraints`, `UpdateInspection.Constraints` and `EventInspection.EventEnsures` are left exactly as they are, with `BuildConstraintResults` unspecified, until that is decided. Deciding it is a design question, not a correction.
 
-It evaluates every declared row, not just the winning candidate. Each `TransitionInspection` describes:
-- `Prospect`: Would this row's guard select it? (`Certain` / `Possible` / `Impossible`)
+It reports every declared row, not just the winning candidate, and evaluates a row only as far as `Fire` could reach it (spec §3A.6). Each `TransitionInspection` describes:
+- `Prospect`: Would this row's guard select it? (`Certain` / `Possible` / `Impossible`). A row after a certain winner is `Impossible` without its guard having been evaluated.
 - `Effect`: The row's outcome kind — `TransitionTo(TargetState)`, `NoTransition()`, or `Rejection(Reason)`
 - `GuardSummary`: Human-readable guard description when the guard failed or was ambiguous; `null` when passed or absent
 - `Constraints`: see the open question above
-- `PostFields`: Projected field values if this row were to fire
+- `PostFields`: Projected field values if this row were to fire — after exit actions, the row's actions, the `omit` reset, entry actions and recomputation, as `Fire` would leave them. Empty for a row that was not simulated
+
+#### InspectCreate(args)
+
+Returns `EventInspection` — one `TransitionInspection` per construction row. What it may and may not evaluate is stated in `precept-language-spec.md` § 3A.6, *What a preview evaluates*, and the phases it runs are those of `Create` in § 3A.4, *Operation execution order*. It cannot reuse `InspectFire` as written, because `InspectFire` refuses the initial event before anything else (phase 1); it is built from the same parts in `Create`'s order:
+
+```csharp
+EventInspection InspectCreate(Precept precept, FiredArgs? args)
+{
+    var initial = precept.InitialEvent;
+    if (initial == null)
+        // No initial event: Create cannot refuse (spec §3A.4, Known exceptions,
+        // item 2). Phase 0, then the initial state's entry actions (stateful),
+        // then recomputation, exactly as Create() above, reported as one Certain
+        // outcome with its field snapshots.
+        return InspectParameterlessCreate(precept);
+
+    // Phase 0 — the hollow version, built exactly as Create builds it.
+    var hollow = BuildHollowVersion(precept);
+
+    // Phase 1 — ingress on the initial event's arguments, against the hollow
+    // version, as Create runs it; a required argument left out is not a failure
+    // here, an optional one left out is not set (spec §3A.6).
+    var argErrors = ValidateIngressForPreview(precept.ConstraintPlanIndex, initial,
+                                              hollow.Slots, args ?? FiredArgs.Empty);
+    if (argErrors.Length > 0)
+        return new EventInspection(initial.Name, Prospect.Impossible,
+                                   initial.ArgDescriptors, argErrors, [], [], []);
+
+    // Phases 2–7 — the row loop of InspectFire, from "Rows Fire would never reach"
+    // on, run over precept.ConstructionRows against the hollow version. The
+    // differences are those of Create: no exit actions and no state change (none
+    // is left); after the row's actions, the initial state's entry actions
+    // (stateful precepts), then recomputation; a row that wins reports `Created`
+    // as its outcome; and when no row can win, the overall result is the
+    // `Rejected` construction outcome, not `Unmatched` (spec §3A.2, §3A.4).
+    return InspectRows(precept, hollow, precept.ConstructionRows, initial,
+                       args, construction: true);
+}
+```
 
 #### InspectUpdate(patch)
 
@@ -943,9 +1076,26 @@ Returns `UpdateInspection` — access mode results, the ingress check on the pat
 ```csharp
 UpdateInspection InspectUpdate(Precept precept, Version version, PreceptValue[]? patch)
 {
+    // Phase 1 exactly as Update runs it, before anything is applied: access modes,
+    // then the ingress check on the patched values (spec §3A.4 phase 1).
+    var accessFailures = CheckAccessModes(patch, precept.Fields, version);
+    var violations = ValidateIngress(patch, precept.Fields, version, skip: accessFailures);
+    // What else `constraintResults` should carry is the open question under
+    // InspectFire above.
+    var constraintResults = BuildConstraintResults(violations, ...);
+
+    if (accessFailures.Count > 0 || violations.Count > 0)
+    {
+        // Update would refuse here with nothing applied, so nothing more is
+        // evaluated (spec §3A.6): the patch is not applied, computed fields are not
+        // recomputed from a value that failed its check, and no event is previewed,
+        // because there is no resulting configuration to fire it from.
+        var unchanged = BuildFieldSnapshots(version.Slots, precept.Fields, version.CurrentState);
+        return new UpdateInspection(unchanged, constraintResults, []);
+    }
+
+    // Apply the patch to a working copy (phase 5)
     var workingCopy = version.Slots.ToArray();
-    
-    // Apply patch if provided
     if (patch != null)
     {
         for (int i = 0; i < patch.Length; i++)
@@ -953,29 +1103,31 @@ UpdateInspection InspectUpdate(Precept precept, Version version, PreceptValue[]?
                 workingCopy[i] = patch[i];  // patch is slot-indexed; IsAbsent means this slot is not being updated
     }
     
-    // Recompute computed fields
+    // Recompute computed fields (phase 7)
     foreach (var slot in precept.SlotLayout.ComputedSlots)
         workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, FiredArgs.Empty);
     
-    // Ingress check on the patched values — the same check Update runs before it
-    // applies them. What else `constraintResults` should carry is the open question
-    // under InspectFire above.
-    var violations = ValidateIngress(patch, precept.Fields, version.CurrentState);
-    var constraintResults = BuildConstraintResults(violations, ...);
     var fieldSnapshots = BuildFieldSnapshots(workingCopy, precept.Fields, version.CurrentState);
     
     // Event-prospect evaluation: what events would be available post-patch?
+    // Each is an ordinary InspectFire with no arguments against the configuration
+    // the update would commit, and is bound by the same rule as any other preview.
     var hypotheticalVersion = new Version(precept, version.CurrentState, workingCopy);
     var eventInspections = new List<EventInspection>();
+    // The events previewed are those with rows in the current state, the initial
+    // event excluded (spec §3A.6, "InspectUpdate and the events that follow").
     foreach (var @event in precept.Events)
     {
-        if (precept.DispatchIndex.Rows.ContainsKey((version.CurrentState, @event)))
+        if (@event != precept.InitialEvent
+            && precept.DispatchIndex.Rows.ContainsKey((version.CurrentState, @event)))
             eventInspections.Add(InspectFire(precept, hypotheticalVersion, @event, null));
     }
     
     return new UpdateInspection(fieldSnapshots, constraintResults, eventInspections);
 }
 ```
+
+An earlier version of this pseudocode applied the patch and recomputed computed fields before running the ingress check, and previewed events even when the update would be refused. `Update` does neither, and a computed expression is proven safe over values that passed their checks, so that order evaluated expressions outside what the compiler proved. The order above is `Update`'s (spec §3A.4, §3A.6).
 
 ### 7.3 Opcode Execution Engine
 
@@ -1350,33 +1502,47 @@ Ship `PreceptValue[]` with no abstraction layer. Introduce `ICollectionBacking` 
 For Update operations, the evaluator checks `FieldDescriptor.AccessModes` before accepting a patch:
 
 ```csharp
-AccessMode GetAccessMode(FieldDescriptor field, StateDescriptor? currentState)
+AccessMode GetAccessMode(FieldDescriptor field, Version version)
 {
     // AccessModes is pre-resolved by the Precept Builder
     // Key: StateDescriptor? (null = all states / stateless)
-    // Value: AccessMode enum (Writable, ReadOnly, Omit)
-    
-    if (field.AccessModes.TryGetValue(currentState, out var mode))
-        return mode;
-    
-    // Fall back to default (writable unless modified)
-    return AccessMode.Writable;
+    // Value: the resolved entry for that (field, state) pair — a fixed mode
+    //        (Writable, ReadOnly, Omit), or a guarded one carrying the guard's plan
+    //        and the mode that applies when the guard holds and when it does not.
+
+    if (!field.AccessModes.TryGetValue(version.CurrentState, out var entry))
+        // The builder resolves an entry for every (field, state) pair, so this is
+        // not reached. The language default for a pair with no declaration is
+        // read-only unless the field carries `editable` (spec §2.2), never writable.
+        return AccessMode.ReadOnly;
+
+    if (entry.Guard is null)
+        return entry.Mode;
+
+    // A guarded access mode (spec §2.2 composition rule 4a) depends on data. Its
+    // guard is evaluated against the starting configuration, before any patched
+    // value is written (spec §3A.4 phase 1, "When a guarded access mode's guard is
+    // evaluated").
+    return EvaluateGuard(entry.Guard, version.Slots, FiredArgs.Empty)
+        ? entry.ModeWhenGuardHolds
+        : entry.Mode;
 }
 ```
 
 The `AccessModes` dictionary on `FieldDescriptor` is the **resolved** per-state access mode — derived from the two-layer composition model at build time:
-- Field-level baseline: `writable` modifier (default is writable)
+- Field-level baseline: the `editable` modifier (a field without it is read-only — spec §2.2)
 - State-level override: `in <State> modify field` or `in <State> omit field`
+- A guarded override (`in <State> when <Guard> modify field editable|readonly`): the entry keeps the guard, because whether the field is editable then depends on the data and cannot be fixed at build time
 
-The evaluator never re-derives this; it reads the pre-resolved descriptor.
+The evaluator never re-derives the composition; it reads the pre-resolved descriptor. The one thing it evaluates is the guard of a guarded entry, at phase 1, against the starting configuration.
 
 **`FieldDescriptor.AccessModes` structural shape:** The evaluator assumes a per-state access-mode lookup on `FieldDescriptor`. The storage shape (dictionary vs. indexed representation) affects lookup cost, descriptor size, and emission strategy. This is a pending implementation decision for the builder/descriptor pass.
 
 ### 7.6 Ingress Validation
 
-This is the only place the evaluator evaluates a declared constraint against data. It runs at §3A.4 phase 1, on values arriving from outside, before the working copy derives anything from them. It is collect-all.
+This is the only place the evaluator evaluates a declared constraint against data. It runs at §3A.4 phase 1, on values arriving from outside, before the working copy derives anything from them. What it checks, in what order, and what collect-all does and does not evaluate are stated in `precept-language-spec.md` § 3A.4 phase 1 (including *What collect-all does not evaluate*); the pseudocode below carries that out.
 
-The pseudocode below is the event path: `ValidateIngress` takes an `EventDescriptor` and checks the values an event supplies. On that path the `Always`, `FromState` and `ToState` buckets of the `ConstraintPlanIndex` are **not** walked. Those are global rules and state ensures over field values; the compiler proved every handler preserves them and every initial event establishes them (spec §0.7), so the evaluator does not re-check them there. Those buckets remain in the built model because the constraint catalogs are built from them (`Precept.Constraints`, `Version.ApplicableConstraints`). What a direct field edit through `Update` evaluates is a separate question, and this document does not settle it.
+The pseudocode below is the event path: `ValidateIngress` takes an `EventDescriptor` and checks the values an event supplies. On that path the `Always`, `FromState` and `ToState` buckets of the `ConstraintPlanIndex` are **not** walked. Those are global rules and state ensures over field values; the compiler proved that every handler makes true what spec § 3A.4, *Handlers*, requires of it — every rule, and each state ensure only where it binds that handler — and that every initial event establishes them (spec §0.7), so the evaluator does not re-check them there. Those buckets remain in the built model because the constraint catalogs are built from them (`Precept.Constraints`, `Version.ApplicableConstraints`). What a direct field edit through `Update` evaluates is a separate question, and this document does not settle it.
 
 ```csharp
 IReadOnlyList<ConstraintViolation> ValidateIngress(
@@ -1387,30 +1553,60 @@ IReadOnlyList<ConstraintViolation> ValidateIngress(
 {
     var violations = new List<ConstraintViolation>();
 
-    // The constraints declared on each supplied argument — the modifier form.
+    // First, presence and type of every declared argument. A required argument
+    // that is missing, or any argument of the wrong type, is a failure, and it is
+    // not "good" below. An optional argument the caller left out passes: it is
+    // not set, which is a value, so it is "good" and every constraint and ensure
+    // that reads it is evaluated, reading not set (spec §3A.4 phase 1). An argument
+    // with a default that the caller left out is given its default here and passes,
+    // so it is "good" too. A supplied name the event does not declare is recorded as
+    // a failure (InvalidArgs, "unknown key").
+    var good = new HashSet<ArgDescriptor>();
     foreach (var arg in @event.ArgDescriptors)
-        foreach (var constraint in arg.Constraints)
-            EvaluateConstraint(constraint, slots, args, violations);
+    {
+        if (CheckPresenceAndType(arg, args, violations))   // records the failure itself
+            good.Add(arg);
+    }
 
-    // on <event> ensures — event preconditions (ConstraintKind.EventPrecondition),
-    // declared against the event's arguments and evaluated before the operation runs.
-    if (index.OnEvent.TryGetValue(@event, out var eventConstraints))
-        foreach (var constraint in eventConstraints)
-            EvaluateConstraint(constraint, slots, args, violations);
+    // Then the constraints declared on each argument that passed — the modifier
+    // form — and the on <event> ensures (ConstraintKind.EventPrecondition), taken
+    // in an order in which each comes after every phase-1 constraint the
+    // compiler's proof of its safety relied on (`ProofPremises`, recorded by the
+    // builder; the order exists because that reliance is never circular).
+    // A constraint is evaluated only when every argument it reads is in `good`
+    // and every constraint in its ProofPremises passed (spec §3A.4 phase 1,
+    // "What collect-all does not evaluate" and the rule after it): one that reads
+    // a missing required argument or a wrongly typed one, or whose proof relied on
+    // a constraint that just failed, is not evaluated, and nothing is reported for
+    // it beyond the failures already recorded.
+    var passed = new HashSet<ConstraintDescriptor>();
+    foreach (var constraint in IngressConstraintsInPremiseOrder(index, @event))
+        if (constraint.ReferencedArgs.All(good.Contains)
+            && constraint.ProofPremises.All(passed.Contains)
+            && EvaluateConstraint(constraint, slots, args, violations))
+            passed.Add(constraint);
 
     return violations;
 }
 ```
 
-`Update` runs the same check over the patched field values, against the constraints declared on each field it writes (spec §0.7, *Governance*). Whether an edit evaluates anything beyond those is the open question noted at the start of this section.
+`ValidateIngressForPreview`, used by `InspectFire` and `InspectCreate`, is the same check with one difference: a required argument that was not supplied is not recorded as a failure, because a preview may be given fewer inputs than the operation needs (spec §3A.6). It is still left out of `good`, so nothing that reads it is evaluated. An `optional` argument left out is treated exactly as `ValidateIngress` treats it — not set, and in `good` — and so is an argument with a `default` left out, which takes its default (spec §3A.6, *When inputs are missing*).
+
+`Update` runs the same check over the patched field values, against the constraints declared on each field it writes (spec §0.7, *Governance*), with the access-mode check first and the same limit: a constraint on a field whose access or type check failed, or that reads another patched field whose access or type check failed, is not evaluated (spec §3A.4 phase 1). A constraint whose proof relied on another phase-1 constraint that failed is not evaluated either, as on the event path. A constraint that reads another field is evaluated against the slots as the patch will leave them — the patched value where the patch names the field, the starting value elsewhere, and for a computed field the value of its `<-` expression over those same slots (spec §3A.4 phase 1, *Which values a patched field's own constraints read*) — so `ValidateIngress` for a patch evaluates over the starting slots with the patched values laid over them and the computed slots it reads re-derived from that overlay, not over `version.Slots` alone, and not with a computed slot left at its starting value. Whether an edit evaluates anything beyond those is the open question noted at the start of this section.
 
 ```csharp
-void EvaluateConstraint(
+bool EvaluateConstraint(           // true when the constraint held
     ConstraintDescriptor constraint,
     PreceptValue[] slots,
     FiredArgs args,
     List<ConstraintViolation> violations)
 {
+    // A guarded constraint applies only when its guard is true: the guard is
+    // evaluated first, and the body only when it holds (spec §3A.4 phase 1,
+    // "A guarded event ensure").
+    if (constraint.Guard is { } guard && EvaluatePlan(guard, slots, args) is not true)
+        return true;
+
     var result = EvaluatePlan(constraint.Expression, slots, args);
     
     if (result is not true)
@@ -1418,7 +1614,9 @@ void EvaluateConstraint(
         violations.Add(new ConstraintViolation(
             constraint,
             BuildFieldNames(constraint.ReferencedFields)));
+        return false;
     }
+    return true;
 }
 ```
 
@@ -1614,7 +1812,7 @@ All in-domain failures produce structured outcome variants — never exceptions:
 | All guards failed | `EventOutcome.Unmatched(evaluatedRows)` | No transition row matched; per-candidate guard trace attached (CC#24) |
 | Ingress violation on a patched field | `UpdateOutcome.ConstraintsFailed(violations)` | A patched value violates a constraint declared on the field it was entering; refused before application, collect-all |
 | Field not editable | `UpdateOutcome.FieldNotEditable(field, mode)` | Update attempted on readonly/omit field |
-| Undefined event | `EventOutcome.UndefinedEvent()` | No rows declared for event in current state |
+| Undefined event | `EventOutcome.UndefinedEvent()` | `Fire` only: the name is not a declared event or names the initial event (refused before any argument is checked), or the event has no rows in the current state (refused at dispatch) — `result-types.md` § EventOutcome, spec §3A.4 phases 1 and 2 |
 | Authored rejection | `EventOutcome.Rejected(reason)` | A `reject` row was the winning candidate |
 | Ingress violation on an argument | `EventOutcome.InvalidArgs(reason)` | Arg validation failed at ingress — wrong type, missing required, or a value violating a constraint declared on the argument |
 | Invalid fields | `UpdateOutcome.InvalidFields(reason)` | Patch validation failed (type mismatch, unknown field) |
@@ -1684,7 +1882,7 @@ The corrupted-model half of that is one of the two accounts canon carries of wha
 | **Immutability preservation** | Input `Version` is never mutated. Output `Version` (in success outcomes) is a fresh instance. |
 | **No fault path at evaluation time** | A definition that compiled has no fault-prevention check for the evaluator to run and no site at which one could fire. Each `FaultCode` member names, through `[StaticallyPreventable]`, the diagnostic responsible for preventing that class of failure at authoring time. |
 | **Inspection–commit agreement** | `InspectFire` and `Fire` execute the same plans. A row that `InspectFire` marks `Prospect.Certain` will be the winning row when `Fire` is called with the same inputs. |
-| **Ingress completeness** | Every constraint declared on an incoming value is checked as it enters. The evaluator does not short-circuit on first violation (it collects all violations for diagnostic completeness). |
+| **Ingress completeness** | Every check phase 1 can make on an incoming value is made as it enters, and every failure found is reported; the evaluator does not stop at the first violation. A constraint over a value that failed an earlier check, or whose proof relied on a phase-1 constraint that failed, is not evaluated (`precept-language-spec.md` § 3A.4 phase 1, *What collect-all does not evaluate*). |
 | **Access mode bypass for Restore** | `Restore` bypasses both access-mode checks and ingress validation — trusted hydration (spec §0.7; Decision 5 below). |
 
 ### Slot Index Invariants
@@ -1702,7 +1900,7 @@ The corrupted-model half of that is one of the two accounts canon carries of wha
 |---|---|
 | Bucket completeness | Every `ConstraintDescriptor` appears in exactly one bucket |
 | Correct bucket routing | `Always` contains only `Invariant`; `InState` contains only `StateResident`; etc. |
-| No constraint skipping | Every constraint declared on an incoming value is checked, regardless of prior failures |
+| No constraint skipped without cause | Every constraint declared on an incoming value is checked, whatever else failed, except one the specification says is not evaluated: a constraint over a value that failed its presence, type or access check, or one whose proof relied on a phase-1 constraint that failed (`precept-language-spec.md` § 3A.4 phase 1, *What collect-all does not evaluate*) |
 | Checked on entry, not after | An incoming value is checked before it is applied and before anything derives from it. Nothing is evaluated against the finished working copy: the rules there were proven at compile time, not re-checked (spec §0.7, §3A.4) |
 
 The bucket index survives the removal of the post-mutation pass because it still serves two live purposes: the definition-level and state-level constraint catalogs (`Precept.Constraints`, `Version.ApplicableConstraints`), and the routing of an incoming value to the constraints declared on the slot it enters.
@@ -1711,7 +1909,7 @@ The bucket index survives the removal of the post-mutation pass because it still
 
 | Guarantee | Description |
 |---|---|
-| All rows inspected | `InspectFire` evaluates every declared row, not just the first match |
+| All rows reported, reachable rows evaluated | `InspectFire` reports every declared row, and evaluates a row only as far as `Fire` could reach it: nothing in a row after a certain winner is evaluated (spec §3A.6) |
 | Consistent projections | `RowInspection.ResultingFields` shows the exact values that would exist post-commit |
 | Hypothetical correctness | `RowInspection.HypotheticalResult` is a valid `Version` whenever the row is the one that would win dispatch and the supplied values pass their ingress check |
 | Event-prospect accuracy | `UpdateInspection.Events` reflects event availability against the hypothetical post-patch state |
@@ -1794,7 +1992,7 @@ The bucket index survives the removal of the post-mutation pass because it still
 
 ### Decision 7: Collect All Violations, Don't Short-Circuit
 
-**Decision:** Ingress validation collects all violations, not just the first one. Every incoming value is checked against every constraint declared on the slot it enters, and the caller gets the complete set.
+**Decision:** Ingress validation collects all violations, not just the first one. Every incoming value is checked against every constraint declared on the slot it enters that the specification says is evaluated, and the caller gets the complete set of failures found. What collect-all leaves unevaluated — a constraint over a value that failed an earlier check, or one whose proof relied on a phase-1 constraint that failed — is stated in `precept-language-spec.md` § 3A.4 phase 1.
 
 **Rationale:**
 - **Diagnostic completeness:** Users see all problems at once, not one-at-a-time whack-a-mole
@@ -1958,8 +2156,8 @@ Most systems have separate "preview" and "execute" paths. Precept's inspection A
 
 | Mode | Guard | Actions | Disposition |
 |---|---|---|---|
-| Commit | Evaluate | Execute | Fail/succeed |
-| Inspect | Evaluate | Execute (on copy) | Report all |
+| Commit | Evaluate, in order, until one passes | Execute the winner's | Fail/succeed |
+| Inspect | Evaluate, in order, until one certainly passes | Execute (on copy) for the winner and for rows that may win | Report every row |
 
 This guarantees that inspection cannot disagree with commit. A row that inspection marks `Certain` will be the winning row when committed.
 
@@ -1998,9 +2196,7 @@ This enables AI agents and UIs to explain WHY the constraint failed, not just TH
 
 ### Computed Field Freshness in Restored Versions
 
-`FromJson` populates slots directly from persisted field values. If computed fields are stored in the persistence envelope, those values may be stale relative to the underlying data if the formula changed since the data was persisted. Callers that need fresh computed values after restoration should call `version.InspectUpdate()` to see the current computed state, or `version.Update()` with no patch to re-evaluate.
-
-This is a deliberate tradeoff: `FromJson` is a hydration primitive, not a recomputation pipeline. Freshness enforcement is a caller concern.
+`Restore` recomputes every computed field from the restored stored values (`precept-language-spec.md` § 3A.4, phase 7; `runtime-api.md` § Restoration). A computed value carried in the persistence envelope is never trusted: it may have been derived under an earlier formula, and a computed field carries no information of its own, so the restored `Version` always holds the values the current definition derives. An earlier version of this section said the opposite — that `FromJson` kept persisted computed values and freshness was the caller's concern — which contradicted the specification, `runtime-api.md` and the matrix in § 15 of this document.
 
 ### Event-Prospect Evaluation in Update Inspection
 
@@ -2056,7 +2252,7 @@ An index of what this document leaves undecided. Each entry says what somebody h
 
 ### Resolved Design Questions
 
-8. **Constraint evaluation order** — Moot. The bucket walk this answered (`always` → `from<current>` → `on<event>` → `to<target>`) was the post-mutation pass, which no longer exists. Ingress validation checks the constraints declared on each incoming value, and because it is collect-all the order only decides how violations are listed, not which ones are found. Within a slot, declaration order remains the reporting order (stable, debuggable).
+8. **Constraint evaluation order** — Moot. The bucket walk this answered (`always` → `from<current>` → `on<event>` → `to<target>`) was the post-mutation pass, which no longer exists. Ingress validation checks the constraints declared on each incoming value, in an order in which each constraint comes after every phase-1 constraint its proof relied on; which constraints are evaluated depends on which of those passed, not on the order in which independent constraints are taken (`precept-language-spec.md` § 3A.4 phase 1). Within a slot, declaration order remains the reporting order (stable, debuggable).
 
 9. **Inspection–commit plan sharing** — Confirmed: same plans, same execution. Disposition (report vs. enforce) is the only difference.
 
@@ -2153,7 +2349,7 @@ This matrix summarizes which constraints and access-mode checks each operation e
 | Operation | Access-mode checks | Row dispatch | Constraints evaluated |
 |---|---|---|---|
 | `Fire` | no | yes | the constraints declared on each supplied argument, plus `on <event>` |
-| `InspectFire` | no | yes (all rows) | same as `Fire` |
+| `InspectFire` | no | yes (every row reported; rows after a certain winner not evaluated) | same as `Fire` |
 | `Update` | yes | no | the constraints declared on each patched field; whether an edit evaluates anything further is not settled — see § 7.6 |
 | `InspectUpdate` | yes (reported) | no | same as `Update`, plus event-prospect over hypothetical state |
 | `Create` with initial event | no | yes (initial event) | same as `Fire` for the initial event |
