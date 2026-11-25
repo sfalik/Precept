@@ -22,6 +22,12 @@ question.
 
 ## Question 1. May a state have several entry actions, and if so, in what order do they run?
 
+**Answered 2026-11-24:** "this is clear, you can always have more than one -> action, it's no different
+here than in other places." Recorded reading: several state actions on one state are allowed and all run,
+in the order written, each seeing the writes of the ones before it, as the actions in one `->` chain do.
+An action with a `when` guard runs only when its guard holds. The same applies to exit actions. This is
+option 1 below.
+
 **Your earlier words.** None. The spec records it as never decided: "when a state carries more than one
 state action, whether all of them fire and in what order (declaration order is the obvious candidate but
 is unstated) ... Until these are ruled, no analysis may assume an ordering" (spec:2207). The walk lists
@@ -60,6 +66,14 @@ that has no state actions, which is the first section written, and the arithmeti
 
 ## Question 2. Do a state's entry actions run when an entity is created in that state?
 
+**Answered by canon 2026-11-25.** Canon already treats creation as entering the initial state: the
+initial state's entry ensures must hold of what construction produces (spec § 3A.5), the `omit` reset is
+applied for the initial state (runtime-api.md, stateless/stateful construction table), and the stateless
+section gives "no state is entered" as the reason entry effects do not apply there. Entry actions are the
+third effect of the same `to <State>` prefix, so they run at creation, after the construction row's
+actions (§ 3A.4 phase 6), and on a parameterless Create too. Exit actions do not run. Written into spec
+§ 3A.4 and § 3A.5; the base case of the induction now includes the entry actions.
+
 **Your earlier words.** None. The spec: construction "names entry *ensures* at construction without
 naming entry actions", and no analysis may assume "that entry actions run at construction" (spec:2207).
 The walk lists it with question 1. That the state's rules must hold at creation is already settled
@@ -86,6 +100,14 @@ entity when the initial state has entry actions. **What does not wait:** the sam
 ---
 
 ## Question 3. Do entry and exit actions run when a row transitions from a state back into the same state?
+
+**Answered by canon 2026-11-25.** A transition back to the same state is an ordinary `transition`
+outcome: the grammar has one form, spec § 3A.4 phase 4 treats it as entering the target state, and
+§ 2.2 composition rule 5 says the `omit` reset applies to self-transitions. So exit actions, the state
+change with its `omit` reset, the row's actions and entry actions all run; `no transition` runs none of
+them (§ 3A.2). Written into spec § 3A.4 for actions. Entry and exit *ensures* on a self-transition were
+left as canon already words them ("any transition into / out of this state", spec § 3A.1); no new rule
+was added for them.
 
 **Your earlier words.** None. The spec: "§2.2 composition rule 5 says the `omit` reset *does* apply to a
 self-transition, but state actions are unaddressed" (spec:2207). An ordinary `no transition` is not part
@@ -114,6 +136,10 @@ from Review on Revise -> transition Review
 ---
 
 ## Question 4. Is `integer` a fixed 64-bit number whose every operation must be proved in range, or a number with no upper limit? And is `decimal` without an upper limit, as your bank example appears to require?
+
+**Deferred 2026-11-25 by the owner; recorded as an open issue in `docs/language/precept-language-spec.md`
+§ Open Questions / Implementation Notes and `docs/language/primitive-types.md` § Open Questions /
+Implementation Notes (Arithmetic overflow model).**
 
 **Your earlier words.** "I am considering arbitrary precision but no decision yet" (2026-07-20,
 `inputs/history-rulings.md:160`). Those words were not recorded about `integer` alone. The note they come
@@ -181,6 +207,10 @@ The `decimal` work does not wait either; it proceeds on reading 1 and is redone 
 
 ## Question 5. May a rule mention the current time, or does time belong only in guards and actions?
 
+**Deferred 2026-11-25 by the owner; recorded as an open issue in `docs/language/precept-language-spec.md`
+§ Open Questions / Implementation Notes and `docs/language/temporal-type-system.md` § `now()`
+(Determinism) and § Open Questions / Implementation Notes.**
+
 **Your earlier words.** In the want document: "Do rules that reference the current moment exist at all,
 or does time belong only in guards (evaluated at event time, like any other premise)? Deliberately left
 open" (want:219). When it turned out that canon already answers it, you said: "it is undecided, add it to
@@ -225,6 +255,10 @@ every other rule form.
 ---
 
 ## Question 6. When a caller edits an `editable` field directly, and a rule mentions that field, what is checked?
+
+**Deferred 2026-11-25 by the owner; recorded as an open issue in `docs/language/precept-language-spec.md`
+§ Open Questions / Implementation Notes, with pointers from § 3A.1 (Collect-all vs first-match),
+`docs/runtime/runtime-api.md` § Update and `docs/runtime/README.md` § Open questions.**
 
 **Your earlier words.** The want document you approved says: "For an editable-field write, it's the
 field's modifier-rules *and* every rule that mentions the field — an edit is an arbitrary incoming value

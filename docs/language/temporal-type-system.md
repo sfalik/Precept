@@ -565,17 +565,15 @@ field IncidentTimestamp as instant
 
 **UTC-always:** `now()` always returns UTC. There is no `now(timezone)` overload and no "local now." Temporal zone-awareness in Precept is always explicit: if you need today's date in a specific timezone, you construct it: `now().inZone(tz).date`. This is consistent with Precept's structural prevention principle — timezone ambiguity cannot arise if the language only produces UTC instants natively.
 
-**Determinism:** `now()` is the canonical example of environment-relative determinism (Locked Decision #9). A precept rule containing `now()` will produce different results when fired at different times. This is accepted behavior — Precept guarantees internal consistency (same inputs, same outputs within a single fire) but cannot freeze the clock. When reviewing a precept rule that contains `now()`, the author is explicitly claiming "this rule's correctness depends on when it is evaluated."
+**Determinism:** `now()` reads the runtime environment's clock, so it is environment-relative in the sense of Locked Decision #9: an expression containing it produces different results at different times. Precept guarantees internal consistency (same inputs, same outputs within a single fire) but cannot freeze the clock. Guards and actions may read `now()`.
+
+**Whether a rule or an ensure may mention `now()` is an outstanding owner decision.** Earlier text here said such a rule was accepted behaviour and cited Locked Decision #9, but that decision is about the timezone database version and does not cover it, and the owner has said the question is open: *"Deliberately left open"* (`what-i-want-2026-07-16.md:219`), and on 2026-08-27, *"it is undecided, add it to the list"*. Until he rules, no analysis may assume that rules or ensures mentioning `now()` are allowed, nor that they are refused. The full entry is in the specification's Open Questions section.
 
 **Usage patterns:**
 
 ```precept
 # Capture current instant on event
 -> set FiledAt = now()
-
-# Time-bounded obligation rule
-rule now() - IncidentAt <= '72 hours'
-  because "HIPAA: incident must be filed within 72 hours"
 
 # Today's date in a specific timezone
 -> set LocalDeadline = now().inZone(IncidentTimezone).date + '30 days'
@@ -1932,7 +1930,7 @@ This section is a **forward design note**, not a commitment. It documents why th
 
 ## Open Questions / Implementation Notes
 
-_TBD — implementation questions will be captured here when this proposal advances._
+- **Owner decision outstanding — may a rule or an ensure mention `now()`.** See § `now()`, *Determinism*, and the full entry in `precept-language-spec.md` § Open Questions.
 
 ---
 

@@ -514,7 +514,7 @@ The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); 
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Still open (§3A.4 / Open Questions):** when a state carries more than one state action, whether all of them fire and in what order, is unsettled — 2c and 2f above depict a single action chain per state-action position, not a resolution of that multiplicity question. Whether entry actions fire at construction and on a self-transition is likewise unsettled.
+**Which rows run 2c, 2d and 2f, and how many state actions run.** Spec §3A.4 settles both. A `transition` row — including one back to the same state — runs exit actions, the state change and `omit` reset, and entry actions; a `no transition` row runs none of them. Construction runs the initial state's entry actions after the construction row's action chain, and no exit actions. When a state carries several state actions at one position, all of them run in declaration order, each seeing the writes of those before it; a guarded one runs only when its guard holds. See `precept-language-spec.md` § 3A.4, *Operation execution order*.
 
 ### Working Copy Management
 
@@ -532,7 +532,7 @@ The evaluator never mutates the input `Version`. The Fire lifecycle for one even
 
 This is why a refused operation leaves no side effects: the working copy it was building is never promoted, and the entity the caller holds is untouched. On success, the working array becomes the committed `Version.Slots` — no extra allocation.
 
-> **Follows § 3A.4's *Operation execution order*.** This lifecycle, the flow diagram above, and the `Fire` pseudocode below now enumerate exit actions, the state change and `omit` reset, and entry actions alongside the row's own writes, in the order fixed by `precept-language-spec.md` § 3A.4. Two things § 3A.4 itself leaves unsettled are not resolved by this enumeration and should not be read as answered here: when a state carries more than one state action, whether all of them fire and in what order; and whether entry actions fire at construction and on a self-transition. See § 3A.4 / Open Questions.
+> **Follows § 3A.4's *Operation execution order*.** This lifecycle, the flow diagram above, and the `Fire` pseudocode below now enumerate exit actions, the state change and `omit` reset, and entry actions alongside the row's own writes, in the order fixed by `precept-language-spec.md` § 3A.4. Steps 4, 5 and 7 run for a `transition` row, including one back to the same state, and are skipped for a `no transition` row; at construction only step 7 runs. Each of steps 4 and 7 runs every state action declared at that position, in declaration order. § 3A.4 states both rules.
 
 ---
 
@@ -596,13 +596,19 @@ EventOutcome Create()
     for (int i = 0; i < slots.Length; i++)
         slots[i] = EvaluateDefault(precept.Fields[i]);
     
-    // 2. Recompute computed fields (no event args — use FiredArgs.Empty)
+    // 2. Entry actions of the initial state (§3A.4 phase 6): construction enters the
+    //    initial state, so they run against the defaults, in declaration order.
+    if (precept.InitialState != null)
+        ExecuteStateActions(precept.InitialState.EntryActions, slots, FiredArgs.Empty);
+
+    // 3. Recompute computed fields (no event args — use FiredArgs.Empty)
     foreach (var slot in precept.SlotLayout.ComputedSlots)
         slots[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, slots, FiredArgs.Empty);
     
-    // 3. Commit. No constraint evaluation: the compiler proved that the default
-    //    configuration satisfies every rule (spec §0.7, base case) — that is what
-    //    C100/C101 enforce at compile time, so there is nothing to re-check here.
+    // 4. Commit. No constraint evaluation: the compiler proved that what this
+    //    commits — the default configuration with the initial state's entry
+    //    actions applied — satisfies every rule (spec §0.7, base case; C100/C101
+    //    check the defaults), so there is nothing to re-check here.
     return new EventOutcome.Applied(new Version(precept, precept.InitialState, slots));
 }
 ```
@@ -638,6 +644,7 @@ With an initial event on a stateless precept, the Fire pipeline runs normally �
 - `to <State> ensure` — structurally absent (no state entered), so nothing to prove and nothing to evaluate
 - `in <State> ensure` — structurally absent (no residency state)
 - Omit-on-entry clearing — not applied (no state to enter)
+- Entry and exit actions — absent (no state entered or left)
 - Arg ensures and the constraints on the supplied arguments — evaluated at ingress, exactly as in a stateful precept
 - Global rules — proven at compile time, not evaluated here
 - Computed fields and the working copy protocol — run normally
@@ -667,24 +674,35 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         // 2b. Snapshot working copy
         var workingCopy = version.Slots.ToArray();
 
-        // 2c. Exit actions (§3A.4 — Exit actions): state actions on the state being
-        // left, resolved against the state being left, applied before the state change.
-        if (version.CurrentState != null)
-            ExecuteStateActions(version.CurrentState.ExitActions, workingCopy, args);
+        // A transition row (TargetState != null, including a transition back to the
+        // same state) leaves its source state and enters its target. A `no transition`
+        // row leaves and enters nothing. A construction row (the initial event) leaves
+        // nothing and enters the initial state the hollow version already carries,
+        // whose omit reset the hollow build already applied (spec §3A.4, §3A.5).
+        bool leaves = row.TargetState != null;
+        bool enters = leaves || @event.IsInitial;
+        var targetState = row.TargetState ?? version.CurrentState;
+
+        // 2c. Exit actions (§3A.4 — Exit actions): every state action on the state
+        // being left, in declaration order, resolved against the state being left,
+        // applied before the state change. A guarded one runs only when its guard holds.
+        if (leaves)
+            ExecuteStateActions(version.CurrentState!.ExitActions, workingCopy, args);
 
         // 2d. State change + omit reset (§3A.4 — The state change): the working
         // copy's state becomes the row's target state; the omit reset (composition
         // rule 5) applies here, before the row's own action chain runs.
-        var targetState = row.TargetState ?? version.CurrentState;
-        ApplyOmitReset(targetState, workingCopy);
+        if (leaves)
+            ApplyOmitReset(targetState, workingCopy);
 
         // 2e. Row action execution (§3A.4 — Mutation)
         foreach (var action in row.Actions)
             ExecuteAction(action, workingCopy, args);
 
-        // 2f. Entry actions (§3A.4 — Entry actions): state actions on the state
-        // being entered, resolved against the state being entered.
-        if (targetState != null)
+        // 2f. Entry actions (§3A.4 — Entry actions): every state action on the state
+        // being entered, in declaration order, resolved against the state being
+        // entered. A guarded one runs only when its guard holds.
+        if (enters && targetState != null)
             ExecuteStateActions(targetState.EntryActions, workingCopy, args);
 
         // 2g. Recompute computed fields (§3A.4 — Computed-field recomputation)
@@ -2014,8 +2032,6 @@ An index of what this document leaves undecided. Each entry says what somebody h
 
 - **Whether a defect in Precept itself reaches the caller as a structured outcome or as a thrown exception.** The case is a bug in the compiler, the builder or the evaluator — not anything an author can write. Nothing constructs a `Fault` today, and canon says both things: `compiler-and-runtime-design.md` names the evaluator as where such a breach surfaces, while § 9 No Unclassified Exceptions and `precept-builder.md` § Builder Invariant Violations both call a corrupted model an unrecoverable exception. **The owner has parked this until the runtime design is done. His stated lean is exception. A lean is not a ruling** — whoever picks this up decides it, and nothing may be built or written as though the answer were already exception. See § 9 Fault Production, and `fault-system.md` § Q3, which states the same question more fully.
 - **Which type carries what inspection reports in place of a constraint verdict.** Execution has no constraint-evaluation phase, so inspection has none to preview, and `TransitionInspection.Constraints`, `UpdateInspection.Constraints` and `EventInspection.EventEnsures` currently have nothing to fill them. What inspection is meant to report instead is proof provenance — no check needed here, and here are the premises it was proven from — and no document says which type carries that. `BuildConstraintResults` stays unspecified until it is decided. See § 7.2 Inspection Operations.
-- **When a state carries more than one state action, whether all of them fire and in what order.** Owned by `precept-language-spec.md` § 3A.4; the flow diagram and lifecycle here depict a single action chain per position and do not answer it. See § 6 Execution Flow Diagram and § 6 Working Copy Management.
-- **Whether entry actions fire at construction and on a self-transition.** Same origin and same two sections as the entry above.
 - **Four opcode semantics that nothing pins down**: how `LOAD_ARG` treats an absent or null input, whether `BRANCH_FALSE` treats numeric zero as false or only `false` itself, whether `RETURN` may legally fall through to further opcodes, and whether the evaluation stack is pooled rather than `stackalloc`-only. They have to be settled before builder-emitted plans and any later compiled path can be relied on to execute identically. See § 7.3 Opcode Execution Engine.
 - **The internal field layout of `PreceptValue`** — which tag type, where the union payload sits, and which value types share which union region. The 32-byte size and the tagged-value-struct shape are locked; the layout inside them is not. See § 5 Inputs and Outputs.
 - **What a trace record looks like, how a trace context is attached to an evaluation call, and how the language server and MCP server read the trace output.** See § 11 Decision 8.

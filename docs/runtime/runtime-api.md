@@ -159,7 +159,7 @@ EventOutcome simple = precept.Create();  // always Created
 
 `Create` is construction. It always returns `EventOutcome.Created` on success — regardless of whether an initial event is declared. `Created` means "an entity was brought into existence." Whether that creation involved firing an initial event or just applying defaults is an implementation detail — the outcome category is the same.
 
-If the precept declares an `initial` event, `Create` fires it atomically: validate the supplied arguments at ingress → build hollow version (defaults + initial state + omitted fields) → evaluate construction rows (first-match) → execute matched row's action chain → commit → return outcome. There is no constraint-evaluation step between the action chain and the commit: the compiler proved that the initial event establishes every rule (spec §0.7), so a construction that ran to completion is valid by construction. If no initial event is declared, `Create` constructs from defaults and returns `Created` (always succeeds by compile-time guarantee C59/C86).
+If the precept declares an `initial` event, `Create` fires it atomically: validate the supplied arguments at ingress → build hollow version (defaults + initial state + omitted fields) → evaluate construction rows (first-match) → execute matched row's action chain → run the initial state's entry actions → computed-field recomputation → commit → return outcome. There is no constraint-evaluation step between the action chain and the commit: the compiler proved that the initial event establishes every rule (spec §0.7), so a construction that ran to completion is valid by construction. If no initial event is declared, `Create` constructs from defaults, runs the initial state's entry actions against them, and returns `Created` (always succeeds by compile-time guarantee C59/C86). Construction enters the initial state; spec § 3A.4 states when entry and exit actions run.
 
 **Construction outcome space:** `Create()` returns exactly one of:
 
@@ -372,7 +372,7 @@ Fire runs the event pipeline in § 3A.4 order (`precept-language-spec.md`, § 3A
 
 There is no constraint-evaluation stage between recomputation and commit, and no pass/fail decision the commit waits on. Ingress validation of the arguments and guard evaluation are the two checks that run, and they are exactly the premises the compiler's proofs rest on (spec §0.7). Everything else was proven at compile time; a working copy the operation completed is promoted unconditionally. The working copy is discarded only when the operation refuses before it finishes — arguments that fail ingress, or a `reject` row that wins dispatch.
 
-> Two things § 3A.4 leaves unsettled are not resolved by this sequence and should not be read as answered here: when a state carries more than one state action, whether all of them fire and in what order; and whether entry actions fire at construction and on a self-transition. See § 3A.4 / Open Questions.
+> Exit actions, the state change and entry actions run for a `transition` row, including one back to the same state, and not for a `no transition` row. Where a state carries several state actions, all of them run in declaration order. Spec § 3A.4 states both rules.
 
 **Row dispatch model:** Transition rows come in two shapes — mutation rows (`TransitionRowMutation`: carry action chain + success outcome) and reject rows (`TransitionRowReject`: carry reject clause only). Row matching evaluates guards in declaration order; the first matching row's shape determines the outcome, and the remaining rows are not evaluated (spec §3A.4 phase 2). A mutation row executes its action chain and produces `Transitioned` or `Applied`. A reject row produces `Rejected` with the authored reason string. The two shapes are grammar-level constructs — a single row cannot mix mutations with rejection.
 
@@ -399,7 +399,7 @@ Version next = outcome switch
 
 Update runs the field-write pipeline: access mode check → type validation → ingress validation of each patched value (collect-all) → patch application to working copy → computed field recomputation → commit. Returns one `UpdateOutcome` variant.
 
-Ingress validation happens **before** the value is applied, and it holds the incoming value to the constraints declared on the field it enters (spec §0.7, *Governance*). It is the same operation-blind check every externally-supplied value gets. There is no second pass over the finished working copy: an editable field is an ordinary write site, and the compiler discharged its obligations at compile time like any other. A patched value that fails its check is refused before any mutation runs, so nothing is rolled back.
+Ingress validation happens **before** the value is applied, and it holds the incoming value to the constraints declared on the field it enters (spec §0.7, *Governance*). It is the same operation-blind check every externally-supplied value gets. There is no second pass over the finished working copy: an editable field is an ordinary write site, and the compiler discharged its obligations at compile time like any other. A patched value that fails its check is refused before any mutation runs, so nothing is rolled back. Whether this check also covers every rule that mentions the edited field is an outstanding owner decision — see `precept-language-spec.md` § Open Questions.
 
 **Why Update, not Edit:** Renamed from `Edit` to avoid confusion with `edit` declarations in the DSL (per-state field access blocks). `Update` describes what the caller does to field values; `edit` describes what the precept author declares.
 
@@ -880,6 +880,7 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 | `to <State> ensure` entry constraints | In scope for the initial state — proven at compile time, not evaluated here | Out of scope — no state to enter |
 | `in <State> ensure` residency constraints | In scope for the initial state — proven at compile time, not evaluated here | Out of scope — no state to enter |
 | Omit-on-entry clearing | Applied for initial state | Skipped — no state to enter |
+| Entry actions (`to <State> -> …`) | Run for the initial state, after the initial event's action chain (or against the defaults if none is declared) | Out of scope — no state to enter |
 | Arg ensures (`on <Event> ensure`) | Evaluated at ingress if initial event declared | Evaluated at ingress if initial event declared |
 | Field constraints on the supplied arguments | Evaluated at ingress | Evaluated at ingress |
 | Global rules | Proven at compile time to be established by construction — not evaluated here | Proven at compile time to be established by construction — not evaluated here |
